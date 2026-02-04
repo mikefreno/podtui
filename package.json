@@ -15,7 +15,6 @@
     "lint": "bun run lint.ts"
   },
   "devDependencies": {
-    "@opentui/react": "^0.1.77",
     "@types/bun": "latest",
     "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
