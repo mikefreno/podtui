@@ -10,6 +10,7 @@ import { TrendingShows } from "./TrendingShows"
 
 type DiscoverPageProps = {
   focused: boolean
+  onExit?: () => void
 }
 
 type FocusArea = "categories" | "shows"
@@ -33,6 +34,11 @@ export function DiscoverPage(props: DiscoverPageProps) {
       } else {
         setFocusArea((a) => (a === "categories" ? "shows" : "categories"))
       }
+      return
+    }
+
+    if (key.name === "enter" && area === "categories") {
+      setFocusArea("shows")
       return
     }
 
@@ -94,6 +100,15 @@ export function DiscoverPage(props: DiscoverPageProps) {
         }
         return
       }
+    }
+
+    if (key.name === "escape") {
+      if (area === "shows") {
+        setFocusArea("categories")
+      } else {
+        props.onExit?.()
+      }
+      return
     }
 
     // Refresh with 'r'
@@ -177,6 +192,7 @@ export function DiscoverPage(props: DiscoverPageProps) {
         <text fg="gray">[Tab] Switch focus</text>
         <text fg="gray">[j/k] Navigate</text>
         <text fg="gray">[Enter] Subscribe</text>
+        <text fg="gray">[Esc] Up</text>
         <text fg="gray">[R] Refresh</text>
       </box>
     </box>

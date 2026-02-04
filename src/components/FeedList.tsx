@@ -17,6 +17,7 @@ interface FeedListProps {
   showLastUpdated?: boolean
   onSelectFeed?: (feed: Feed) => void
   onOpenFeed?: (feed: Feed) => void
+  onFocusChange?: (focused: boolean) => void
 }
 
 export function FeedList(props: FeedListProps) {
@@ -26,6 +27,10 @@ export function FeedList(props: FeedListProps) {
   const filteredFeeds = () => feedStore.getFilteredFeeds()
 
   const handleKeyPress = (key: { name: string }) => {
+    if (key.name === "escape") {
+      props.onFocusChange?.(false)
+      return
+    }
     const feeds = filteredFeeds()
 
     if (key.name === "up" || key.name === "k") {
@@ -180,7 +185,7 @@ export function FeedList(props: FeedListProps) {
       {/* Navigation help */}
       <box paddingTop={0}>
         <text fg="gray">
-          j/k navigate | Enter open | p pin | f filter | s sort | Click to select
+          Enter open | Esc up | j/k navigate | p pin | f filter | s sort
         </text>
       </box>
     </box>

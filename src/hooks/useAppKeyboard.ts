@@ -13,6 +13,7 @@ type ShortcutOptions = {
   onTabChange: (tab: TabId) => void
   onAction?: (action: string) => void
   inputFocused?: boolean
+  navigationEnabled?: boolean
 }
 
 export function useAppKeyboard(options: ShortcutOptions) {
@@ -35,8 +36,22 @@ export function useAppKeyboard(options: ShortcutOptions) {
       return
     }
 
+    if (key.name === "escape") {
+      options.onAction?.("escape")
+      return
+    }
+
     // Skip global shortcuts if input is focused (let input handle keys)
     if (options.inputFocused) {
+      return
+    }
+
+    if (options.navigationEnabled === false) {
+      return
+    }
+
+    if (key.name === "enter") {
+      options.onAction?.("enter")
       return
     }
 
@@ -89,8 +104,6 @@ export function useAppKeyboard(options: ShortcutOptions) {
         options.onAction("save")
       } else if (key.ctrl && key.name === "f") {
         options.onAction("find")
-      } else if (key.name === "escape") {
-        options.onAction("escape")
       } else if (key.name === "?" || (key.shift && key.name === "/")) {
         options.onAction("help")
       }

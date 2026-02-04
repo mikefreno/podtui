@@ -13,6 +13,7 @@ type SearchPageProps = {
   focused: boolean
   onSubscribe?: (result: SearchResult) => void
   onInputFocusChange?: (focused: boolean) => void
+  onExit?: () => void
 }
 
 type FocusArea = "input" | "results" | "history"
@@ -33,6 +34,9 @@ export function SearchPage(props: SearchPageProps) {
         setResultIndex(0)
         props.onInputFocusChange?.(false)
       }
+    }
+    if (props.focused && focusArea() === "input") {
+      props.onInputFocusChange?.(true)
     }
   }
 
@@ -144,10 +148,14 @@ export function SearchPage(props: SearchPageProps) {
       }
     }
 
-    // Escape goes back to input
+    // Escape goes back to input or up one level
     if (key.name === "escape") {
-      setFocusArea("input")
-      props.onInputFocusChange?.(true)
+      if (area === "input") {
+        props.onExit?.()
+      } else {
+        setFocusArea("input")
+        props.onInputFocusChange?.(true)
+      }
       return
     }
 
@@ -261,7 +269,7 @@ export function SearchPage(props: SearchPageProps) {
         <text fg="gray">[Tab] Switch focus</text>
         <text fg="gray">[/] Focus search</text>
         <text fg="gray">[Enter] Select</text>
-        <text fg="gray">[Esc] Back to search</text>
+        <text fg="gray">[Esc] Up</text>
       </box>
     </box>
   )

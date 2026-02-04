@@ -13,6 +13,7 @@ import { Player } from "./components/Player";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { useAuthStore } from "./stores/auth";
 import { useFeedStore } from "./stores/feed";
+import { useAppStore } from "./stores/app";
 import { FeedVisibility } from "./types/feed";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import type { TabId } from "./components/Tab";
@@ -23,8 +24,10 @@ export function App() {
   const [authScreen, setAuthScreen] = createSignal<AuthScreen>("login");
   const [showAuthPanel, setShowAuthPanel] = createSignal(false);
   const [inputFocused, setInputFocused] = createSignal(false);
+  const [layerDepth, setLayerDepth] = createSignal(0);
   const auth = useAuthStore();
   const feedStore = useFeedStore();
+  const appStore = useAppStore();
 
   // Centralized keyboard handler for all tab navigation and shortcuts
   useAppKeyboard({
@@ -33,10 +36,20 @@ export function App() {
     },
     onTabChange: setActiveTab,
     inputFocused: inputFocused(),
+    navigationEnabled: layerDepth() === 0,
     onAction: (action) => {
       if (action === "escape") {
-        setShowAuthPanel(false);
-        setInputFocused(false);
+        if (layerDepth() > 0) {
+          setLayerDepth(0);
+          setInputFocused(false);
+        } else {
+          setShowAuthPanel(false);
+          setInputFocused(false);
+        }
+      }
+
+      if (action === "enter" && layerDepth() === 0) {
+        setLayerDepth(1);
       }
     },
   });
@@ -48,9 +61,10 @@ export function App() {
       case "feeds":
         return (
           <FeedList
-            focused={true}
+            focused={layerDepth() > 0}
             showEpisodeCount={true}
             showLastUpdated={true}
+            onFocusChange={() => setLayerDepth(0)}
             onOpenFeed={(feed) => {
               // Would open feed detail view
             }}
@@ -63,7 +77,7 @@ export function App() {
           if (auth.isAuthenticated) {
             return (
               <SyncProfile
-                focused={true}
+                focused={layerDepth() > 0}
                 onLogout={() => {
                   auth.logout();
                   setShowAuthPanel(false);
@@ -77,14 +91,14 @@ export function App() {
             case "code":
               return (
                 <CodeValidation
-                  focused={true}
+                  focused={layerDepth() > 0}
                   onBack={() => setAuthScreen("login")}
                 />
               );
             case "oauth":
               return (
                 <OAuthPlaceholder
-                  focused={true}
+                  focused={layerDepth() > 0}
                   onBack={() => setAuthScreen("login")}
                   onNavigateToCode={() => setAuthScreen("code")}
                 />
@@ -93,7 +107,7 @@ export function App() {
             default:
               return (
                 <LoginScreen
-                  focused={true}
+                  focused={layerDepth() > 0}
                   onNavigateToCode={() => setAuthScreen("code")}
                   onNavigateToOAuth={() => setAuthScreen("oauth")}
                 />
@@ -110,17 +124,24 @@ export function App() {
                 : "Not signed in"
             }
             accountStatus={auth.isAuthenticated ? "signed-in" : "signed-out"}
+            onExit={() => setLayerDepth(0)}
           />
         );
 
       case "discover":
-        return <DiscoverPage focused={!inputFocused()} />;
+        return (
+          <DiscoverPage
+            focused={layerDepth() > 0}
+            onExit={() => setLayerDepth(0)}
+          />
+        );
 
       case "search":
         return (
           <SearchPage
-            focused={!inputFocused()}
+            focused={layerDepth() > 0}
             onInputFocusChange={setInputFocused}
+            onExit={() => setLayerDepth(0)}
             onSubscribe={(result) => {
               const feeds = feedStore.feeds();
               const alreadySubscribed = feeds.some(
@@ -141,7 +162,9 @@ export function App() {
         );
 
       case "player":
-        return <Player focused={!inputFocused()} />;
+        return (
+          <Player focused={layerDepth() > 0} onExit={() => setLayerDepth(0)} />
+        );
 
       default:
         return (
@@ -158,6 +181,7 @@ export function App() {
 
   return (
     <Layout
+      theme={appStore.resolveTheme()}
       header={
         <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
       }
