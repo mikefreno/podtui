@@ -117,7 +117,6 @@ const buildItunesUrl = (query: string, source: PodcastSource) => {
   params.set("term", query.trim())
   params.set("media", "podcast")
   params.set("entity", "podcast")
-  params.set("limit", String(source.searchLimit ?? 25))
   params.set("country", source.country ?? "US")
   params.set("lang", source.language ?? "en_us")
   params.set("explicit", source.allowExplicit === false ? "No" : "Yes")

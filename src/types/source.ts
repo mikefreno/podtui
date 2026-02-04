@@ -34,8 +34,6 @@ export interface PodcastSource {
   country?: string
   /** Default language for search results */
   language?: string
-  /** Default results limit */
-  searchLimit?: number
   /** Include explicit results */
   allowExplicit?: boolean
   /** Rate limit (requests per minute) */
@@ -105,7 +103,6 @@ export const DEFAULT_SOURCES: PodcastSource[] = [
     description: "Search the Apple Podcasts directory",
     country: "US",
     language: "en_us",
-    searchLimit: 25,
     allowExplicit: true,
   },
   {

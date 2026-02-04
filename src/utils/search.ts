@@ -12,6 +12,26 @@ type SearchOptions = {
 }
 
 const searchCache = new Map<string, SearchCacheEntry>()
+const rateLimitState = new Map<string, number[]>()
+const RATE_LIMIT_WINDOW_MS = 60000
+const RATE_LIMIT_MAX_CALLS = 20
+
+const throttleSource = async (sourceId: string) => {
+  const now = Date.now()
+  const windowStart = now - RATE_LIMIT_WINDOW_MS
+  const timestamps = rateLimitState.get(sourceId)?.filter((ts) => ts > windowStart) ?? []
+
+  if (timestamps.length >= RATE_LIMIT_MAX_CALLS) {
+    const waitMs = timestamps[0] + RATE_LIMIT_WINDOW_MS - now
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+    }
+  }
+
+  const updated = rateLimitState.get(sourceId)?.filter((ts) => ts > windowStart) ?? []
+  updated.push(Date.now())
+  rateLimitState.set(sourceId, updated)
+}
 
 const buildCacheKey = (query: string, sourceIds: string[]) => {
   const keySources = [...sourceIds].sort().join(",")
@@ -61,6 +81,7 @@ export const searchPodcasts = async (
   await Promise.all(
     activeSources.map(async (source) => {
       try {
+        await throttleSource(source.id)
         const sourceResults = await searchSourceByType(trimmed, source)
         results.push(...sourceResults)
       } catch (error) {
@@ -80,12 +101,56 @@ export const searchPodcasts = async (
   return sorted
 }
 
+type ItunesEpisodeResult = {
+  trackId?: number
+  trackName?: string
+  description?: string
+  shortDescription?: string
+  releaseDate?: string
+  trackTimeMillis?: number
+  episodeUrl?: string
+  previewUrl?: string
+  trackViewUrl?: string
+}
+
+type ItunesEpisodeResponse = {
+  resultCount: number
+  results: ItunesEpisodeResult[]
+}
+
 export const searchEpisodes = async (
   query: string,
-  _feedId: string
+  feedId: string
 ): Promise<Episode[]> => {
   const trimmed = query.trim()
   if (!trimmed) return []
-  await new Promise((resolve) => setTimeout(resolve, 200))
-  return []
+
+  const url = new URL("https://itunes.apple.com/search")
+  url.searchParams.set("term", trimmed)
+  url.searchParams.set("media", "podcast")
+  url.searchParams.set("entity", "podcastEpisode")
+  url.searchParams.set("country", "US")
+  url.searchParams.set("lang", "en_us")
+
+  const response = await fetch(url.toString())
+  if (!response.ok) return []
+
+  const data = (await response.json()) as ItunesEpisodeResponse
+  return data.results
+    .map((item) => {
+      if (!item.trackName) return null
+      const id = item.trackId ? `episode-${item.trackId}` : `episode-${item.trackName}`
+      const audioUrl = item.episodeUrl || item.previewUrl || item.trackViewUrl || ""
+
+      return {
+        id,
+        podcastId: feedId,
+        title: item.trackName,
+        description: item.description || item.shortDescription || "",
+        audioUrl,
+        duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 0,
+        pubDate: item.releaseDate ? new Date(item.releaseDate) : new Date(),
+      }
+    })
+    .filter((item): item is Episode => Boolean(item))
 }

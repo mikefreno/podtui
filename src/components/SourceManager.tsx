@@ -5,14 +5,15 @@
 
 import { createSignal, For } from "solid-js"
 import { useFeedStore } from "../stores/feed"
-import type { PodcastSource, SourceType } from "../types/source"
+import { SourceType } from "../types/source"
+import type { PodcastSource } from "../types/source"
 
 interface SourceManagerProps {
   focused?: boolean
   onClose?: () => void
 }
 
-type FocusArea = "list" | "add" | "url"
+type FocusArea = "list" | "add" | "url" | "country" | "explicit" | "language"
 
 export function SourceManager(props: SourceManagerProps) {
   const feedStore = useFeedStore()
@@ -36,7 +37,14 @@ export function SourceManager(props: SourceManagerProps) {
     }
 
     if (key.name === "tab") {
-      const areas: FocusArea[] = ["list", "add", "url"]
+      const areas: FocusArea[] = [
+        "list",
+        "country",
+        "language",
+        "explicit",
+        "add",
+        "url",
+      ]
       const idx = areas.indexOf(focusArea())
       const nextIdx = key.shift
         ? (idx - 1 + areas.length) % areas.length
@@ -65,6 +73,35 @@ export function SourceManager(props: SourceManagerProps) {
         }
       } else if (key.name === "a") {
         setFocusArea("add")
+      }
+    }
+
+    if (focusArea() === "country") {
+      if (key.name === "enter" || key.name === "return" || key.name === "space") {
+        const source = sources()[selectedIndex()]
+        if (source && source.type === SourceType.API) {
+          const next = source.country === "US" ? "GB" : "US"
+          feedStore.updateSource(source.id, { country: next })
+        }
+      }
+    }
+
+    if (focusArea() === "explicit") {
+      if (key.name === "enter" || key.name === "return" || key.name === "space") {
+        const source = sources()[selectedIndex()]
+        if (source && source.type === SourceType.API) {
+          feedStore.updateSource(source.id, { allowExplicit: !source.allowExplicit })
+        }
+      }
+    }
+
+    if (focusArea() === "language") {
+      if (key.name === "enter" || key.name === "return" || key.name === "space") {
+        const source = sources()[selectedIndex()]
+        if (source && source.type === SourceType.API) {
+          const next = source.language === "ja_jp" ? "en_us" : "ja_jp"
+          feedStore.updateSource(source.id, { language: next })
+        }
       }
     }
   }
@@ -100,10 +137,16 @@ export function SourceManager(props: SourceManagerProps) {
   }
 
   const getSourceIcon = (source: PodcastSource) => {
-    if (source.type === "api") return "[API]"
-    if (source.type === "rss") return "[RSS]"
+    if (source.type === SourceType.API) return "[API]"
+    if (source.type === SourceType.RSS) return "[RSS]"
     return "[?]"
   }
+
+  const selectedSource = () => sources()[selectedIndex()]
+  const isApiSource = () => selectedSource()?.type === SourceType.API
+  const sourceCountry = () => selectedSource()?.country || "US"
+  const sourceExplicit = () => selectedSource()?.allowExplicit !== false
+  const sourceLanguage = () => selectedSource()?.language || "en_us"
 
   return (
     <box flexDirection="column" border padding={1} gap={1}>
@@ -119,7 +162,7 @@ export function SourceManager(props: SourceManagerProps) {
         <text fg="gray">Manage where to search for podcasts</text>
 
       {/* Source list */}
-      <box border padding={1} flexDirection="column">
+      <box border padding={1} flexDirection="column" gap={1}>
         <text fg={focusArea() === "list" ? "cyan" : "gray"}>Sources:</text>
         <scrollbox height={6}>
           <For each={sources()}>
@@ -166,6 +209,43 @@ export function SourceManager(props: SourceManagerProps) {
           </For>
         </scrollbox>
         <text fg="gray">Space/Enter to toggle, d to delete, a to add</text>
+
+        {/* API settings */}
+        <box flexDirection="column" gap={1}>
+          <text fg={isApiSource() ? "gray" : "yellow"}>
+            {isApiSource() ? "API Settings" : "API Settings (select an API source)"}
+          </text>
+          <box flexDirection="row" gap={2}>
+            <box
+              border
+              padding={0}
+              backgroundColor={focusArea() === "country" ? "#333" : undefined}
+            >
+              <text fg={focusArea() === "country" ? "cyan" : "gray"}>
+                Country: {sourceCountry()}
+              </text>
+            </box>
+            <box
+              border
+              padding={0}
+              backgroundColor={focusArea() === "language" ? "#333" : undefined}
+            >
+              <text fg={focusArea() === "language" ? "cyan" : "gray"}>
+                Language: {sourceLanguage() === "ja_jp" ? "Japanese" : "English"}
+              </text>
+            </box>
+            <box
+              border
+              padding={0}
+              backgroundColor={focusArea() === "explicit" ? "#333" : undefined}
+            >
+              <text fg={focusArea() === "explicit" ? "cyan" : "gray"}>
+                Explicit: {sourceExplicit() ? "Yes" : "No"}
+              </text>
+            </box>
+          </box>
+          <text fg="gray">Enter/Space to toggle focused setting</text>
+        </box>
       </box>
 
       {/* Add new source form */}

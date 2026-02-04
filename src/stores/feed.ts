@@ -351,6 +351,17 @@ export function createFeedStore() {
     return newSource
   }
 
+  /** Update a source */
+  const updateSource = (sourceId: string, updates: Partial<PodcastSource>) => {
+    setSources((prev) => {
+      const updated = prev.map((source) =>
+        source.id === sourceId ? { ...source, ...updates } : source
+      )
+      saveSources(updated)
+      return updated
+    })
+  }
+
   /** Remove a source */
   const removeSource = (sourceId: string) => {
     // Don't remove default sources
@@ -409,6 +420,7 @@ export function createFeedStore() {
     addSource,
     removeSource,
     toggleSource,
+    updateSource,
   }
 }
 
