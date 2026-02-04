@@ -4,6 +4,7 @@
  */
 
 import { createSignal, For, Show } from "solid-js"
+import { useKeyboard } from "@opentui/solid"
 import type { Feed } from "../types/feed"
 import type { Episode } from "../types/episode"
 import { format } from "date-fns"
@@ -71,6 +72,11 @@ export function FeedDetail(props: FeedDetailProps) {
       setSelectedIndex((i) => Math.min(eps.length - 1, i + 10))
     }
   }
+
+  useKeyboard((key) => {
+    if (!props.focused) return
+    handleKeyPress(key)
+  })
 
   return (
     <box flexDirection="column" gap={1}>

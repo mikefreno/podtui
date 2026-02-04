@@ -2,7 +2,6 @@ import { createSignal } from "solid-js";
 import { Layout } from "./components/Layout";
 import { Navigation } from "./components/Navigation";
 import { TabNavigation } from "./components/TabNavigation";
-import { SyncPanel } from "./components/SyncPanel";
 import { FeedList } from "./components/FeedList";
 import { LoginScreen } from "./components/LoginScreen";
 import { CodeValidation } from "./components/CodeValidation";
@@ -10,6 +9,8 @@ import { OAuthPlaceholder } from "./components/OAuthPlaceholder";
 import { SyncProfile } from "./components/SyncProfile";
 import { SearchPage } from "./components/SearchPage";
 import { DiscoverPage } from "./components/DiscoverPage";
+import { Player } from "./components/Player";
+import { SettingsScreen } from "./components/SettingsScreen";
 import { useAuthStore } from "./stores/auth";
 import { useFeedStore } from "./stores/feed";
 import { FeedVisibility } from "./types/feed";
@@ -101,29 +102,15 @@ export function App() {
         }
 
         return (
-          <box flexDirection="column" gap={1}>
-            <SyncPanel />
-            <box height={1} />
-            <box border padding={1}>
-              <box flexDirection="row" gap={2}>
-                <text fg="gray">Account:</text>
-                {auth.isAuthenticated ? (
-                  <text fg="green">Signed in as {auth.user?.email}</text>
-                ) : (
-                  <text fg="yellow">Not signed in</text>
-                )}
-                <box
-                  border
-                  padding={0}
-                  onMouseDown={() => setShowAuthPanel(true)}
-                >
-                  <text fg="cyan">
-                    {auth.isAuthenticated ? "[A] Account" : "[A] Sign In"}
-                  </text>
-                </box>
-              </box>
-            </box>
-          </box>
+          <SettingsScreen
+            onOpenAccount={() => setShowAuthPanel(true)}
+            accountLabel={
+              auth.isAuthenticated
+                ? `Signed in as ${auth.user?.email}`
+                : "Not signed in"
+            }
+            accountStatus={auth.isAuthenticated ? "signed-in" : "signed-out"}
+          />
         );
 
       case "discover":
@@ -154,13 +141,15 @@ export function App() {
         );
 
       case "player":
+        return <Player focused={!inputFocused()} />;
+
       default:
         return (
           <box border style={{ padding: 2 }}>
             <text>
               <strong>{tab}</strong>
               <br />
-              Player - coming in later phases
+              Coming soon
             </text>
           </box>
         );

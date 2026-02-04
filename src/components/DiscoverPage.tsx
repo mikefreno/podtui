@@ -39,15 +39,17 @@ export function DiscoverPage(props: DiscoverPageProps) {
     // Category navigation
     if (area === "categories") {
       if (key.name === "left" || key.name === "h") {
-        setCategoryIndex((i) => Math.max(0, i - 1))
-        const cat = DISCOVER_CATEGORIES[categoryIndex()]
+        const nextIndex = Math.max(0, categoryIndex() - 1)
+        setCategoryIndex(nextIndex)
+        const cat = DISCOVER_CATEGORIES[nextIndex]
         if (cat) discoverStore.setSelectedCategory(cat.id)
-        setShowIndex(0) // Reset show selection when changing category
+        setShowIndex(0)
         return
       }
       if (key.name === "right" || key.name === "l") {
-        setCategoryIndex((i) => Math.min(DISCOVER_CATEGORIES.length - 1, i + 1))
-        const cat = DISCOVER_CATEGORIES[categoryIndex()]
+        const nextIndex = Math.min(DISCOVER_CATEGORIES.length - 1, categoryIndex() + 1)
+        setCategoryIndex(nextIndex)
+        const cat = DISCOVER_CATEGORIES[nextIndex]
         if (cat) discoverStore.setSelectedCategory(cat.id)
         setShowIndex(0)
         return
@@ -67,10 +69,15 @@ export function DiscoverPage(props: DiscoverPageProps) {
     if (area === "shows") {
       const shows = discoverStore.filteredPodcasts()
       if (key.name === "down" || key.name === "j") {
+        if (shows.length === 0) return
         setShowIndex((i) => Math.min(i + 1, shows.length - 1))
         return
       }
       if (key.name === "up" || key.name === "k") {
+        if (shows.length === 0) {
+          setFocusArea("categories")
+          return
+        }
         const newIndex = showIndex() - 1
         if (newIndex < 0) {
           setFocusArea("categories")

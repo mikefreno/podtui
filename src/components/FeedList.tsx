@@ -4,6 +4,7 @@
  */
 
 import { createSignal, For, Show } from "solid-js"
+import { useKeyboard } from "@opentui/solid"
 import { FeedItem } from "./FeedItem"
 import { useFeedStore } from "../stores/feed"
 import { FeedVisibility, FeedSortField } from "../types/feed"
@@ -64,6 +65,11 @@ export function FeedList(props: FeedListProps) {
       props.onSelectFeed(selectedFeed)
     }
   }
+
+  useKeyboard((key) => {
+    if (!props.focused) return
+    handleKeyPress(key)
+  })
 
   const cycleVisibilityFilter = () => {
     const current = feedStore.filter().visibility
