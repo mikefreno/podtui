@@ -30,6 +30,14 @@ export interface PodcastSource {
   iconUrl?: string
   /** Source description */
   description?: string
+  /** Default country for source searches */
+  country?: string
+  /** Default language for search results */
+  language?: string
+  /** Default results limit */
+  searchLimit?: number
+  /** Include explicit results */
+  allowExplicit?: boolean
   /** Rate limit (requests per minute) */
   rateLimit?: number
   /** Last successful fetch */
@@ -76,6 +84,10 @@ export enum SearchSortField {
 export interface SearchResult {
   /** Source that returned this result */
   sourceId: string
+  /** Source display name */
+  sourceName?: string
+  /** Source type */
+  sourceType?: SourceType
   /** Podcast data */
   podcast: import("./podcast").Podcast
   /** Relevance score (0-1) */
@@ -91,6 +103,10 @@ export const DEFAULT_SOURCES: PodcastSource[] = [
     baseUrl: "https://itunes.apple.com/search",
     enabled: true,
     description: "Search the Apple Podcasts directory",
+    country: "US",
+    language: "en_us",
+    searchLimit: 25,
+    allowExplicit: true,
   },
   {
     id: "rss",

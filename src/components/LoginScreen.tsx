@@ -81,13 +81,7 @@ export function LoginScreen(props: LoginScreenProps) {
   }
 
   return (
-    <box
-      flexDirection="column"
-      border
-      padding={2}
-      gap={1}
-      onKeyPress={props.focused ? handleKeyPress : undefined}
-    >
+    <box flexDirection="column" border padding={2} gap={1}>
       <text>
         <strong>Sign In</strong>
       </text>
@@ -96,11 +90,7 @@ export function LoginScreen(props: LoginScreenProps) {
 
       {/* Email field */}
       <box flexDirection="column" gap={0}>
-        <text>
-          <span fg={focusField() === "email" ? "cyan" : undefined}>
-            Email:
-          </span>
-        </text>
+        <text fg={focusField() === "email" ? "cyan" : undefined}>Email:</text>
         <input
           value={email()}
           onInput={setEmail}
@@ -109,18 +99,14 @@ export function LoginScreen(props: LoginScreenProps) {
           width={30}
         />
         {emailError() && (
-          <text>
-            <span fg="red">{emailError()}</span>
-          </text>
+          <text fg="red">{emailError()}</text>
         )}
       </box>
 
       {/* Password field */}
       <box flexDirection="column" gap={0}>
-        <text>
-          <span fg={focusField() === "password" ? "cyan" : undefined}>
-            Password:
-          </span>
+        <text fg={focusField() === "password" ? "cyan" : undefined}>
+          Password:
         </text>
         <input
           value={password()}
@@ -130,9 +116,7 @@ export function LoginScreen(props: LoginScreenProps) {
           width={30}
         />
         {passwordError() && (
-          <text>
-            <span fg="red">{passwordError()}</span>
-          </text>
+          <text fg="red">{passwordError()}</text>
         )}
       </box>
 
@@ -145,27 +129,21 @@ export function LoginScreen(props: LoginScreenProps) {
           padding={1}
           backgroundColor={focusField() === "submit" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "submit" ? "cyan" : undefined}>
-              {auth.isLoading ? "Signing in..." : "[Enter] Sign In"}
-            </span>
+          <text fg={focusField() === "submit" ? "cyan" : undefined}>
+            {auth.isLoading ? "Signing in..." : "[Enter] Sign In"}
           </text>
         </box>
       </box>
 
       {/* Auth error message */}
       {auth.error && (
-        <text>
-          <span fg="red">{auth.error.message}</span>
-        </text>
+        <text fg="red">{auth.error.message}</text>
       )}
 
       <box height={1} />
 
       {/* Alternative auth options */}
-      <text>
-        <span fg="gray">Or authenticate with:</span>
-      </text>
+      <text fg="gray">Or authenticate with:</text>
 
       <box flexDirection="row" gap={2}>
         <box
@@ -173,10 +151,8 @@ export function LoginScreen(props: LoginScreenProps) {
           padding={1}
           backgroundColor={focusField() === "code" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "code" ? "yellow" : "gray"}>
-              [C] Sync Code
-            </span>
+          <text fg={focusField() === "code" ? "yellow" : "gray"}>
+            [C] Sync Code
           </text>
         </box>
 
@@ -185,19 +161,15 @@ export function LoginScreen(props: LoginScreenProps) {
           padding={1}
           backgroundColor={focusField() === "oauth" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "oauth" ? "yellow" : "gray"}>
-              [O] OAuth Info
-            </span>
+          <text fg={focusField() === "oauth" ? "yellow" : "gray"}>
+            [O] OAuth Info
           </text>
         </box>
       </box>
 
       <box height={1} />
 
-      <text>
-        <span fg="gray">Tab to navigate, Enter to select</span>
-      </text>
+      <text fg="gray">Tab to navigate, Enter to select</text>
     </box>
   )
 }

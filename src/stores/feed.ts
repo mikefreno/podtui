@@ -4,7 +4,8 @@
  */
 
 import { createSignal } from "solid-js"
-import type { Feed, FeedFilter, FeedVisibility, FeedSortField } from "../types/feed"
+import { FeedVisibility } from "../types/feed"
+import type { Feed, FeedFilter, FeedSortField } from "../types/feed"
 import type { Podcast } from "../types/podcast"
 import type { Episode, EpisodeStatus } from "../types/episode"
 import type { PodcastSource, SourceType } from "../types/source"
@@ -287,7 +288,7 @@ export function createFeedStore() {
   }
 
   /** Add a new feed */
-  const addFeed = (podcast: Podcast, sourceId: string, visibility: FeedVisibility = "public") => {
+  const addFeed = (podcast: Podcast, sourceId: string, visibility: FeedVisibility = FeedVisibility.PUBLIC) => {
     const newFeed: Feed = {
       id: crypto.randomUUID(),
       podcast,

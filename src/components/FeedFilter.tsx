@@ -4,7 +4,8 @@
  */
 
 import { createSignal } from "solid-js"
-import type { FeedFilter, FeedVisibility, FeedSortField } from "../types/feed"
+import { FeedVisibility, FeedSortField } from "../types/feed"
+import type { FeedFilter } from "../types/feed"
 
 interface FeedFilterProps {
   filter: FeedFilter
@@ -45,14 +46,19 @@ export function FeedFilterComponent(props: FeedFilterProps) {
   const cycleVisibility = () => {
     const current = props.filter.visibility
     let next: FeedVisibility | "all"
-    if (current === "all") next = "public"
-    else if (current === "public") next = "private"
+    if (current === "all") next = FeedVisibility.PUBLIC
+    else if (current === FeedVisibility.PUBLIC) next = FeedVisibility.PRIVATE
     else next = "all"
     props.onFilterChange({ ...props.filter, visibility: next })
   }
 
   const cycleSort = () => {
-    const sortOptions: FeedSortField[] = ["updated", "title", "episodeCount", "latestEpisode"]
+    const sortOptions: FeedSortField[] = [
+      FeedSortField.UPDATED,
+      FeedSortField.TITLE,
+      FeedSortField.EPISODE_COUNT,
+      FeedSortField.LATEST_EPISODE,
+    ]
     const currentIndex = sortOptions.indexOf(props.filter.sortBy as FeedSortField)
     const nextIndex = (currentIndex + 1) % sortOptions.length
     props.onFilterChange({ ...props.filter, sortBy: sortOptions[nextIndex] })
@@ -100,13 +106,7 @@ export function FeedFilterComponent(props: FeedFilterProps) {
   }
 
   return (
-    <box
-      flexDirection="column"
-      border
-      padding={1}
-      gap={1}
-      onKeyPress={props.focused ? handleKeyPress : undefined}
-    >
+    <box flexDirection="column" border padding={1} gap={1}>
       <text>
         <strong>Filter Feeds</strong>
       </text>
@@ -118,12 +118,10 @@ export function FeedFilterComponent(props: FeedFilterProps) {
           padding={0}
           backgroundColor={focusField() === "visibility" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "visibility" ? "cyan" : "gray"}>
-              Show:{" "}
-            </span>
-            <span fg={visibilityColor()}>{visibilityLabel()}</span>
-          </text>
+          <box flexDirection="row" gap={1}>
+            <text fg={focusField() === "visibility" ? "cyan" : "gray"}>Show:</text>
+            <text fg={visibilityColor()}>{visibilityLabel()}</text>
+          </box>
         </box>
 
         {/* Sort filter */}
@@ -132,10 +130,10 @@ export function FeedFilterComponent(props: FeedFilterProps) {
           padding={0}
           backgroundColor={focusField() === "sort" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "sort" ? "cyan" : "gray"}>Sort: </span>
-            <span fg="white">{sortLabel()}</span>
-          </text>
+          <box flexDirection="row" gap={1}>
+            <text fg={focusField() === "sort" ? "cyan" : "gray"}>Sort:</text>
+            <text fg="white">{sortLabel()}</text>
+          </box>
         </box>
 
         {/* Pinned filter */}
@@ -144,22 +142,18 @@ export function FeedFilterComponent(props: FeedFilterProps) {
           padding={0}
           backgroundColor={focusField() === "pinned" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "pinned" ? "cyan" : "gray"}>
-              Pinned:{" "}
-            </span>
-            <span fg={props.filter.pinnedOnly ? "yellow" : "gray"}>
+          <box flexDirection="row" gap={1}>
+            <text fg={focusField() === "pinned" ? "cyan" : "gray"}>Pinned:</text>
+            <text fg={props.filter.pinnedOnly ? "yellow" : "gray"}>
               {props.filter.pinnedOnly ? "Yes" : "No"}
-            </span>
-          </text>
+            </text>
+          </box>
         </box>
       </box>
 
       {/* Search box */}
       <box flexDirection="row" gap={1}>
-        <text>
-          <span fg={focusField() === "search" ? "cyan" : "gray"}>Search:</span>
-        </text>
+        <text fg={focusField() === "search" ? "cyan" : "gray"}>Search:</text>
         <input
           value={searchValue()}
           onInput={handleSearchInput}
@@ -169,9 +163,7 @@ export function FeedFilterComponent(props: FeedFilterProps) {
         />
       </box>
 
-      <text>
-        <span fg="gray">Tab to navigate, Enter/Space to toggle</span>
-      </text>
+      <text fg="gray">Tab to navigate, Enter/Space to toggle</text>
     </box>
   )
 }

@@ -4,6 +4,8 @@
 
 import { For, Show } from "solid-js"
 import type { SearchResult } from "../types/source"
+import { ResultCard } from "./ResultCard"
+import { ResultDetail } from "./ResultDetail"
 
 type SearchResultsProps = {
   results: SearchResult[]
@@ -11,88 +13,63 @@ type SearchResultsProps = {
   focused: boolean
   onSelect?: (result: SearchResult) => void
   onChange?: (index: number) => void
+  isSearching?: boolean
+  error?: string | null
 }
 
 export function SearchResults(props: SearchResultsProps) {
-  const handleMouseDown = (index: number, result: SearchResult) => {
+  const handleSelect = (index: number) => {
     props.onChange?.(index)
-    props.onSelect?.(result)
   }
 
   return (
-    <Show
-      when={props.results.length > 0}
-      fallback={
-        <box padding={1}>
-          <text>
-            <span fg="gray">No results found. Try a different search term.</span>
-          </text>
-        </box>
-      }
-    >
-      <scrollbox height="100%" showScrollIndicator>
-        <box flexDirection="column">
-          <For each={props.results}>
-            {(result, index) => {
-              const isSelected = () => index() === props.selectedIndex
-              const podcast = result.podcast
-
-              return (
-                <box
-                  flexDirection="column"
-                  padding={1}
-                  backgroundColor={isSelected() ? "#333" : undefined}
-                  onMouseDown={() => handleMouseDown(index(), result)}
-                >
-                  <box flexDirection="row" gap={2}>
-                    <text>
-                      <span fg={isSelected() ? "cyan" : "white"}>
-                        <strong>{podcast.title}</strong>
-                      </span>
-                    </text>
-                    <Show when={podcast.isSubscribed}>
-                      <text>
-                        <span fg="green">[Subscribed]</span>
-                      </text>
-                    </Show>
-                    <text>
-                      <span fg="gray">({result.sourceId})</span>
-                    </text>
-                  </box>
-
-                  <Show when={podcast.author}>
-                    <text>
-                      <span fg="gray">by {podcast.author}</span>
-                    </text>
-                  </Show>
-
-                  <Show when={podcast.description}>
-                    <text>
-                      <span fg={isSelected() ? "white" : "gray"}>
-                        {podcast.description!.length > 100
-                          ? podcast.description!.slice(0, 100) + "..."
-                          : podcast.description}
-                      </span>
-                    </text>
-                  </Show>
-
-                  <Show when={podcast.categories && podcast.categories.length > 0}>
-                    <box flexDirection="row" gap={1}>
-                      <For each={podcast.categories!.slice(0, 3)}>
-                        {(category) => (
-                          <text>
-                            <span fg="yellow">[{category}]</span>
-                          </text>
-                        )}
-                      </For>
-                    </box>
-                  </Show>
+    <Show when={!props.isSearching} fallback={
+      <box padding={1}>
+        <text fg="yellow">Searching...</text>
+      </box>
+    }>
+      <Show
+        when={!props.error}
+        fallback={
+          <box padding={1}>
+            <text fg="red">{props.error}</text>
+          </box>
+        }
+      >
+        <Show
+          when={props.results.length > 0}
+          fallback={
+            <box padding={1}>
+              <text fg="gray">No results found. Try a different search term.</text>
+            </box>
+          }
+        >
+          <box flexDirection="row" gap={1} height="100%">
+            <box flexDirection="column" flexGrow={1}>
+              <scrollbox height="100%">
+                <box flexDirection="column" gap={1}>
+                  <For each={props.results}>
+                    {(result, index) => (
+                      <ResultCard
+                        result={result}
+                        selected={index() === props.selectedIndex}
+                        onSelect={() => handleSelect(index())}
+                        onSubscribe={() => props.onSelect?.(result)}
+                      />
+                    )}
+                  </For>
                 </box>
-              )
-            }}
-          </For>
-        </box>
-      </scrollbox>
+              </scrollbox>
+            </box>
+            <box width={36}>
+              <ResultDetail
+                result={props.results[props.selectedIndex]}
+                onSubscribe={(result) => props.onSelect?.(result)}
+              />
+            </box>
+          </box>
+        </Show>
+      </Show>
     </Show>
   )
 }

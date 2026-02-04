@@ -38,13 +38,7 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
   }
 
   return (
-    <box
-      flexDirection="column"
-      border
-      padding={2}
-      gap={1}
-      onKeyPress={props.focused ? handleKeyPress : undefined}
-    >
+    <box flexDirection="column" border padding={2} gap={1}>
       <text>
         <strong>OAuth Authentication</strong>
       </text>
@@ -52,18 +46,16 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
       <box height={1} />
 
       {/* OAuth providers list */}
-      <text>
-        <span fg="cyan">Available OAuth Providers:</span>
-      </text>
+      <text fg="cyan">Available OAuth Providers:</text>
 
       <box flexDirection="column" gap={0} paddingLeft={2}>
         {OAUTH_PROVIDERS.map((provider) => (
-          <text>
-            <span fg={provider.enabled ? "green" : "gray"}>
+          <box flexDirection="row" gap={1}>
+            <text fg={provider.enabled ? "green" : "gray"}>
               {provider.enabled ? "[+]" : "[-]"} {provider.name}
-            </span>
-            <span fg="gray"> - {provider.description}</span>
-          </text>
+            </text>
+            <text fg="gray">- {provider.description}</text>
+          </box>
         ))}
       </box>
 
@@ -71,39 +63,33 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
 
       {/* Limitation message */}
       <box border padding={1} borderColor="yellow">
-        <text>
-          <span fg="yellow">Terminal Limitations</span>
-        </text>
+        <text fg="yellow">Terminal Limitations</text>
       </box>
 
       <box paddingLeft={1}>
         {OAUTH_LIMITATION_MESSAGE.split("\n").map((line) => (
-          <text>
-            <span fg="gray">{line}</span>
-          </text>
+          <text fg="gray">{line}</text>
         ))}
       </box>
 
       <box height={1} />
 
       {/* Alternative options */}
-      <text>
-        <span fg="cyan">Recommended Alternatives:</span>
-      </text>
+      <text fg="cyan">Recommended Alternatives:</text>
 
       <box flexDirection="column" gap={0} paddingLeft={2}>
-        <text>
-          <span fg="green">[1]</span>
-          <span fg="white"> Use a sync code from the web portal</span>
-        </text>
-        <text>
-          <span fg="green">[2]</span>
-          <span fg="white"> Use email/password authentication</span>
-        </text>
-        <text>
-          <span fg="green">[3]</span>
-          <span fg="white"> Use file-based sync (no account needed)</span>
-        </text>
+        <box flexDirection="row" gap={1}>
+          <text fg="green">[1]</text>
+          <text fg="white">Use a sync code from the web portal</text>
+        </box>
+        <box flexDirection="row" gap={1}>
+          <text fg="green">[2]</text>
+          <text fg="white">Use email/password authentication</text>
+        </box>
+        <box flexDirection="row" gap={1}>
+          <text fg="green">[3]</text>
+          <text fg="white">Use file-based sync (no account needed)</text>
+        </box>
       </box>
 
       <box height={1} />
@@ -115,10 +101,8 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
           padding={1}
           backgroundColor={focusField() === "code" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "code" ? "cyan" : undefined}>
-              [C] Enter Sync Code
-            </span>
+          <text fg={focusField() === "code" ? "cyan" : undefined}>
+            [C] Enter Sync Code
           </text>
         </box>
 
@@ -127,19 +111,15 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
           padding={1}
           backgroundColor={focusField() === "back" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "back" ? "yellow" : "gray"}>
-              [Esc] Back to Login
-            </span>
+          <text fg={focusField() === "back" ? "yellow" : "gray"}>
+            [Esc] Back to Login
           </text>
         </box>
       </box>
 
       <box height={1} />
 
-      <text>
-        <span fg="gray">Tab to navigate, Enter to select, Esc to go back</span>
-      </text>
+      <text fg="gray">Tab to navigate, Enter to select, Esc to go back</text>
     </box>
   )
 }

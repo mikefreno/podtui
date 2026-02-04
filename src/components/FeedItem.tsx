@@ -47,23 +47,15 @@ export function FeedItem(props: FeedItemProps) {
         paddingLeft={1}
         paddingRight={1}
       >
-        <text>
-          <span fg={props.isSelected ? "cyan" : "gray"}>
-            {props.isSelected ? ">" : " "}
-          </span>
+        <text fg={props.isSelected ? "cyan" : "gray"}>
+          {props.isSelected ? ">" : " "}
         </text>
-        <text>
-          <span fg={visibilityColor()}>{visibilityIcon()}</span>
-        </text>
-        <text>
-          <span fg={props.isSelected ? "white" : undefined}>
-            {props.feed.customName || props.feed.podcast.title}
-          </span>
+        <text fg={visibilityColor()}>{visibilityIcon()}</text>
+        <text fg={props.isSelected ? "white" : undefined}>
+          {props.feed.customName || props.feed.podcast.title}
         </text>
         {props.showEpisodeCount && (
-          <text>
-            <span fg="gray">({episodeCount()})</span>
-          </text>
+          <text fg="gray">({episodeCount()})</text>
         )}
       </box>
     )
@@ -81,50 +73,34 @@ export function FeedItem(props: FeedItemProps) {
     >
       {/* Title row */}
       <box flexDirection="row" gap={1}>
-        <text>
-          <span fg={props.isSelected ? "cyan" : "gray"}>
-            {props.isSelected ? ">" : " "}
-          </span>
+        <text fg={props.isSelected ? "cyan" : "gray"}>
+          {props.isSelected ? ">" : " "}
         </text>
-        <text>
-          <span fg={visibilityColor()}>{visibilityIcon()}</span>
-        </text>
-        <text>
-          <span fg="yellow">{pinnedIndicator()}</span>
-        </text>
-        <text>
-          <span fg={props.isSelected ? "white" : undefined}>
-            <strong>{props.feed.customName || props.feed.podcast.title}</strong>
-          </span>
+        <text fg={visibilityColor()}>{visibilityIcon()}</text>
+        <text fg="yellow">{pinnedIndicator()}</text>
+        <text fg={props.isSelected ? "white" : undefined}>
+          <strong>{props.feed.customName || props.feed.podcast.title}</strong>
         </text>
       </box>
 
       {/* Details row */}
       <box flexDirection="row" gap={2} paddingLeft={4}>
         {props.showEpisodeCount && (
-          <text>
-            <span fg="gray">
-              {episodeCount()} episodes ({unplayedCount()} new)
-            </span>
+          <text fg="gray">
+            {episodeCount()} episodes ({unplayedCount()} new)
           </text>
         )}
         {props.showLastUpdated && (
-          <text>
-            <span fg="gray">
-              Updated: {formatDate(props.feed.lastUpdated)}
-            </span>
-          </text>
+          <text fg="gray">Updated: {formatDate(props.feed.lastUpdated)}</text>
         )}
       </box>
 
       {/* Description (truncated) */}
       {props.feed.podcast.description && (
         <box paddingLeft={4} paddingTop={0}>
-          <text>
-            <span fg="gray">
-              {props.feed.podcast.description.slice(0, 60)}
-              {props.feed.podcast.description.length > 60 ? "..." : ""}
-            </span>
+          <text fg="gray">
+            {props.feed.podcast.description.slice(0, 60)}
+            {props.feed.podcast.description.length > 60 ? "..." : ""}
           </text>
         </box>
       )}

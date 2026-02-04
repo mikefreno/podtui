@@ -11,6 +11,8 @@ import { SyncProfile } from "./components/SyncProfile"
 import { SearchPage } from "./components/SearchPage"
 import { DiscoverPage } from "./components/DiscoverPage"
 import { useAuthStore } from "./stores/auth"
+import { useFeedStore } from "./stores/feed"
+import { FeedVisibility } from "./types/feed"
 import { useAppKeyboard } from "./hooks/useAppKeyboard"
 import type { TabId } from "./components/Tab"
 import type { AuthScreen } from "./types/auth"
@@ -21,6 +23,7 @@ export function App() {
   const [showAuthPanel, setShowAuthPanel] = createSignal(false)
   const [inputFocused, setInputFocused] = createSignal(false)
   const auth = useAuthStore()
+  const feedStore = useFeedStore()
 
   // Centralized keyboard handler for all tab navigation and shortcuts
   useAppKeyboard({
@@ -101,27 +104,19 @@ export function App() {
             <box height={1} />
             <box border padding={1}>
               <box flexDirection="row" gap={2}>
-                <text>
-                  <span fg="gray">Account:</span>
-                </text>
+                <text fg="gray">Account:</text>
                 {auth.isAuthenticated ? (
-                  <text>
-                    <span fg="green">Signed in as {auth.user?.email}</span>
-                  </text>
+                  <text fg="green">Signed in as {auth.user?.email}</text>
                 ) : (
-                  <text>
-                    <span fg="yellow">Not signed in</span>
-                  </text>
+                  <text fg="yellow">Not signed in</text>
                 )}
                 <box
                   border
                   padding={0}
                   onMouseDown={() => setShowAuthPanel(true)}
                 >
-                  <text>
-                    <span fg="cyan">
-                      {auth.isAuthenticated ? "[A] Account" : "[A] Sign In"}
-                    </span>
+                  <text fg="cyan">
+                    {auth.isAuthenticated ? "[A] Account" : "[A] Sign In"}
                   </text>
                 </box>
               </box>
@@ -140,8 +135,20 @@ export function App() {
             focused={!inputFocused()}
             onInputFocusChange={setInputFocused}
             onSubscribe={(result) => {
-              // Would add to feeds
-              console.log("Subscribe to:", result.podcast.title)
+              const feeds = feedStore.feeds()
+              const alreadySubscribed = feeds.some(
+                (feed) =>
+                  feed.podcast.id === result.podcast.id ||
+                  feed.podcast.feedUrl === result.podcast.feedUrl
+              )
+
+              if (!alreadySubscribed) {
+                feedStore.addFeed(
+                  { ...result.podcast, isSubscribed: true },
+                  result.sourceId,
+                  FeedVisibility.PUBLIC
+                )
+              }
             }}
           />
         )
@@ -153,7 +160,7 @@ export function App() {
             <text>
               <strong>{tab}</strong>
               <br />
-              <span fg="gray">Player - coming in later phases</span>
+              Player - coming in later phases
             </text>
           </box>
         )

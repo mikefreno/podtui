@@ -59,13 +59,7 @@ export function SyncProfile(props: SyncProfileProps) {
   }
 
   return (
-    <box
-      flexDirection="column"
-      border
-      padding={2}
-      gap={1}
-      onKeyPress={props.focused ? handleKeyPress : undefined}
-    >
+    <box flexDirection="column" border padding={2} gap={1}>
       <text>
         <strong>User Profile</strong>
       </text>
@@ -76,24 +70,14 @@ export function SyncProfile(props: SyncProfileProps) {
       <box flexDirection="row" gap={2}>
         {/* ASCII avatar */}
         <box border padding={1} width={8} height={4} justifyContent="center" alignItems="center">
-          <text>
-            <span fg="cyan">{userInitials()}</span>
-          </text>
+          <text fg="cyan">{userInitials()}</text>
         </box>
 
         {/* User details */}
         <box flexDirection="column" gap={0}>
-          <text>
-            <span fg="white">{user()?.name || "Guest User"}</span>
-          </text>
-          <text>
-            <span fg="gray">{user()?.email || "No email"}</span>
-          </text>
-          <text>
-            <span fg="gray">
-              Joined: {formatDate(user()?.createdAt)}
-            </span>
-          </text>
+          <text fg="white">{user()?.name || "Guest User"}</text>
+          <text fg="gray">{user()?.email || "No email"}</text>
+          <text fg="gray">Joined: {formatDate(user()?.createdAt)}</text>
         </box>
       </box>
 
@@ -101,37 +85,23 @@ export function SyncProfile(props: SyncProfileProps) {
 
       {/* Sync status section */}
       <box border padding={1} flexDirection="column" gap={0}>
-        <text>
-          <span fg="cyan">Sync Status</span>
-        </text>
+        <text fg="cyan">Sync Status</text>
 
         <box flexDirection="row" gap={1}>
-          <text>
-            <span fg="gray">Status:</span>
-          </text>
-          <text>
-            <span fg={user()?.syncEnabled ? "green" : "yellow"}>
-              {user()?.syncEnabled ? "Enabled" : "Disabled"}
-            </span>
+          <text fg="gray">Status:</text>
+          <text fg={user()?.syncEnabled ? "green" : "yellow"}>
+            {user()?.syncEnabled ? "Enabled" : "Disabled"}
           </text>
         </box>
 
         <box flexDirection="row" gap={1}>
-          <text>
-            <span fg="gray">Last Sync:</span>
-          </text>
-          <text>
-            <span fg="white">{formatDate(lastSyncTime())}</span>
-          </text>
+          <text fg="gray">Last Sync:</text>
+          <text fg="white">{formatDate(lastSyncTime())}</text>
         </box>
 
         <box flexDirection="row" gap={1}>
-          <text>
-            <span fg="gray">Method:</span>
-          </text>
-          <text>
-            <span fg="white">File-based (JSON/XML)</span>
-          </text>
+          <text fg="gray">Method:</text>
+          <text fg="white">File-based (JSON/XML)</text>
         </box>
       </box>
 
@@ -144,10 +114,8 @@ export function SyncProfile(props: SyncProfileProps) {
           padding={1}
           backgroundColor={focusField() === "sync" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "sync" ? "cyan" : undefined}>
-              [S] Manage Sync
-            </span>
+          <text fg={focusField() === "sync" ? "cyan" : undefined}>
+            [S] Manage Sync
           </text>
         </box>
 
@@ -156,10 +124,8 @@ export function SyncProfile(props: SyncProfileProps) {
           padding={1}
           backgroundColor={focusField() === "export" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "export" ? "cyan" : undefined}>
-              [E] Export Data
-            </span>
+          <text fg={focusField() === "export" ? "cyan" : undefined}>
+            [E] Export Data
           </text>
         </box>
 
@@ -168,19 +134,15 @@ export function SyncProfile(props: SyncProfileProps) {
           padding={1}
           backgroundColor={focusField() === "logout" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "logout" ? "red" : "gray"}>
-              [L] Logout
-            </span>
+          <text fg={focusField() === "logout" ? "red" : "gray"}>
+            [L] Logout
           </text>
         </box>
       </box>
 
       <box height={1} />
 
-      <text>
-        <span fg="gray">Tab to navigate, Enter to select</span>
-      </text>
+      <text fg="gray">Tab to navigate, Enter to select</text>
     </box>
   )
 }

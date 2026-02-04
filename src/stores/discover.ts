@@ -35,7 +35,7 @@ const TRENDING_PODCASTS: Podcast[] = [
     feedUrl: "https://example.com/aitoday.rss",
     author: "Tech Futures",
     categories: ["Technology", "Science"],
-    imageUrl: undefined,
+    coverUrl: undefined,
     lastUpdated: new Date(),
     isSubscribed: false,
   },

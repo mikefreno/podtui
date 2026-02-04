@@ -20,22 +20,18 @@ export function TrendingShows(props: TrendingShowsProps) {
     <box flexDirection="column" height="100%">
       <Show when={props.isLoading}>
         <box padding={2}>
-          <text>
-            <span fg="yellow">Loading trending shows...</span>
-          </text>
+          <text fg="yellow">Loading trending shows...</text>
         </box>
       </Show>
 
       <Show when={!props.isLoading && props.podcasts.length === 0}>
         <box padding={2}>
-          <text>
-            <span fg="gray">No podcasts found in this category.</span>
-          </text>
+          <text fg="gray">No podcasts found in this category.</text>
         </box>
       </Show>
 
       <Show when={!props.isLoading && props.podcasts.length > 0}>
-        <scrollbox height="100%" showScrollIndicator>
+        <scrollbox height="100%">
           <box flexDirection="column">
             <For each={props.podcasts}>
               {(podcast, index) => (

@@ -28,10 +28,8 @@ export function CategoryFilter(props: CategoryFilterProps) {
               backgroundColor={isSelected() ? "#444" : undefined}
               onMouseDown={() => props.onSelect?.(category.id)}
             >
-              <text>
-                <span fg={isSelected() ? "cyan" : "gray"}>
-                  {category.icon} {category.name}
-                </span>
+              <text fg={isSelected() ? "cyan" : "gray"}>
+                {category.icon} {category.name}
               </text>
             </box>
           )

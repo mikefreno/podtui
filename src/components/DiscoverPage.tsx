@@ -116,19 +116,15 @@ export function DiscoverPage(props: DiscoverPageProps) {
     <box flexDirection="column" height="100%" gap={1}>
       {/* Header */}
       <box flexDirection="row" justifyContent="space-between" alignItems="center">
-        <text>
-          <strong>Discover Podcasts</strong>
-        </text>
-        <box flexDirection="row" gap={2}>
           <text>
-            <span fg="gray">
-              {discoverStore.filteredPodcasts().length} shows
-            </span>
+            <strong>Discover Podcasts</strong>
+          </text>
+        <box flexDirection="row" gap={2}>
+          <text fg="gray">
+            {discoverStore.filteredPodcasts().length} shows
           </text>
           <box onMouseDown={() => discoverStore.refresh()}>
-            <text>
-              <span fg="cyan">[R] Refresh</span>
-            </text>
+            <text fg="cyan">[R] Refresh</text>
           </box>
         </box>
       </box>
@@ -136,10 +132,8 @@ export function DiscoverPage(props: DiscoverPageProps) {
       {/* Category Filter */}
       <box border padding={1}>
         <box flexDirection="column" gap={1}>
-          <text>
-            <span fg={focusArea() === "categories" ? "cyan" : "gray"}>
-              Categories:
-            </span>
+          <text fg={focusArea() === "categories" ? "cyan" : "gray"}>
+            Categories:
           </text>
           <CategoryFilter
             categories={discoverStore.categories}
@@ -152,17 +146,15 @@ export function DiscoverPage(props: DiscoverPageProps) {
 
       {/* Trending Shows */}
       <box flexDirection="column" flexGrow={1} border>
-        <box padding={1} borderBottom>
-          <text>
-            <span fg={focusArea() === "shows" ? "cyan" : "gray"}>
+          <box padding={1}>
+            <text fg={focusArea() === "shows" ? "cyan" : "gray"}>
               Trending in {
                 DISCOVER_CATEGORIES.find(
                   (c) => c.id === discoverStore.selectedCategory()
                 )?.name ?? "All"
               }
-            </span>
-          </text>
-        </box>
+            </text>
+          </box>
         <TrendingShows
           podcasts={discoverStore.filteredPodcasts()}
           selectedIndex={showIndex()}
@@ -175,18 +167,10 @@ export function DiscoverPage(props: DiscoverPageProps) {
 
       {/* Footer Hints */}
       <box flexDirection="row" gap={2}>
-        <text>
-          <span fg="gray">[Tab] Switch focus</span>
-        </text>
-        <text>
-          <span fg="gray">[j/k] Navigate</span>
-        </text>
-        <text>
-          <span fg="gray">[Enter] Subscribe</span>
-        </text>
-        <text>
-          <span fg="gray">[R] Refresh</span>
-        </text>
+        <text fg="gray">[Tab] Switch focus</text>
+        <text fg="gray">[j/k] Navigate</text>
+        <text fg="gray">[Enter] Subscribe</text>
+        <text fg="gray">[R] Refresh</text>
       </box>
     </box>
   )

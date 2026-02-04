@@ -96,47 +96,27 @@ export function CodeValidation(props: CodeValidationProps) {
   }
 
   return (
-    <box
-      flexDirection="column"
-      border
-      padding={2}
-      gap={1}
-      onKeyPress={props.focused ? handleKeyPress : undefined}
-    >
+    <box flexDirection="column" border padding={2} gap={1}>
       <text>
         <strong>Enter Sync Code</strong>
       </text>
 
       <box height={1} />
 
-      <text>
-        <span fg="gray">
-          Enter your 8-character sync code to link your account.
-        </span>
-      </text>
-      <text>
-        <span fg="gray">
-          You can get this code from the web portal.
-        </span>
-      </text>
+      <text fg="gray">Enter your 8-character sync code to link your account.</text>
+      <text fg="gray">You can get this code from the web portal.</text>
 
       <box height={1} />
 
       {/* Code display */}
       <box flexDirection="column" gap={0}>
-        <text>
-          <span fg={focusField() === "code" ? "cyan" : undefined}>
-            Code ({codeProgress()}):
-          </span>
+        <text fg={focusField() === "code" ? "cyan" : undefined}>
+          Code ({codeProgress()}):
         </text>
 
         <box border padding={1}>
-          <text>
-            <span
-              fg={code().length === AUTH_CONFIG.codeValidation.codeLength ? "green" : "yellow"}
-            >
-              {codeDisplay()}
-            </span>
+          <text fg={code().length === AUTH_CONFIG.codeValidation.codeLength ? "green" : "yellow"}>
+            {codeDisplay()}
           </text>
         </box>
 
@@ -150,9 +130,7 @@ export function CodeValidation(props: CodeValidationProps) {
         />
 
         {codeError() && (
-          <text>
-            <span fg="red">{codeError()}</span>
-          </text>
+          <text fg="red">{codeError()}</text>
         )}
       </box>
 
@@ -165,10 +143,8 @@ export function CodeValidation(props: CodeValidationProps) {
           padding={1}
           backgroundColor={focusField() === "submit" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "submit" ? "cyan" : undefined}>
-              {auth.isLoading ? "Validating..." : "[Enter] Validate Code"}
-            </span>
+          <text fg={focusField() === "submit" ? "cyan" : undefined}>
+            {auth.isLoading ? "Validating..." : "[Enter] Validate Code"}
           </text>
         </box>
 
@@ -177,26 +153,20 @@ export function CodeValidation(props: CodeValidationProps) {
           padding={1}
           backgroundColor={focusField() === "back" ? "#333" : undefined}
         >
-          <text>
-            <span fg={focusField() === "back" ? "yellow" : "gray"}>
-              [Esc] Back to Login
-            </span>
+          <text fg={focusField() === "back" ? "yellow" : "gray"}>
+            [Esc] Back to Login
           </text>
         </box>
       </box>
 
       {/* Auth error message */}
       {auth.error && (
-        <text>
-          <span fg="red">{auth.error.message}</span>
-        </text>
+        <text fg="red">{auth.error.message}</text>
       )}
 
       <box height={1} />
 
-      <text>
-        <span fg="gray">Tab to navigate, Enter to select, Esc to go back</span>
-      </text>
+      <text fg="gray">Tab to navigate, Enter to select, Esc to go back</text>
     </box>
   )
 }

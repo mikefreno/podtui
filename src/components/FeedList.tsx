@@ -6,7 +6,8 @@
 import { createSignal, For, Show } from "solid-js"
 import { FeedItem } from "./FeedItem"
 import { useFeedStore } from "../stores/feed"
-import type { Feed, FeedFilter, FeedVisibility, FeedSortField } from "../types/feed"
+import { FeedVisibility, FeedSortField } from "../types/feed"
+import type { Feed } from "../types/feed"
 
 interface FeedListProps {
   focused?: boolean
@@ -67,14 +68,19 @@ export function FeedList(props: FeedListProps) {
   const cycleVisibilityFilter = () => {
     const current = feedStore.filter().visibility
     let next: FeedVisibility | "all"
-    if (current === "all") next = "public"
-    else if (current === "public") next = "private"
+    if (current === "all") next = FeedVisibility.PUBLIC
+    else if (current === FeedVisibility.PUBLIC) next = FeedVisibility.PRIVATE
     else next = "all"
     feedStore.setFilter({ ...feedStore.filter(), visibility: next })
   }
 
   const cycleSortField = () => {
-    const sortOptions: FeedSortField[] = ["updated", "title", "episodeCount", "latestEpisode"]
+    const sortOptions: FeedSortField[] = [
+      FeedSortField.UPDATED,
+      FeedSortField.TITLE,
+      FeedSortField.EPISODE_COUNT,
+      FeedSortField.LATEST_EPISODE,
+    ]
     const current = feedStore.filter().sortBy as FeedSortField
     const idx = sortOptions.indexOf(current)
     const next = sortOptions[(idx + 1) % sortOptions.length]
@@ -112,35 +118,27 @@ export function FeedList(props: FeedListProps) {
   }
 
   return (
-    <box
-      flexDirection="column"
-      gap={1}
-      onKeyPress={props.focused ? handleKeyPress : undefined}
-    >
+      <box flexDirection="column" gap={1}>
       {/* Header with filter controls */}
       <box flexDirection="row" justifyContent="space-between" paddingBottom={0}>
         <text>
           <strong>My Feeds</strong>
-          <span fg="gray"> ({filteredFeeds().length} feeds)</span>
         </text>
+        <text fg="gray">({filteredFeeds().length} feeds)</text>
         <box flexDirection="row" gap={1}>
           <box
             border
             padding={0}
             onMouseDown={cycleVisibilityFilter}
           >
-            <text>
-              <span fg="cyan">[f] {visibilityLabel()}</span>
-            </text>
+            <text fg="cyan">[f] {visibilityLabel()}</text>
           </box>
           <box
             border
             padding={0}
             onMouseDown={cycleSortField}
           >
-            <text>
-              <span fg="cyan">[s] {sortLabel()}</span>
-            </text>
+            <text fg="cyan">[s] {sortLabel()}</text>
           </box>
         </box>
       </box>
@@ -150,25 +148,16 @@ export function FeedList(props: FeedListProps) {
         when={filteredFeeds().length > 0}
         fallback={
           <box border padding={2}>
-            <text>
-              <span fg="gray">
-                No feeds found. Add podcasts from the Discover or Search tabs.
-              </span>
+            <text fg="gray">
+              No feeds found. Add podcasts from the Discover or Search tabs.
             </text>
           </box>
         }
       >
-        <scrollbox
-          height={15}
-          focused={props.focused}
-          selectedIndex={selectedIndex()}
-        >
+        <scrollbox height={15} focused={props.focused}>
           <For each={filteredFeeds()}>
             {(feed, index) => (
-              <box
-                onMouseDown={() => handleFeedClick(feed, index())}
-                onDoubleClick={() => handleFeedDoubleClick(feed)}
-              >
+              <box onMouseDown={() => handleFeedClick(feed, index())}>
                 <FeedItem
                   feed={feed}
                   isSelected={index() === selectedIndex()}
@@ -184,10 +173,8 @@ export function FeedList(props: FeedListProps) {
 
       {/* Navigation help */}
       <box paddingTop={0}>
-        <text>
-          <span fg="gray">
-            j/k navigate | Enter open | p pin | f filter | s sort | Click to select
-          </span>
+        <text fg="gray">
+          j/k navigate | Enter open | p pin | f filter | s sort | Click to select
         </text>
       </box>
     </box>

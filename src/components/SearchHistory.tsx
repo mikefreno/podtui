@@ -20,22 +20,17 @@ export function SearchHistory(props: SearchHistoryProps) {
     props.onSelect?.(query)
   }
 
-  const handleRemoveClick = (e: MouseEvent, query: string) => {
-    e.stopPropagation?.()
+  const handleRemoveClick = (query: string) => {
     props.onRemove?.(query)
   }
 
   return (
     <box flexDirection="column" gap={1}>
       <box flexDirection="row" justifyContent="space-between">
-        <text>
-          <span fg="gray">Recent Searches</span>
-        </text>
+        <text fg="gray">Recent Searches</text>
         <Show when={props.history.length > 0}>
           <box onMouseDown={() => props.onClear?.()} padding={0}>
-            <text>
-              <span fg="red">[Clear All]</span>
-            </text>
+            <text fg="red">[Clear All]</text>
           </box>
         </Show>
       </box>
@@ -44,13 +39,11 @@ export function SearchHistory(props: SearchHistoryProps) {
         when={props.history.length > 0}
         fallback={
           <box padding={1}>
-            <text>
-              <span fg="gray">No recent searches</span>
-            </text>
+            <text fg="gray">No recent searches</text>
           </box>
         }
       >
-        <scrollbox height={10} showScrollIndicator>
+        <scrollbox height={10}>
           <box flexDirection="column">
             <For each={props.history}>
               {(query, index) => {
@@ -67,20 +60,11 @@ export function SearchHistory(props: SearchHistoryProps) {
                     onMouseDown={() => handleSearchClick(index(), query)}
                   >
                     <box flexDirection="row" gap={1}>
-                      <text>
-                        <span fg="gray">{">"}</span>
-                      </text>
-                      <text>
-                        <span fg={isSelected() ? "cyan" : "white"}>{query}</span>
-                      </text>
+                      <text fg="gray">{">"}</text>
+                      <text fg={isSelected() ? "cyan" : "white"}>{query}</text>
                     </box>
-                    <box
-                      onMouseDown={(e: MouseEvent) => handleRemoveClick(e, query)}
-                      padding={0}
-                    >
-                      <text>
-                        <span fg="red">[x]</span>
-                      </text>
+                    <box onMouseDown={() => handleRemoveClick(query)} padding={0}>
+                      <text fg="red">[x]</text>
                     </box>
                   </box>
                 )

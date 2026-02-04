@@ -47,6 +47,7 @@ export function SearchPage(props: SearchPageProps) {
 
   const handleResultSelect = (result: SearchResult) => {
     props.onSubscribe?.(result)
+    searchStore.markSubscribed(result.podcast.id)
   }
 
   // Keyboard navigation
@@ -162,23 +163,24 @@ export function SearchPage(props: SearchPageProps) {
     <box flexDirection="column" height="100%" gap={1}>
       {/* Search Header */}
       <box flexDirection="column" gap={1}>
-        <text>
-          <strong>Search Podcasts</strong>
-        </text>
+          <text>
+            <strong>Search Podcasts</strong>
+          </text>
 
         {/* Search Input */}
         <box flexDirection="row" gap={1} alignItems="center">
-          <text>
-            <span fg="gray">Search:</span>
-          </text>
+          <text fg="gray">Search:</text>
           <input
             value={inputValue()}
-            onInput={setInputValue}
+            onInput={(value) => {
+              setInputValue(value)
+              if (props.focused && focusArea() === "input") {
+                props.onInputFocusChange?.(true)
+              }
+            }}
             placeholder="Enter podcast name, topic, or author..."
             focused={props.focused && focusArea() === "input"}
             width={50}
-            onFocus={() => props.onInputFocusChange?.(true)}
-            onBlur={() => props.onInputFocusChange?.(false)}
           />
           <box
             border
@@ -187,22 +189,16 @@ export function SearchPage(props: SearchPageProps) {
             paddingRight={1}
             onMouseDown={handleSearch}
           >
-            <text>
-              <span fg="cyan">[Enter] Search</span>
-            </text>
+            <text fg="cyan">[Enter] Search</text>
           </box>
         </box>
 
         {/* Status */}
         <Show when={searchStore.isSearching()}>
-          <text>
-            <span fg="yellow">Searching...</span>
-          </text>
+          <text fg="yellow">Searching...</text>
         </Show>
         <Show when={searchStore.error()}>
-          <text>
-            <span fg="red">{searchStore.error()}</span>
-          </text>
+          <text fg="red">{searchStore.error()}</text>
         </Show>
       </box>
 
@@ -210,23 +206,19 @@ export function SearchPage(props: SearchPageProps) {
       <box flexDirection="row" height="100%" gap={2}>
         {/* Results Panel */}
         <box flexDirection="column" flexGrow={1} border>
-          <box padding={1} borderBottom>
-            <text>
-              <span fg={focusArea() === "results" ? "cyan" : "gray"}>
-                Results ({searchStore.results().length})
-              </span>
+          <box padding={1}>
+            <text fg={focusArea() === "results" ? "cyan" : "gray"}>
+              Results ({searchStore.results().length})
             </text>
           </box>
           <Show
             when={searchStore.results().length > 0}
             fallback={
               <box padding={2}>
-                <text>
-                  <span fg="gray">
-                    {searchStore.query()
-                      ? "No results found"
-                      : "Enter a search term to find podcasts"}
-                  </span>
+                <text fg="gray">
+                  {searchStore.query()
+                    ? "No results found"
+                    : "Enter a search term to find podcasts"}
                 </text>
               </box>
             }
@@ -237,24 +229,24 @@ export function SearchPage(props: SearchPageProps) {
               focused={focusArea() === "results"}
               onSelect={handleResultSelect}
               onChange={setResultIndex}
+              isSearching={searchStore.isSearching()}
+              error={searchStore.error()}
             />
           </Show>
         </box>
 
         {/* History Sidebar */}
-        <box width={30} border>
-          <box padding={1} flexDirection="column">
-            <box borderBottom paddingBottom={1}>
-              <text>
-                <span fg={focusArea() === "history" ? "cyan" : "gray"}>
+          <box width={30} border>
+            <box padding={1} flexDirection="column">
+              <box paddingBottom={1}>
+                <text fg={focusArea() === "history" ? "cyan" : "gray"}>
                   History
-                </span>
-              </text>
-            </box>
-            <SearchHistory
-              history={searchStore.history()}
-              selectedIndex={historyIndex()}
-              focused={focusArea() === "history"}
+                </text>
+              </box>
+              <SearchHistory
+                history={searchStore.history()}
+                selectedIndex={historyIndex()}
+                focused={focusArea() === "history"}
               onSelect={handleHistorySelect}
               onRemove={searchStore.removeFromHistory}
               onClear={searchStore.clearHistory}
@@ -266,18 +258,10 @@ export function SearchPage(props: SearchPageProps) {
 
       {/* Footer Hints */}
       <box flexDirection="row" gap={2}>
-        <text>
-          <span fg="gray">[Tab] Switch focus</span>
-        </text>
-        <text>
-          <span fg="gray">[/] Focus search</span>
-        </text>
-        <text>
-          <span fg="gray">[Enter] Select</span>
-        </text>
-        <text>
-          <span fg="gray">[Esc] Back to search</span>
-        </text>
+        <text fg="gray">[Tab] Switch focus</text>
+        <text fg="gray">[/] Focus search</text>
+        <text fg="gray">[Enter] Select</text>
+        <text fg="gray">[Esc] Back to search</text>
       </box>
     </box>
   )

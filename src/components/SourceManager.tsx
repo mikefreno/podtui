@@ -106,35 +106,21 @@ export function SourceManager(props: SourceManagerProps) {
   }
 
   return (
-    <box
-      flexDirection="column"
-      border
-      padding={1}
-      gap={1}
-      onKeyPress={props.focused ? handleKeyPress : undefined}
-    >
+    <box flexDirection="column" border padding={1} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text>
           <strong>Podcast Sources</strong>
         </text>
         <box border padding={0} onMouseDown={props.onClose}>
-          <text>
-            <span fg="cyan">[Esc] Close</span>
-          </text>
+          <text fg="cyan">[Esc] Close</text>
         </box>
       </box>
 
-      <text>
-        <span fg="gray">
-          Manage where to search for podcasts
-        </span>
-      </text>
+        <text fg="gray">Manage where to search for podcasts</text>
 
       {/* Source list */}
       <box border padding={1} flexDirection="column">
-        <text>
-          <span fg={focusArea() === "list" ? "cyan" : "gray"}>Sources:</span>
-        </text>
+        <text fg={focusArea() === "list" ? "cyan" : "gray"}>Sources:</text>
         <scrollbox height={6}>
           <For each={sources()}>
             {(source, index) => (
@@ -153,61 +139,43 @@ export function SourceManager(props: SourceManagerProps) {
                   feedStore.toggleSource(source.id)
                 }}
               >
-                <text>
-                  <span
-                    fg={
-                      focusArea() === "list" && index() === selectedIndex()
-                        ? "cyan"
-                        : "gray"
-                    }
-                  >
-                    {focusArea() === "list" && index() === selectedIndex()
-                      ? ">"
-                      : " "}
-                  </span>
+                <text fg={
+                  focusArea() === "list" && index() === selectedIndex()
+                    ? "cyan"
+                    : "gray"
+                }>
+                  {focusArea() === "list" && index() === selectedIndex()
+                    ? ">"
+                    : " "}
                 </text>
-                <text>
-                  <span fg={source.enabled ? "green" : "red"}>
-                    {source.enabled ? "[x]" : "[ ]"}
-                  </span>
+                <text fg={source.enabled ? "green" : "red"}>
+                  {source.enabled ? "[x]" : "[ ]"}
                 </text>
-                <text>
-                  <span fg="yellow">{getSourceIcon(source)}</span>
-                </text>
-                <text>
-                  <span
-                    fg={
-                      focusArea() === "list" && index() === selectedIndex()
-                        ? "white"
-                        : undefined
-                    }
-                  >
-                    {source.name}
-                  </span>
+                <text fg="yellow">{getSourceIcon(source)}</text>
+                <text
+                  fg={
+                    focusArea() === "list" && index() === selectedIndex()
+                      ? "white"
+                      : undefined
+                  }
+                >
+                  {source.name}
                 </text>
               </box>
             )}
           </For>
         </scrollbox>
-        <text>
-          <span fg="gray">
-            Space/Enter to toggle, d to delete, a to add
-          </span>
-        </text>
+        <text fg="gray">Space/Enter to toggle, d to delete, a to add</text>
       </box>
 
       {/* Add new source form */}
       <box border padding={1} flexDirection="column" gap={1}>
-        <text>
-          <span fg={focusArea() === "add" || focusArea() === "url" ? "cyan" : "gray"}>
-            Add New Source:
-          </span>
+        <text fg={focusArea() === "add" || focusArea() === "url" ? "cyan" : "gray"}>
+          Add New Source:
         </text>
         
         <box flexDirection="row" gap={1}>
-          <text>
-            <span fg="gray">Name:</span>
-          </text>
+          <text fg="gray">Name:</text>
           <input
             value={newSourceName()}
             onInput={setNewSourceName}
@@ -218,9 +186,7 @@ export function SourceManager(props: SourceManagerProps) {
         </box>
 
         <box flexDirection="row" gap={1}>
-          <text>
-            <span fg="gray">URL:</span>
-          </text>
+          <text fg="gray">URL:</text>
           <input
             value={newSourceUrl()}
             onInput={(v) => {
@@ -239,22 +205,16 @@ export function SourceManager(props: SourceManagerProps) {
           width={15}
           onMouseDown={handleAddSource}
         >
-          <text>
-            <span fg="green">[+] Add Source</span>
-          </text>
+          <text fg="green">[+] Add Source</text>
         </box>
       </box>
 
       {/* Error message */}
       {error() && (
-        <text>
-          <span fg="red">{error()}</span>
-        </text>
+        <text fg="red">{error()}</text>
       )}
 
-      <text>
-        <span fg="gray">Tab to switch sections, Esc to close</span>
-      </text>
+      <text fg="gray">Tab to switch sections, Esc to close</text>
     </box>
   )
 }
