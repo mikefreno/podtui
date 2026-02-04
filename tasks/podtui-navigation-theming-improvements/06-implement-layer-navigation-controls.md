@@ -3,28 +3,28 @@
 meta:
   id: podtui-navigation-theming-improvements-06
   feature: podtui-navigation-theming-improvements
-  priority: P2
+  priority: P1
   depends_on: [podtui-navigation-theming-improvements-05]
   tags: [implementation, navigation, keyboard]
 
 objective:
-- Implement left/right arrow key navigation between layers
-- Add keyboard handlers for <left> and <right> keys
-- Update navigation state to track current layer index
+- Enhance left/right arrow key navigation between layers
+- Add visual feedback when navigating layers
+- Prevent invalid layer transitions (can't go left from layer 0)
+- Add navigation hints in Navigation component
 
 deliverables:
-- Updated Navigation component with left/right navigation
-- Keyboard handler implementation in App.tsx
-- Updated layer management logic
+- Enhanced keyboard handler with layer navigation
+- Updated Navigation component with layer hints
+- Visual feedback for layer navigation
+- Layer boundary prevention logic
 
 steps:
-- Read references/keyboard/REFERENCE.md for keyboard handling patterns
-- Design layer index management (currentLayer, maxLayers)
+- Update useAppKeyboard hook to handle left/right for layer navigation
+- Add layer navigation visual feedback
+- Prevent invalid layer transitions (can't go left from layer 0, can't go right beyond max)
 - Update Navigation component to show layer navigation hints
-- Add <left> and <right> key handlers in App.tsx useAppKeyboard hook
-- Update layerDepth signal to reflect current layer index
 - Add visual indicators for current layer position
-- Update layer rendering to show active layer with left/right arrows
 - Test navigation between layers
 - Ensure keyboard shortcuts don't conflict with page-specific shortcuts
 
@@ -33,8 +33,8 @@ tests:
 - Integration: Test left/right navigation between layers
 
 acceptance_criteria:
-- <left> key navigates to previous layer
-- <right> key navigates to next layer
+- <left> key navigates to previous layer (prevents going below layer 0)
+- <right> key navigates to next layer (prevents exceeding max depth)
 - Current layer is visually indicated
 - Navigation hints are shown in Navigation component
 - No keyboard conflicts with page-specific shortcuts
@@ -48,7 +48,7 @@ validation:
 - Verify no conflicts with page shortcuts
 
 notes:
-- Use references/keyboard/REFERENCE.md for proper keyboard handling patterns
-- Consider accessibility and screen reader support
-- Ensure consistent behavior across all pages
-- Test with different terminal sizes
+- Use existing useAppKeyboard hook as base
+- Consider max layer depth (3-4 levels)
+- Ensure smooth visual transitions
+- Consider adding sound effects for navigation

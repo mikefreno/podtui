@@ -3,51 +3,49 @@
 meta:
   id: podtui-navigation-theming-improvements-05
   feature: podtui-navigation-theming-improvements
-  priority: P2
+  priority: P1
   depends_on: [podtui-navigation-theming-improvements-02, podtui-navigation-theming-improvements-03, podtui-navigation-theming-improvements-04]
-  tags: [design, navigation, ui]
+  tags: [navigation, ui-design, layer-system]
 
 objective:
-- Design the layered navigation UI based on user requirements
-- Create visual design for layer separation and active states
-- Define how layers should be displayed and navigated
+- Design a visual layered navigation system that clearly shows depth
+- Implement active layer indicators and highlighting
+- Create smooth layer transition animations
+- Establish visual hierarchy for nested content
 
 deliverables:
-- Navigation design document
-- Layer visualization mockups
-- Clear specifications for layer colors and borders
-- Implementation plan for layered navigation
+- Enhanced Layout component with layer background system
+- Layer indicator component
+- Layer transition animations
+- Visual hierarchy documentation
 
 steps:
-- Review user requirements for navigation (clear layer separation, bg colors, left/right navigation, enter/escape controls)
-- Analyze current layerDepth signal implementation
-- Design layer separation mechanism (borders, backgrounds, spacing)
-- Define active layer visual state (bg color, borders, indicators)
-- Design navigation controls (left/right arrows, enter arrow down, escape arrow up)
-- Create layer visualization showing how multiple layers should work
-- Document layer structure and hierarchy
-- Create implementation plan for Navigation component
-- Define theme colors for layer backgrounds
+- Create layer background color system in constants/themes.ts
+- Enhance Layout.tsx to support layer backgrounds
+- Create LayerIndicator component
+- Implement layer depth visual cues
+- Add smooth transitions between layers
+- Test layer visibility and transitions
 
 tests:
-- Unit: None (design task)
-- Integration: None (design task)
+- Unit: Test LayerIndicator component
+- Integration: Test layer navigation visual feedback
 
 acceptance_criteria:
-- Navigation design document is created
-- Layer separation mechanism is clearly specified
-- Active layer visual state is defined
-- Navigation controls are documented
-- Implementation plan is provided
+- Layer backgrounds are visible and distinct
+- Active layer is clearly highlighted
+- Layer depth is visually indicated
+- Transitions are smooth and intuitive
+- Visual hierarchy is clear
 
 validation:
-- Review design document for clarity
-- Verify it addresses all user requirements
-- Check that design is feasible to implement
+- Run `bun run start` and test layer navigation
+- Verify layer backgrounds appear at different depths
+- Check that active layer is clearly visible
+- Test smooth transitions between layers
 
 notes:
-- Layers should be clearly delineated with visual separation
-- Active layer should have distinct background color
-- Navigation should be intuitive with clear visual feedback
-- Consider terminal width limitations
-- Design should work with existing theme system
+- Use subtle color variations for layer backgrounds
+- Ensure high contrast for readability
+- Consider animation duration (200-300ms)
+- Layer depth should be limited to 3-4 levels max

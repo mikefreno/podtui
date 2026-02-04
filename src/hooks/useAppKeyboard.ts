@@ -5,6 +5,7 @@
 
 import { useKeyboard, useRenderer } from "@opentui/solid"
 import type { TabId } from "../components/Tab"
+import type { Accessor } from "solid-js"
 
 const TAB_ORDER: TabId[] = ["discover", "feeds", "search", "player", "settings"]
 
@@ -14,6 +15,8 @@ type ShortcutOptions = {
   onAction?: (action: string) => void
   inputFocused?: boolean
   navigationEnabled?: boolean
+  layerDepth?: Accessor<number>
+  onLayerChange?: (newDepth: number) => void
 }
 
 export function useAppKeyboard(options: ShortcutOptions) {
@@ -53,6 +56,26 @@ export function useAppKeyboard(options: ShortcutOptions) {
     if (key.name === "enter") {
       options.onAction?.("enter")
       return
+    }
+
+    // Layer navigation with left/right arrows
+    if (options.layerDepth !== undefined && options.onLayerChange) {
+      const currentDepth = options.layerDepth()
+      const maxLayers = 3
+
+      if (key.name === "right") {
+        if (currentDepth < maxLayers) {
+          options.onLayerChange(currentDepth + 1)
+        }
+        return
+      }
+
+      if (key.name === "left") {
+        if (currentDepth > 0) {
+          options.onLayerChange(currentDepth - 1)
+        }
+        return
+      }
     }
 
     // Tab navigation with left/right arrows OR [ and ]

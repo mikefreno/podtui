@@ -3,22 +3,24 @@
 meta:
   id: podtui-navigation-theming-improvements-09
   feature: podtui-navigation-theming-improvements
-  priority: P2
+  priority: P1
   depends_on: []
   tags: [theming, implementation, solid-js]
 
 objective:
-- Create theme context provider based on opencode implementation
-- Implement theme state management
+- Create theme context provider for global theme management
+- Implement theme state management with signals
 - Provide theme tokens to all components
+- Add system theme detection and preference observer
 
 deliverables:
 - Theme context provider component
 - Theme state management hooks
 - Theme provider integration
+- System theme detection logic
 
 steps:
-- Read opencode/packages/ui/src/theme/context.tsx for reference
+- Review existing theme system in src/stores/app.ts
 - Create theme context using SolidJS createContext
 - Design theme state structure (themeId, colorScheme, mode, etc.)
 - Implement theme state management with signals
@@ -50,8 +52,8 @@ validation:
 - Check system theme detection
 
 notes:
-- Use references/solid/REFERENCE.md for SolidJS patterns
-- Follow opencode theming implementation patterns
+- Use existing appStore as base for theme management
+- Follow SolidJS context patterns
 - Use createSignal for reactive theme state
 - Ensure proper cleanup in onCleanup
 - Test with different theme configurations

@@ -11,6 +11,7 @@ import { SearchPage } from "./components/SearchPage";
 import { DiscoverPage } from "./components/DiscoverPage";
 import { Player } from "./components/Player";
 import { SettingsScreen } from "./components/SettingsScreen";
+import { ThemeProvider } from "./context/ThemeContext";
 import { useAuthStore } from "./stores/auth";
 import { useFeedStore } from "./stores/feed";
 import { useAppStore } from "./stores/app";
@@ -32,27 +33,31 @@ export function App() {
   // Centralized keyboard handler for all tab navigation and shortcuts
   useAppKeyboard({
     get activeTab() {
-      return activeTab();
+      return activeTab()
     },
     onTabChange: setActiveTab,
     inputFocused: inputFocused(),
     navigationEnabled: layerDepth() === 0,
+    layerDepth,
+    onLayerChange: (newDepth) => {
+      setLayerDepth(newDepth)
+    },
     onAction: (action) => {
       if (action === "escape") {
         if (layerDepth() > 0) {
-          setLayerDepth(0);
-          setInputFocused(false);
+          setLayerDepth(0)
+          setInputFocused(false)
         } else {
-          setShowAuthPanel(false);
-          setInputFocused(false);
+          setShowAuthPanel(false)
+          setInputFocused(false)
         }
       }
 
       if (action === "enter" && layerDepth() === 0) {
-        setLayerDepth(1);
+        setLayerDepth(1)
       }
     },
-  });
+  })
 
   const renderContent = () => {
     const tab = activeTab();
@@ -180,14 +185,17 @@ export function App() {
   };
 
   return (
-    <Layout
-      theme={appStore.resolveTheme()}
-      header={
-        <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
-      }
-      footer={<Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />}
-    >
-      <box style={{ padding: 1 }}>{renderContent()}</box>
-    </Layout>
+    <ThemeProvider>
+      <Layout
+        theme={appStore.resolveTheme()}
+        layerDepth={layerDepth()}
+        header={
+          <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
+        }
+        footer={<Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />}
+      >
+        <box style={{ padding: 1 }}>{renderContent()}</box>
+      </Layout>
+    </ThemeProvider>
   );
 }

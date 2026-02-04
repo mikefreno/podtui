@@ -5,14 +5,14 @@ Objective: Implement layered navigation system, fix tab crashes, and integrate s
 Status legend: [ ] todo, [~] in-progress, [x] done
 
 Tasks
-- [ ] 01 — Analyze current navigation and layer system → `01-analyze-navigation-system.md`
-- [ ] 02 — Fix Discover tab crash → `02-fix-discover-tab-crash.md`
-- [ ] 03 — Fix My Feeds tab crash → `03-fix-feeds-tab-crash.md`
-- [ ] 04 — Fix Settings/Sources sub-tab crash → `04-fix-settings-sources-crash.md`
-- [ ] 05 — Design layered navigation UI system → `05-design-layered-navigation-ui.md`
-- [ ] 06 — Implement left/right layer navigation controls → `06-implement-layer-navigation-controls.md`
-- [ ] 07 — Implement enter/escape layer navigation controls → `07-implement-enter-escape-controls.md`
-- [ ] 08 — Design active layer background color system → `08-design-active-layer-colors.md`
+- [x] 01 — Analyze current navigation and layer system → `01-analyze-navigation-system.md`
+- [x] 02 — Fix Discover tab crash → `02-fix-discover-tab-crash.md`
+- [x] 03 — Fix My Feeds tab crash → `03-fix-feeds-tab-crash.md`
+- [x] 04 — Fix Settings/Sources sub-tab crash → `04-fix-settings-sources-crash.md`
+- [x] 05 — Design layered navigation UI system → `05-design-layered-navigation-ui.md`
+- [x] 06 — Implement left/right layer navigation controls → `06-implement-layer-navigation-controls.md`
+- [x] 07 — Implement enter/escape layer navigation controls → `07-implement-enter-escape-controls.md`
+- [x] 08 — Design active layer background color system → `08-design-active-layer-colors.md`
 - [ ] 09 — Create theme context provider → `09-create-theme-context-provider.md`
 - [ ] 10 — Implement DesktopTheme type and structure → `10-implement-desktop-theme-types.md`
 - [ ] 11 — Implement theme resolution system → `11-implement-theme-resolution.md`

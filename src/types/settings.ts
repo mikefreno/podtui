@@ -1,5 +1,12 @@
 export type ThemeName = "system" | "catppuccin" | "gruvbox" | "tokyo" | "nord" | "custom"
 
+export type LayerBackgrounds = {
+  layer0: string
+  layer1: string
+  layer2: string
+  layer3: string
+}
+
 export type ThemeColors = {
   background: string
   surface: string
@@ -11,6 +18,27 @@ export type ThemeColors = {
   warning: string
   error: string
   success: string
+  layerBackgrounds?: LayerBackgrounds
+}
+
+export type ThemeVariant = {
+  name: string
+  colors: ThemeColors
+}
+
+export type ThemeToken = {
+  [key: string]: string
+}
+
+export type ResolvedTheme = ThemeColors & {
+  layerBackgrounds: LayerBackgrounds
+}
+
+export type DesktopTheme = {
+  name: string
+  variants: ThemeVariant[]
+  defaultVariant: string
+  tokens: ThemeToken
 }
 
 export type AppSettings = {
