@@ -3,10 +3,14 @@
   "module": "src/index.tsx",
   "type": "module",
   "private": true,
+  "bin": {
+    "podtui": "./dist/index.js"
+  },
   "scripts": {
-    "start": "bun run src/index.tsx",
-    "dev": "bun run --watch src/index.tsx",
+    "start": "bun src/index.tsx",
+    "dev": "bun --watch src/index.tsx",
     "build": "bun run build.ts",
+    "dist": "bun dist/index.js",
     "test": "bun test",
     "lint": "bun run lint.ts"
   },

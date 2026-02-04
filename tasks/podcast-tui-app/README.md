@@ -9,10 +9,10 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 1: Project Foundation 🏗️
 **Setup and configure the development environment**
 
-- [ ] 01 — Initialize SolidJS OpenTUI project with Bun → `01-project-setup.md`
-- [ ] 13 — Set up TypeScript configuration and build system → `13-typescript-config.md`
-- [ ] 14 — Create project directory structure and dependencies → `14-project-structure.md`
-- [ ] 15 — Build responsive layout system (Flexbox) → `15-responsive-layout.md`
+- [x] 01 — Initialize SolidJS OpenTUI project with Bun → `01-project-setup.md`
+- [x] 13 — Set up TypeScript configuration and build system → `13-typescript-config.md`
+- [x] 14 — Create project directory structure and dependencies → `14-project-structure.md`
+- [x] 15 — Build responsive layout system (Flexbox) → `15-responsive-layout.md`
 
 **Dependencies:** 01 -> 02 -> 03 -> 04 -> 05 -> 06 -> 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
@@ -21,9 +21,9 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 2: Core Architecture 🏗️
 **Build the main application shell and navigation**
 
-- [ ] 02 — Create main app shell with tab navigation → `02-core-layout.md`
-- [ ] 16 — Implement tab navigation component → `16-tab-navigation.md`
-- [ ] 17 — Add keyboard shortcuts and navigation handling → `17-keyboard-handling.md`
+- [x] 02 — Create main app shell with tab navigation → `02-core-layout.md`
+- [x] 16 — Implement tab navigation component → `16-tab-navigation.md`
+- [x] 17 — Add keyboard shortcuts and navigation handling → `17-keyboard-handling.md`
 
 **Dependencies:** 01 -> 02 -> 03 -> 04 -> 05 -> 06 -> 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
@@ -32,12 +32,12 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 3: File Sync & Data Import/Export 💾
 **Implement direct file sync with JSON/XML formats**
 
-- [ ] 03 — Implement direct file sync (JSON/XML import/export) → `03-file-sync.md`
-- [ ] 18 — Create sync data models (JSON/XML formats) → `18-sync-data-models.md`
-- [ ] 19 — Build import/export functionality → `19-import-export.md`
-- [ ] 20 — Create file picker UI for import → `20-file-picker.md`
-- [ ] 21 — Build sync status indicator → `21-sync-status.md`
-- [ ] 22 — Add backup/restore functionality → `22-backup-restore.md`
+- [x] 03 — Implement direct file sync (JSON/XML import/export) → `03-file-sync.md`
+- [x] 18 — Create sync data models (JSON/XML formats) → `18-sync-data-models.md`
+- [x] 19 — Build import/export functionality → `19-import-export.md`
+- [x] 20 — Create file picker UI for import → `20-file-picker.md`
+- [x] 21 — Build sync status indicator → `21-sync-status.md`
+- [x] 22 — Add backup/restore functionality → `22-backup-restore.md`
 
 **Dependencies:** 02 -> 03 -> 04 -> 05 -> 06 -> 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
@@ -46,12 +46,12 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 4: Authentication System 🔐
 **Implement authentication (MUST be implemented as optional for users)**
 
-- [ ] 04 — Build optional authentication system → `04-authentication.md`
-- [ ] 23 — Create authentication state (disabled by default) → `23-auth-state.md`
-- [ ] 24 — Build simple login screen (email/password) → `24-login-screen.md`
-- [ ] 25 — Implement 8-character code validation flow → `25-code-validation.md`
-- [ ] 26 — Add OAuth placeholder screens (document limitations) → `26-oauth-placeholders.md`
-- [ ] 27 — Create sync-only user profile → `27-sync-profile.md`
+- [x] 04 — Build optional authentication system → `04-authentication.md`
+- [x] 23 — Create authentication state (disabled by default) → `23-auth-state.md`
+- [x] 24 — Build simple login screen (email/password) → `24-login-screen.md`
+- [x] 25 — Implement 8-character code validation flow → `25-code-validation.md`
+- [x] 26 — Add OAuth placeholder screens (document limitations) → `26-oauth-placeholders.md`
+- [x] 27 — Create sync-only user profile → `27-sync-profile.md`
 
 **Dependencies:** 03 -> 04 -> 05 -> 06 -> 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
@@ -60,9 +60,9 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 5: Feed Management 📻
 **Create feed data models and management UI**
 
-- [ ] 05 — Create feed data models and types → `05-feed-management.md`
-- [ ] 28 — Create feed data models and types → `28-feed-types.md`
-- [ ] 29 — Build feed list component (public/private feeds) → `29-feed-list.md`
+- [x] 05 — Create feed data models and types → `05-feed-management.md`
+- [x] 28 — Create feed data models and types → `28-feed-types.md`
+- [x] 29 — Build feed list component (public/private feeds) → `29-feed-list.md`
 - [ ] 30 — Implement feed source management (add/remove sources) → `30-source-management.md`
 - [ ] 31 — Add reverse chronological ordering → `31-reverse-chronological.md`
 - [ ] 32 — Create feed detail view → `32-feed-detail.md`
@@ -170,7 +170,7 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 13: OAuth & External Integration 🔗
 **Complete OAuth implementation and external integrations**
 
-- [ ] 26 — Add OAuth placeholder screens (document limitations) → `26-oauth-placeholders.md`
+- [x] 26 — Add OAuth placeholder screens (document limitations) → `26-oauth-placeholders.md`
 - [ ] 67 — Implement browser redirect flow for OAuth → `67-browser-redirect.md`
 - [ ] 68 — Build QR code display for mobile verification → `68-qr-code-display.md`
 
