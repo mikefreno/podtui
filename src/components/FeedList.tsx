@@ -1,15 +1,14 @@
 /**
  * Feed list component for PodTUI
- * Scrollable list of feeds with keyboard navigation
+ * Scrollable list of feeds with keyboard navigation and mouse support
  */
 
 import { createSignal, For, Show } from "solid-js"
 import { FeedItem } from "./FeedItem"
+import { useFeedStore } from "../stores/feed"
 import type { Feed, FeedFilter, FeedVisibility, FeedSortField } from "../types/feed"
-import { format } from "date-fns"
 
 interface FeedListProps {
-  feeds: Feed[]
   focused?: boolean
   compact?: boolean
   showEpisodeCount?: boolean
@@ -19,73 +18,10 @@ interface FeedListProps {
 }
 
 export function FeedList(props: FeedListProps) {
+  const feedStore = useFeedStore()
   const [selectedIndex, setSelectedIndex] = createSignal(0)
-  const [filter, setFilter] = createSignal<FeedFilter>({
-    visibility: "all",
-    sortBy: "updated" as FeedSortField,
-    sortDirection: "desc",
-  })
 
-  /** Get filtered and sorted feeds */
-  const filteredFeeds = (): Feed[] => {
-    let result = [...props.feeds]
-
-    // Filter by visibility
-    const vis = filter().visibility
-    if (vis && vis !== "all") {
-      result = result.filter((f) => f.visibility === vis)
-    }
-
-    // Filter by pinned only
-    if (filter().pinnedOnly) {
-      result = result.filter((f) => f.isPinned)
-    }
-
-    // Filter by search query
-    const query = filter().searchQuery?.toLowerCase()
-    if (query) {
-      result = result.filter(
-        (f) =>
-          f.podcast.title.toLowerCase().includes(query) ||
-          f.customName?.toLowerCase().includes(query) ||
-          f.podcast.description?.toLowerCase().includes(query)
-      )
-    }
-
-    // Sort feeds
-    const sortField = filter().sortBy
-    const sortDir = filter().sortDirection === "asc" ? 1 : -1
-
-    result.sort((a, b) => {
-      switch (sortField) {
-        case "title":
-          return (
-            sortDir *
-            (a.customName || a.podcast.title).localeCompare(
-              b.customName || b.podcast.title
-            )
-          )
-        case "episodeCount":
-          return sortDir * (a.episodes.length - b.episodes.length)
-        case "latestEpisode":
-          const aLatest = a.episodes[0]?.pubDate?.getTime() || 0
-          const bLatest = b.episodes[0]?.pubDate?.getTime() || 0
-          return sortDir * (aLatest - bLatest)
-        case "updated":
-        default:
-          return sortDir * (a.lastUpdated.getTime() - b.lastUpdated.getTime())
-      }
-    })
-
-    // Pinned feeds always first
-    result.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1
-      if (!a.isPinned && b.isPinned) return 1
-      return 0
-    })
-
-    return result
-  }
+  const filteredFeeds = () => feedStore.getFilteredFeeds()
 
   const handleKeyPress = (key: { name: string }) => {
     const feeds = filteredFeeds()
@@ -99,7 +35,7 @@ export function FeedList(props: FeedListProps) {
       if (feed && props.onOpenFeed) {
         props.onOpenFeed(feed)
       }
-    } else if (key.name === "home") {
+    } else if (key.name === "home" || key.name === "g") {
       setSelectedIndex(0)
     } else if (key.name === "end") {
       setSelectedIndex(feeds.length - 1)
@@ -107,6 +43,18 @@ export function FeedList(props: FeedListProps) {
       setSelectedIndex((i) => Math.max(0, i - 5))
     } else if (key.name === "pagedown") {
       setSelectedIndex((i) => Math.min(feeds.length - 1, i + 5))
+    } else if (key.name === "p") {
+      // Toggle pin on selected feed
+      const feed = feeds[selectedIndex()]
+      if (feed) {
+        feedStore.togglePinned(feed.id)
+      }
+    } else if (key.name === "f") {
+      // Cycle visibility filter
+      cycleVisibilityFilter()
+    } else if (key.name === "s") {
+      // Cycle sort
+      cycleSortField()
     }
 
     // Notify selection change
@@ -116,22 +64,51 @@ export function FeedList(props: FeedListProps) {
     }
   }
 
-  const toggleVisibilityFilter = () => {
-    setFilter((f) => {
-      const current = f.visibility
-      let next: FeedVisibility | "all"
-      if (current === "all") next = "public"
-      else if (current === "public") next = "private"
-      else next = "all"
-      return { ...f, visibility: next }
-    })
+  const cycleVisibilityFilter = () => {
+    const current = feedStore.filter().visibility
+    let next: FeedVisibility | "all"
+    if (current === "all") next = "public"
+    else if (current === "public") next = "private"
+    else next = "all"
+    feedStore.setFilter({ ...feedStore.filter(), visibility: next })
+  }
+
+  const cycleSortField = () => {
+    const sortOptions: FeedSortField[] = ["updated", "title", "episodeCount", "latestEpisode"]
+    const current = feedStore.filter().sortBy as FeedSortField
+    const idx = sortOptions.indexOf(current)
+    const next = sortOptions[(idx + 1) % sortOptions.length]
+    feedStore.setFilter({ ...feedStore.filter(), sortBy: next })
   }
 
   const visibilityLabel = () => {
-    const vis = filter().visibility
+    const vis = feedStore.filter().visibility
     if (vis === "all") return "All"
     if (vis === "public") return "Public"
     return "Private"
+  }
+
+  const sortLabel = () => {
+    const sort = feedStore.filter().sortBy
+    switch (sort) {
+      case "title": return "Title"
+      case "episodeCount": return "Episodes"
+      case "latestEpisode": return "Latest"
+      default: return "Updated"
+    }
+  }
+
+  const handleFeedClick = (feed: Feed, index: number) => {
+    setSelectedIndex(index)
+    if (props.onSelectFeed) {
+      props.onSelectFeed(feed)
+    }
+  }
+
+  const handleFeedDoubleClick = (feed: Feed) => {
+    if (props.onOpenFeed) {
+      props.onOpenFeed(feed)
+    }
   }
 
   return (
@@ -140,16 +117,29 @@ export function FeedList(props: FeedListProps) {
       gap={1}
       onKeyPress={props.focused ? handleKeyPress : undefined}
     >
-      {/* Header with filter */}
-      <box flexDirection="row" justifyContent="space-between" paddingBottom={1}>
+      {/* Header with filter controls */}
+      <box flexDirection="row" justifyContent="space-between" paddingBottom={0}>
         <text>
           <strong>My Feeds</strong>
           <span fg="gray"> ({filteredFeeds().length} feeds)</span>
         </text>
-        <box flexDirection="row" gap={2}>
-          <box border padding={0} onMouseDown={toggleVisibilityFilter}>
+        <box flexDirection="row" gap={1}>
+          <box
+            border
+            padding={0}
+            onMouseDown={cycleVisibilityFilter}
+          >
             <text>
-              <span fg="cyan">[F] {visibilityLabel()}</span>
+              <span fg="cyan">[f] {visibilityLabel()}</span>
+            </text>
+          </box>
+          <box
+            border
+            padding={0}
+            onMouseDown={cycleSortField}
+          >
+            <text>
+              <span fg="cyan">[s] {sortLabel()}</span>
             </text>
           </box>
         </box>
@@ -175,23 +165,28 @@ export function FeedList(props: FeedListProps) {
         >
           <For each={filteredFeeds()}>
             {(feed, index) => (
-              <FeedItem
-                feed={feed}
-                isSelected={index() === selectedIndex()}
-                compact={props.compact}
-                showEpisodeCount={props.showEpisodeCount ?? true}
-                showLastUpdated={props.showLastUpdated ?? true}
-              />
+              <box
+                onMouseDown={() => handleFeedClick(feed, index())}
+                onDoubleClick={() => handleFeedDoubleClick(feed)}
+              >
+                <FeedItem
+                  feed={feed}
+                  isSelected={index() === selectedIndex()}
+                  compact={props.compact}
+                  showEpisodeCount={props.showEpisodeCount ?? true}
+                  showLastUpdated={props.showLastUpdated ?? true}
+                />
+              </box>
             )}
           </For>
         </scrollbox>
       </Show>
 
       {/* Navigation help */}
-      <box paddingTop={1}>
+      <box paddingTop={0}>
         <text>
           <span fg="gray">
-            j/k or arrows to navigate, Enter to open, F to filter
+            j/k navigate | Enter open | p pin | f filter | s sort | Click to select
           </span>
         </text>
       </box>

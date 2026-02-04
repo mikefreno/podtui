@@ -63,9 +63,9 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 - [x] 05 — Create feed data models and types → `05-feed-management.md`
 - [x] 28 — Create feed data models and types → `28-feed-types.md`
 - [x] 29 — Build feed list component (public/private feeds) → `29-feed-list.md`
-- [ ] 30 — Implement feed source management (add/remove sources) → `30-source-management.md`
-- [ ] 31 — Add reverse chronological ordering → `31-reverse-chronological.md`
-- [ ] 32 — Create feed detail view → `32-feed-detail.md`
+- [x] 30 — Implement feed source management (add/remove sources) → `30-source-management.md`
+- [x] 31 — Add reverse chronological ordering → `31-reverse-chronological.md`
+- [x] 32 — Create feed detail view → `32-feed-detail.md`
 
 **Dependencies:** 01 -> 02 -> 03 -> 04 -> 05 -> 06 -> 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
