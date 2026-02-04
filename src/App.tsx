@@ -1,45 +1,47 @@
-import { createSignal } from "solid-js"
-import { Layout } from "./components/Layout"
-import { Navigation } from "./components/Navigation"
-import { TabNavigation } from "./components/TabNavigation"
-import { SyncPanel } from "./components/SyncPanel"
-import { FeedList } from "./components/FeedList"
-import { LoginScreen } from "./components/LoginScreen"
-import { CodeValidation } from "./components/CodeValidation"
-import { OAuthPlaceholder } from "./components/OAuthPlaceholder"
-import { SyncProfile } from "./components/SyncProfile"
-import { SearchPage } from "./components/SearchPage"
-import { DiscoverPage } from "./components/DiscoverPage"
-import { useAuthStore } from "./stores/auth"
-import { useFeedStore } from "./stores/feed"
-import { FeedVisibility } from "./types/feed"
-import { useAppKeyboard } from "./hooks/useAppKeyboard"
-import type { TabId } from "./components/Tab"
-import type { AuthScreen } from "./types/auth"
+import { createSignal } from "solid-js";
+import { Layout } from "./components/Layout";
+import { Navigation } from "./components/Navigation";
+import { TabNavigation } from "./components/TabNavigation";
+import { SyncPanel } from "./components/SyncPanel";
+import { FeedList } from "./components/FeedList";
+import { LoginScreen } from "./components/LoginScreen";
+import { CodeValidation } from "./components/CodeValidation";
+import { OAuthPlaceholder } from "./components/OAuthPlaceholder";
+import { SyncProfile } from "./components/SyncProfile";
+import { SearchPage } from "./components/SearchPage";
+import { DiscoverPage } from "./components/DiscoverPage";
+import { useAuthStore } from "./stores/auth";
+import { useFeedStore } from "./stores/feed";
+import { FeedVisibility } from "./types/feed";
+import { useAppKeyboard } from "./hooks/useAppKeyboard";
+import type { TabId } from "./components/Tab";
+import type { AuthScreen } from "./types/auth";
 
 export function App() {
-  const [activeTab, setActiveTab] = createSignal<TabId>("discover")
-  const [authScreen, setAuthScreen] = createSignal<AuthScreen>("login")
-  const [showAuthPanel, setShowAuthPanel] = createSignal(false)
-  const [inputFocused, setInputFocused] = createSignal(false)
-  const auth = useAuthStore()
-  const feedStore = useFeedStore()
+  const [activeTab, setActiveTab] = createSignal<TabId>("settings");
+  const [authScreen, setAuthScreen] = createSignal<AuthScreen>("login");
+  const [showAuthPanel, setShowAuthPanel] = createSignal(false);
+  const [inputFocused, setInputFocused] = createSignal(false);
+  const auth = useAuthStore();
+  const feedStore = useFeedStore();
 
   // Centralized keyboard handler for all tab navigation and shortcuts
   useAppKeyboard({
-    get activeTab() { return activeTab() },
+    get activeTab() {
+      return activeTab();
+    },
     onTabChange: setActiveTab,
     inputFocused: inputFocused(),
     onAction: (action) => {
       if (action === "escape") {
-        setShowAuthPanel(false)
-        setInputFocused(false)
+        setShowAuthPanel(false);
+        setInputFocused(false);
       }
     },
-  })
+  });
 
   const renderContent = () => {
-    const tab = activeTab()
+    const tab = activeTab();
 
     switch (tab) {
       case "feeds":
@@ -52,7 +54,7 @@ export function App() {
               // Would open feed detail view
             }}
           />
-        )
+        );
 
       case "settings":
         // Show auth panel or sync panel based on state
@@ -62,12 +64,12 @@ export function App() {
               <SyncProfile
                 focused={true}
                 onLogout={() => {
-                  auth.logout()
-                  setShowAuthPanel(false)
+                  auth.logout();
+                  setShowAuthPanel(false);
                 }}
                 onManageSync={() => setShowAuthPanel(false)}
               />
-            )
+            );
           }
 
           switch (authScreen()) {
@@ -77,7 +79,7 @@ export function App() {
                   focused={true}
                   onBack={() => setAuthScreen("login")}
                 />
-              )
+              );
             case "oauth":
               return (
                 <OAuthPlaceholder
@@ -85,7 +87,7 @@ export function App() {
                   onBack={() => setAuthScreen("login")}
                   onNavigateToCode={() => setAuthScreen("code")}
                 />
-              )
+              );
             case "login":
             default:
               return (
@@ -94,7 +96,7 @@ export function App() {
                   onNavigateToCode={() => setAuthScreen("code")}
                   onNavigateToOAuth={() => setAuthScreen("oauth")}
                 />
-              )
+              );
           }
         }
 
@@ -122,12 +124,10 @@ export function App() {
               </box>
             </box>
           </box>
-        )
+        );
 
       case "discover":
-        return (
-          <DiscoverPage focused={!inputFocused()} />
-        )
+        return <DiscoverPage focused={!inputFocused()} />;
 
       case "search":
         return (
@@ -135,23 +135,23 @@ export function App() {
             focused={!inputFocused()}
             onInputFocusChange={setInputFocused}
             onSubscribe={(result) => {
-              const feeds = feedStore.feeds()
+              const feeds = feedStore.feeds();
               const alreadySubscribed = feeds.some(
                 (feed) =>
                   feed.podcast.id === result.podcast.id ||
-                  feed.podcast.feedUrl === result.podcast.feedUrl
-              )
+                  feed.podcast.feedUrl === result.podcast.feedUrl,
+              );
 
               if (!alreadySubscribed) {
                 feedStore.addFeed(
                   { ...result.podcast, isSubscribed: true },
                   result.sourceId,
-                  FeedVisibility.PUBLIC
-                )
+                  FeedVisibility.PUBLIC,
+                );
               }
             }}
           />
-        )
+        );
 
       case "player":
       default:
@@ -163,20 +163,18 @@ export function App() {
               Player - coming in later phases
             </text>
           </box>
-        )
+        );
     }
-  }
+  };
 
   return (
     <Layout
       header={
         <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
       }
-      footer={
-        <Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />
-      }
+      footer={<Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />}
     >
       <box style={{ padding: 1 }}>{renderContent()}</box>
     </Layout>
-  )
+  );
 }
