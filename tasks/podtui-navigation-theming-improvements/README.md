@@ -13,13 +13,13 @@ Tasks
 - [x] 06 — Implement left/right layer navigation controls → `06-implement-layer-navigation-controls.md`
 - [x] 07 — Implement enter/escape layer navigation controls → `07-implement-enter-escape-controls.md`
 - [x] 08 — Design active layer background color system → `08-design-active-layer-colors.md`
-- [ ] 09 — Create theme context provider → `09-create-theme-context-provider.md`
-- [ ] 10 — Implement DesktopTheme type and structure → `10-implement-desktop-theme-types.md`
-- [ ] 11 — Implement theme resolution system → `11-implement-theme-resolution.md`
-- [ ] 12 — Create CSS variable token system → `12-create-css-token-system.md`
-- [ ] 13 — Implement system theme detection → `13-implement-system-theme-detection.md`
-- [ ] 14 — Integrate theme provider into App component → `14-integrate-theme-provider.md`
-- [ ] 15 — Update components to use theme tokens → `15-update-components-to-use-themes.md`
+- [x] 09 — Create theme context provider → `09-create-theme-context-provider.md`
+- [x] 10 — Implement DesktopTheme type and structure → `10-implement-desktop-theme-types.md`
+- [x] 11 — Implement theme resolution system → `11-implement-theme-resolution.md`
+- [x] 12 — Create CSS variable token system → `12-create-css-token-system.md`
+- [x] 13 — Implement system theme detection → `13-implement-system-theme-detection.md`
+- [x] 14 — Integrate theme provider into App component → `14-integrate-theme-provider.md`
+- [x] 15 — Update components to use theme tokens → `15-update-components-to-use-themes.md`
 - [ ] 16 — Test navigation flows and layer transitions → `16-test-navigation-flows.md`
 - [ ] 17 — Test tab crash fixes and edge cases → `17-test-tab-crash-fixes.md`
 - [ ] 18 — Test theming system with all modes → `18-test-theming-system.md`

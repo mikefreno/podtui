@@ -50,7 +50,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
         <text>
           <strong>Settings</strong>
         </text>
-        <text fg="gray">[Tab] Switch section | 1-4 jump | Esc up</text>
+        <text fg="var(--color-muted)">[Tab] Switch section | 1-4 jump | Esc up</text>
       </box>
 
       <box flexDirection="row" gap={1}>
@@ -58,10 +58,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
           <box
             border
             padding={0}
-            backgroundColor={activeSection() === section.id ? "#2b303b" : undefined}
+            backgroundColor={activeSection() === section.id ? "var(--color-primary)" : undefined}
             onMouseDown={() => setActiveSection(section.id)}
           >
-            <text fg={activeSection() === section.id ? "cyan" : "gray"}>
+            <text fg={activeSection() === section.id ? "var(--color-text)" : "var(--color-muted)"}>
               [{index + 1}] {section.label}
             </text>
           </box>
@@ -74,21 +74,21 @@ export function SettingsScreen(props: SettingsScreenProps) {
         {activeSection() === "preferences" && <PreferencesPanel />}
         {activeSection() === "account" && (
           <box flexDirection="column" gap={1}>
-            <text fg="gray">Account</text>
+            <text fg="var(--color-muted)">Account</text>
             <box flexDirection="row" gap={2} alignItems="center">
-              <text fg="gray">Status:</text>
-              <text fg={props.accountStatus === "signed-in" ? "green" : "yellow"}>
+              <text fg="var(--color-muted)">Status:</text>
+              <text fg={props.accountStatus === "signed-in" ? "var(--color-success)" : "var(--color-warning)"}>
                 {props.accountLabel}
               </text>
             </box>
             <box border padding={0} onMouseDown={() => props.onOpenAccount?.()}>
-              <text fg="cyan">[A] Manage Account</text>
+              <text fg="var(--color-primary)">[A] Manage Account</text>
             </box>
           </box>
         )}
       </box>
 
-      <text fg="gray">Enter to dive | Esc up</text>
+      <text fg="var(--color-muted)">Enter to dive | Esc up</text>
     </box>
   )
 }

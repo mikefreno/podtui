@@ -90,7 +90,7 @@ export function LoginScreen(props: LoginScreenProps) {
 
       {/* Email field */}
       <box flexDirection="column" gap={0}>
-        <text fg={focusField() === "email" ? "cyan" : undefined}>Email:</text>
+        <text fg={focusField() === "email" ? "var(--color-primary)" : undefined}>Email:</text>
         <input
           value={email()}
           onInput={setEmail}
@@ -99,13 +99,13 @@ export function LoginScreen(props: LoginScreenProps) {
           width={30}
         />
         {emailError() && (
-          <text fg="red">{emailError()}</text>
+          <text fg="var(--color-error)">{emailError()}</text>
         )}
       </box>
 
       {/* Password field */}
       <box flexDirection="column" gap={0}>
-        <text fg={focusField() === "password" ? "cyan" : undefined}>
+        <text fg={focusField() === "password" ? "var(--color-primary)" : undefined}>
           Password:
         </text>
         <input
@@ -116,7 +116,7 @@ export function LoginScreen(props: LoginScreenProps) {
           width={30}
         />
         {passwordError() && (
-          <text fg="red">{passwordError()}</text>
+          <text fg="var(--color-error)">{passwordError()}</text>
         )}
       </box>
 
@@ -127,9 +127,9 @@ export function LoginScreen(props: LoginScreenProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "submit" ? "#333" : undefined}
+          backgroundColor={focusField() === "submit" ? "var(--color-primary)" : undefined}
         >
-          <text fg={focusField() === "submit" ? "cyan" : undefined}>
+          <text fg={focusField() === "submit" ? "var(--color-text)" : undefined}>
             {auth.isLoading ? "Signing in..." : "[Enter] Sign In"}
           </text>
         </box>
@@ -137,21 +137,21 @@ export function LoginScreen(props: LoginScreenProps) {
 
       {/* Auth error message */}
       {auth.error && (
-        <text fg="red">{auth.error.message}</text>
+        <text fg="var(--color-error)">{auth.error.message}</text>
       )}
 
       <box height={1} />
 
       {/* Alternative auth options */}
-      <text fg="gray">Or authenticate with:</text>
+      <text fg="var(--color-muted)">Or authenticate with:</text>
 
       <box flexDirection="row" gap={2}>
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "code" ? "#333" : undefined}
+          backgroundColor={focusField() === "code" ? "var(--color-primary)" : undefined}
         >
-          <text fg={focusField() === "code" ? "yellow" : "gray"}>
+          <text fg={focusField() === "code" ? "var(--color-accent)" : "var(--color-muted)"}>
             [C] Sync Code
           </text>
         </box>
@@ -159,9 +159,9 @@ export function LoginScreen(props: LoginScreenProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "oauth" ? "#333" : undefined}
+          backgroundColor={focusField() === "oauth" ? "var(--color-primary)" : undefined}
         >
-          <text fg={focusField() === "oauth" ? "yellow" : "gray"}>
+          <text fg={focusField() === "oauth" ? "var(--color-accent)" : "var(--color-muted)"}>
             [O] OAuth Info
           </text>
         </box>
@@ -169,7 +169,7 @@ export function LoginScreen(props: LoginScreenProps) {
 
       <box height={1} />
 
-      <text fg="gray">Tab to navigate, Enter to select</text>
+      <text fg="var(--color-muted)">Tab to navigate, Enter to select</text>
     </box>
   )
 }

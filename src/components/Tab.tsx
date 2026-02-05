@@ -24,7 +24,7 @@ export function Tab(props: TabProps) {
     <box
       border
       onMouseDown={() => props.onSelect(props.tab.id)}
-      style={{ padding: 1, backgroundColor: props.active ? "#333333" : "transparent" }}
+      style={{ padding: 1, backgroundColor: props.active ? "var(--color-primary)" : "transparent" }}
     >
       <text>
         {props.active ? "[" : " "}

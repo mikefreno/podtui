@@ -187,7 +187,6 @@ export function App() {
   return (
     <ThemeProvider>
       <Layout
-        theme={appStore.resolveTheme()}
         layerDepth={layerDepth()}
         header={
           <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />

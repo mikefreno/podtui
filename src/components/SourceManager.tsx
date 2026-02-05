@@ -155,15 +155,15 @@ export function SourceManager(props: SourceManagerProps) {
           <strong>Podcast Sources</strong>
         </text>
         <box border padding={0} onMouseDown={props.onClose}>
-          <text fg="cyan">[Esc] Close</text>
+          <text fg="var(--color-primary)">[Esc] Close</text>
         </box>
       </box>
 
-        <text fg="gray">Manage where to search for podcasts</text>
+        <text fg="var(--color-muted)">Manage where to search for podcasts</text>
 
       {/* Source list */}
       <box border padding={1} flexDirection="column" gap={1}>
-        <text fg={focusArea() === "list" ? "cyan" : "gray"}>Sources:</text>
+        <text fg={focusArea() === "list" ? "var(--color-primary)" : "var(--color-muted)"}>Sources:</text>
         <scrollbox height={6}>
           <For each={sources()}>
             {(source, index) => (
@@ -173,7 +173,7 @@ export function SourceManager(props: SourceManagerProps) {
                 padding={0}
                 backgroundColor={
                   focusArea() === "list" && index() === selectedIndex()
-                    ? "#333"
+                    ? "var(--color-primary)"
                     : undefined
                 }
                 onMouseDown={() => {
@@ -184,21 +184,21 @@ export function SourceManager(props: SourceManagerProps) {
               >
                 <text fg={
                   focusArea() === "list" && index() === selectedIndex()
-                    ? "cyan"
-                    : "gray"
+                    ? "var(--color-primary)"
+                    : "var(--color-muted)"
                 }>
                   {focusArea() === "list" && index() === selectedIndex()
                     ? ">"
                     : " "}
                 </text>
-                <text fg={source.enabled ? "green" : "red"}>
+                <text fg={source.enabled ? "var(--color-success)" : "var(--color-error)"}>
                   {source.enabled ? "[x]" : "[ ]"}
                 </text>
-                <text fg="yellow">{getSourceIcon(source)}</text>
+                <text fg="var(--color-accent)">{getSourceIcon(source)}</text>
                 <text
                   fg={
                     focusArea() === "list" && index() === selectedIndex()
-                      ? "white"
+                      ? "var(--color-text)"
                       : undefined
                   }
                 >
@@ -208,54 +208,54 @@ export function SourceManager(props: SourceManagerProps) {
             )}
           </For>
         </scrollbox>
-        <text fg="gray">Space/Enter to toggle, d to delete, a to add</text>
+        <text fg="var(--color-muted)">Space/Enter to toggle, d to delete, a to add</text>
 
         {/* API settings */}
         <box flexDirection="column" gap={1}>
-          <text fg={isApiSource() ? "gray" : "yellow"}>
+          <text fg={isApiSource() ? "var(--color-muted)" : "var(--color-accent)"}>
             {isApiSource() ? "API Settings" : "API Settings (select an API source)"}
           </text>
           <box flexDirection="row" gap={2}>
             <box
               border
               padding={0}
-              backgroundColor={focusArea() === "country" ? "#333" : undefined}
+              backgroundColor={focusArea() === "country" ? "var(--color-primary)" : undefined}
             >
-              <text fg={focusArea() === "country" ? "cyan" : "gray"}>
+              <text fg={focusArea() === "country" ? "var(--color-primary)" : "var(--color-muted)"}>
                 Country: {sourceCountry()}
               </text>
             </box>
             <box
               border
               padding={0}
-              backgroundColor={focusArea() === "language" ? "#333" : undefined}
+              backgroundColor={focusArea() === "language" ? "var(--color-primary)" : undefined}
             >
-              <text fg={focusArea() === "language" ? "cyan" : "gray"}>
+              <text fg={focusArea() === "language" ? "var(--color-primary)" : "var(--color-muted)"}>
                 Language: {sourceLanguage() === "ja_jp" ? "Japanese" : "English"}
               </text>
             </box>
             <box
               border
               padding={0}
-              backgroundColor={focusArea() === "explicit" ? "#333" : undefined}
+              backgroundColor={focusArea() === "explicit" ? "var(--color-primary)" : undefined}
             >
-              <text fg={focusArea() === "explicit" ? "cyan" : "gray"}>
+              <text fg={focusArea() === "explicit" ? "var(--color-primary)" : "var(--color-muted)"}>
                 Explicit: {sourceExplicit() ? "Yes" : "No"}
               </text>
             </box>
           </box>
-          <text fg="gray">Enter/Space to toggle focused setting</text>
+          <text fg="var(--color-muted)">Enter/Space to toggle focused setting</text>
         </box>
       </box>
 
       {/* Add new source form */}
       <box border padding={1} flexDirection="column" gap={1}>
-        <text fg={focusArea() === "add" || focusArea() === "url" ? "cyan" : "gray"}>
+        <text fg={focusArea() === "add" || focusArea() === "url" ? "var(--color-primary)" : "var(--color-muted)"}>
           Add New Source:
         </text>
-        
+
         <box flexDirection="row" gap={1}>
-          <text fg="gray">Name:</text>
+          <text fg="var(--color-muted)">Name:</text>
           <input
             value={newSourceName()}
             onInput={setNewSourceName}
@@ -266,7 +266,7 @@ export function SourceManager(props: SourceManagerProps) {
         </box>
 
         <box flexDirection="row" gap={1}>
-          <text fg="gray">URL:</text>
+          <text fg="var(--color-muted)">URL:</text>
           <input
             value={newSourceUrl()}
             onInput={(v) => {
@@ -285,16 +285,16 @@ export function SourceManager(props: SourceManagerProps) {
           width={15}
           onMouseDown={handleAddSource}
         >
-          <text fg="green">[+] Add Source</text>
+          <text fg="var(--color-success)">[+] Add Source</text>
         </box>
       </box>
 
       {/* Error message */}
       {error() && (
-        <text fg="red">{error()}</text>
+        <text fg="var(--color-error)">{error()}</text>
       )}
 
-      <text fg="gray">Tab to switch sections, Esc to close</text>
+      <text fg="var(--color-muted)">Tab to switch sections, Esc to close</text>
     </box>
   )
 }

@@ -1,41 +1,64 @@
-import { createContext, useContext, createSignal } from "solid-js"
+import { createContext, useContext, createSignal, createEffect, onCleanup } from "solid-js"
 import type { ThemeColors, ThemeName } from "../types/settings"
+import { useAppStore } from "../stores/app"
+import { applyTheme, setThemeAttribute, getSystemThemeMode } from "../utils/theme"
 
 type ThemeContextType = {
   themeName: () => ThemeName
   setThemeName: (theme: ThemeName) => void
-  resolvedTheme: ThemeColors
+  resolvedTheme: () => ThemeColors
   isSystemTheme: () => boolean
+  currentMode: () => "dark" | "light"
 }
 
 const ThemeContext = createContext<ThemeContextType>()
 
 export function ThemeProvider({ children }: { children: any }) {
-  const [themeName, setThemeName] = createSignal<ThemeName>("system")
+  const appStore = useAppStore()
+  const [themeName, setThemeName] = createSignal<ThemeName>(appStore.state().settings.theme)
+  const [resolvedTheme, setResolvedTheme] = createSignal<ThemeColors>(appStore.resolveTheme())
+  const [currentMode, setCurrentMode] = createSignal<"dark" | "light">(getSystemThemeMode())
 
   const isSystemTheme = () => themeName() === "system"
 
-  const resolvedTheme = {
-    background: "transparent",
-    surface: "#1b1f27",
-    primary: "#6fa8ff",
-    secondary: "#a9b1d6",
-    accent: "#f6c177",
-    text: "#e6edf3",
-    muted: "#7d8590",
-    warning: "#f0b429",
-    error: "#f47067",
-    success: "#3fb950",
-    layerBackgrounds: {
-      layer0: "transparent",
-      layer1: "#1e222e",
-      layer2: "#161b22",
-      layer3: "#0d1117",
-    },
-  }
+  // Update theme when appStore theme changes
+  createEffect(() => {
+    const currentTheme = appStore.state().settings.theme
+    setThemeName(currentTheme)
+    setResolvedTheme(appStore.resolveTheme())
+
+    // Apply theme to CSS variables
+    if (currentTheme === "system") {
+      const mode = getSystemThemeMode()
+      setCurrentMode(mode)
+      applyTheme(resolvedTheme())
+    } else {
+      setCurrentMode("dark") // All themes are dark by default
+    }
+
+    setThemeAttribute(currentTheme === "system" ? "system" : currentTheme)
+  })
+
+  // Handle system theme changes
+  createEffect(() => {
+    if (isSystemTheme()) {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+      const handler = () => {
+        const newMode = getSystemThemeMode()
+        setCurrentMode(newMode)
+        setResolvedTheme(appStore.resolveTheme())
+      }
+
+      mediaQuery.addEventListener("change", handler)
+
+      onCleanup(() => {
+        mediaQuery.removeEventListener("change", handler)
+      })
+    }
+  })
 
   return (
-    <ThemeContext.Provider value={{ themeName, setThemeName, resolvedTheme, isSystemTheme }}>
+    <ThemeContext.Provider value={{ themeName, setThemeName, resolvedTheme, isSystemTheme, currentMode }}>
       {children}
     </ThemeContext.Provider>
   )
