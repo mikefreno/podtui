@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { useRenderer } from "@opentui/solid";
 import { Layout } from "./components/Layout";
 import { Navigation } from "./components/Navigation";
 import { TabNavigation } from "./components/TabNavigation";
@@ -32,31 +33,31 @@ export function App() {
   // Centralized keyboard handler for all tab navigation and shortcuts
   useAppKeyboard({
     get activeTab() {
-      return activeTab()
+      return activeTab();
     },
     onTabChange: setActiveTab,
     inputFocused: inputFocused(),
     navigationEnabled: layerDepth() === 0,
     layerDepth,
     onLayerChange: (newDepth) => {
-      setLayerDepth(newDepth)
+      setLayerDepth(newDepth);
     },
     onAction: (action) => {
       if (action === "escape") {
         if (layerDepth() > 0) {
-          setLayerDepth(0)
-          setInputFocused(false)
+          setLayerDepth(0);
+          setInputFocused(false);
         } else {
-          setShowAuthPanel(false)
-          setInputFocused(false)
+          setShowAuthPanel(false);
+          setInputFocused(false);
         }
       }
 
       if (action === "enter" && layerDepth() === 0) {
-        setLayerDepth(1)
+        setLayerDepth(1);
       }
     },
-  })
+  });
 
   const renderContent = () => {
     const tab = activeTab();

@@ -1,13 +1,14 @@
-import { createContext, createEffect, createMemo, createSignal, Show, useContext } from "solid-js"
+import { createEffect, createMemo, onMount, onCleanup } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useRenderer } from "@opentui/solid"
 import type { ThemeName } from "../types/settings"
 import type { ThemeJson } from "../types/theme-schema"
 import { useAppStore } from "../stores/app"
 import { THEME_JSON } from "../constants/themes"
-import { resolveTheme } from "../utils/theme-resolver"
 import { generateSyntax, generateSubtleSyntax } from "../utils/syntax-highlighter"
 import { resolveTerminalTheme, loadThemes } from "../utils/theme"
+import { createSimpleContext } from "./helper"
+import { setupThemeSignalHandler, emitThemeChanged, emitThemeModeChanged } from "../utils/theme-observer"
 import type { RGBA, TerminalColors } from "@opentui/core"
 
 type ThemeResolved = {
@@ -75,93 +76,154 @@ type ThemeResolved = {
   thinkingOpacity?: number
 }
 
-type ThemeContextValue = {
-  theme: ThemeResolved
-  selected: () => string
-  all: () => Record<string, ThemeJson>
-  syntax: () => unknown
-  subtleSyntax: () => unknown
-  mode: () => "dark" | "light"
-  setMode: (mode: "dark" | "light") => void
-  set: (theme: string) => void
-  ready: () => boolean
-}
+/**
+ * Theme context using the createSimpleContext pattern.
+ *
+ * This ensures children are NOT rendered until the theme is ready,
+ * preventing "useTheme must be used within a ThemeProvider" errors.
+ *
+ * The key insight from opencode's implementation is that the provider
+ * uses `<Show when={ready}>` to gate rendering, so components can
+ * safely call useTheme() without checking ready state.
+ */
+export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
+  name: "Theme",
+  init: (props: { mode: "dark" | "light" }) => {
+    const appStore = useAppStore()
+    const renderer = useRenderer()
+    const [store, setStore] = createStore({
+      themes: THEME_JSON as Record<string, ThemeJson>,
+      mode: props.mode,
+      active: appStore.state().settings.theme as string,
+      system: undefined as undefined | TerminalColors,
+      ready: false,
+    })
 
-const ThemeContext = createContext<ThemeContextValue>()
+    function init() {
+      resolveSystemTheme()
+      loadThemes()
+        .then((custom) => {
+          setStore(
+            produce((draft) => {
+              Object.assign(draft.themes, custom)
+            })
+          )
+        })
+        .catch(() => {
+          // If custom themes fail to load, fall back to opencode theme
+          setStore("active", "opencode")
+        })
+        .finally(() => {
+          // Only set ready if not waiting for system theme
+          if (store.active !== "system") {
+            setStore("ready", true)
+          }
+        })
+    }
 
-export function ThemeProvider({ children }: { children: any }) {
-  const appStore = useAppStore()
-  const renderer = useRenderer()
-  const [ready, setReady] = createSignal(false)
-  const [store, setStore] = createStore({
-    themes: {} as Record<string, ThemeJson>,
-    mode: "dark" as "dark" | "light",
-    active: appStore.state().settings.theme as ThemeName,
-    system: undefined as undefined | TerminalColors,
-  })
+    function resolveSystemTheme() {
+      renderer
+        .getPalette({ size: 16 })
+        .then((colors) => {
+          if (!colors.palette[0]) {
+            // No system colors available, fall back to default
+            // This happens when the terminal doesn't support OSC palette queries
+            // (e.g., running inside tmux, or on unsupported terminals)
+            if (store.active === "system") {
+              setStore(
+                produce((draft) => {
+                  draft.active = "opencode"
+                  draft.ready = true
+                })
+              )
+            }
+            return
+          }
+          setStore(
+            produce((draft) => {
+              draft.system = colors
+              if (store.active === "system") {
+                draft.ready = true
+              }
+            })
+          )
+        })
+        .catch(() => {
+          // On error, fall back to default theme if using system
+          if (store.active === "system") {
+            setStore(
+              produce((draft) => {
+                draft.active = "opencode"
+                draft.ready = true
+              })
+            )
+          }
+        })
+    }
 
-  const init = () => {
-    loadThemes()
-      .then((custom) => {
-        setStore(
-          produce((draft) => {
-            Object.assign(draft.themes, custom)
-          })
-        )
-      })
-      .finally(() => setReady(true))
-  }
+    onMount(init)
 
-  init()
+    // Setup SIGUSR2 signal handler for dynamic theme reload
+    // This allows external tools to trigger a theme refresh by sending:
+    // `kill -USR2 <pid>`
+    const cleanupSignalHandler = setupThemeSignalHandler(() => {
+      renderer.clearPaletteCache()
+      init()
+    })
+    onCleanup(cleanupSignalHandler)
 
-  createEffect(() => {
-    setStore("active", appStore.state().settings.theme)
-  })
+    // Sync active theme with app store settings
+    createEffect(() => {
+      const theme = appStore.state().settings.theme
+      if (theme) setStore("active", theme)
+    })
 
-  createEffect(() => {
-    renderer
-      .getPalette({ size: 16 })
-      .then((colors) => setStore("system", colors))
-      .catch(() => {})
-  })
+    // Emit theme change events for observers
+    createEffect(() => {
+      const theme = store.active
+      const mode = store.mode
+      if (store.ready) {
+        emitThemeChanged(theme, mode)
+      }
+    })
 
-  const values = createMemo(() => {
-    const themes = Object.keys(store.themes).length ? store.themes : THEME_JSON
-    return resolveTerminalTheme(themes, store.active, store.mode, store.system)
-  })
+    const values = createMemo(() => {
+      return resolveTerminalTheme(store.themes, store.active, store.mode, store.system)
+    })
 
-  const syntax = createMemo(() => generateSyntax(values() as unknown as Record<string, RGBA>))
-  const subtleSyntax = createMemo(() =>
-    generateSubtleSyntax(values() as unknown as Record<string, RGBA> & { thinkingOpacity?: number })
-  )
+    const syntax = createMemo(() => generateSyntax(values() as unknown as Record<string, RGBA>))
+    const subtleSyntax = createMemo(() =>
+      generateSubtleSyntax(values() as unknown as Record<string, RGBA> & { thinkingOpacity?: number })
+    )
 
-  const context: ThemeContextValue = {
-  theme: new Proxy(values(), {
-    get(_target, prop) {
-      return values()[prop as keyof typeof values]
-    },
-  }) as ThemeResolved,
-    selected: () => store.active,
-    all: () => store.themes,
-    syntax,
-    subtleSyntax,
-    mode: () => store.mode,
-    setMode: (mode) => setStore("mode", mode),
-    set: (theme) => appStore.setTheme(theme as ThemeName),
-    ready,
-  }
-
-  return (
-    <Show when={ready()}>
-      <ThemeContext.Provider value={context}>{children}</ThemeContext.Provider>
-    </Show>
-  )
-}
-
-export function useTheme() {
-  const context = useContext(ThemeContext)
-  if (!context) {
-    throw new Error("useTheme must be used within a ThemeProvider")
-  }
-  return context
-}
+    return {
+      theme: new Proxy(values(), {
+        get(_target, prop) {
+          // @ts-expect-error - dynamic property access
+          return values()[prop]
+        },
+      }) as ThemeResolved,
+      get selected() {
+        return store.active
+      },
+      all() {
+        return store.themes
+      },
+      syntax,
+      subtleSyntax,
+      mode() {
+        return store.mode
+      },
+      setMode(mode: "dark" | "light") {
+        setStore("mode", mode)
+        emitThemeModeChanged(mode)
+      },
+      set(theme: string) {
+        appStore.setTheme(theme as ThemeName)
+      },
+      get ready() {
+        return store.ready
+      },
+    }
+  },
+})

@@ -1,10 +1,22 @@
 import { render } from "@opentui/solid"
 import { App } from "./App"
 import { ThemeProvider } from "./context/ThemeContext"
-import "./styles/theme.css"
+import { ToastProvider, Toast } from "./ui/toast"
+import { KeybindProvider } from "./context/KeybindContext"
+import { DialogProvider } from "./ui/dialog"
+import { CommandProvider } from "./ui/command"
 
 render(() => (
-  <ThemeProvider>
-    <App />
-  </ThemeProvider>
+  <ToastProvider>
+    <ThemeProvider mode="dark">
+      <KeybindProvider>
+        <DialogProvider>
+          <CommandProvider>
+            <App />
+            <Toast />
+          </CommandProvider>
+        </DialogProvider>
+      </KeybindProvider>
+    </ThemeProvider>
+  </ToastProvider>
 ))

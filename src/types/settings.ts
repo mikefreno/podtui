@@ -1,7 +1,7 @@
 import type { RGBA } from "@opentui/core"
 import type { ColorValue, ThemeJson, Variant } from "./theme-schema"
 
-export type ThemeName = "system" | "catppuccin" | "gruvbox" | "tokyo" | "nord" | "custom"
+export type ThemeName = "system" | "opencode" | "catppuccin" | "gruvbox" | "tokyo" | "nord" | "custom"
 
 export type LayerBackgrounds = {
   layer0: ColorValue
