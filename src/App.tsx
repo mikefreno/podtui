@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal, ErrorBoundary } from "solid-js";
 import { Layout } from "./components/Layout";
 import { Navigation } from "./components/Navigation";
 import { TabNavigation } from "./components/TabNavigation";
@@ -191,7 +191,18 @@ export function App() {
       }
       footer={<Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />}
     >
-      <box style={{ padding: 1 }}>{renderContent()}</box>
+      <box style={{ padding: 1 }}>
+        <ErrorBoundary fallback={(err) => (
+          <box border padding={2}>
+            <text fg="red">
+              Error rendering tab: {err?.message ?? String(err)}{"\n"}
+              Press a number key (1-5) to switch tabs.
+            </text>
+          </box>
+        )}>
+          {renderContent()}
+        </ErrorBoundary>
+      </box>
     </Layout>
   );
 }

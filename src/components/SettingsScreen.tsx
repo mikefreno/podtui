@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js"
+import { createSignal, For } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { SourceManager } from "./SourceManager"
 import { useTheme } from "../context/ThemeContext"
@@ -56,18 +56,20 @@ export function SettingsScreen(props: SettingsScreenProps) {
       </box>
 
       <box flexDirection="row" gap={1}>
-        {SECTIONS.map((section, index) => (
-          <box
-            border
-            padding={0}
-            backgroundColor={activeSection() === section.id ? theme.primary : undefined}
-            onMouseDown={() => setActiveSection(section.id)}
-          >
-            <text fg={activeSection() === section.id ? theme.text : theme.textMuted}>
-              [{index + 1}] {section.label}
-            </text>
-          </box>
-        ))}
+        <For each={SECTIONS}>
+          {(section, index) => (
+            <box
+              border
+              padding={0}
+              backgroundColor={activeSection() === section.id ? theme.primary : undefined}
+              onMouseDown={() => setActiveSection(section.id)}
+            >
+              <text fg={activeSection() === section.id ? theme.text : theme.textMuted}>
+                [{index() + 1}] {section.label}
+              </text>
+            </box>
+          )}
+        </For>
       </box>
 
       <box border flexGrow={1} padding={1} flexDirection="column" gap={1}>

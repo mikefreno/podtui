@@ -31,7 +31,7 @@ export function TrendingShows(props: TrendingShowsProps) {
       </Show>
 
       <Show when={!props.isLoading && props.podcasts.length > 0}>
-        <scrollbox height="100%">
+        <scrollbox height={15}>
           <box flexDirection="column">
             <For each={props.podcasts}>
               {(podcast, index) => (

@@ -2,7 +2,7 @@
  * PodcastCard component - Reusable card for displaying podcast info
  */
 
-import { Show } from "solid-js"
+import { Show, For } from "solid-js"
 import type { Podcast } from "../types/podcast"
 
 type PodcastCardProps = {
@@ -54,9 +54,9 @@ export function PodcastCard(props: PodcastCardProps) {
       <box flexDirection="row" justifyContent="space-between" marginTop={props.compact ? 0 : 1}>
         <box flexDirection="row" gap={1}>
           <Show when={(props.podcast.categories ?? []).length > 0}>
-            {(props.podcast.categories ?? []).slice(0, 2).map((cat) => (
-              <text fg="yellow">[{cat}]</text>
-            ))}
+            <For each={(props.podcast.categories ?? []).slice(0, 2)}>
+              {(cat) => <text fg="yellow">[{cat}]</text>}
+            </For>
           </Show>
         </box>
 

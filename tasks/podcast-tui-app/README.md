@@ -74,11 +74,11 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 6: Search Functionality 🔍
 **Implement multi-source search interface**
 
-- [ ] 06 — Implement multi-source search interface → `06-search.md`
-- [ ] 33 — Create search interface → `33-search-interface.md`
-- [ ] 34 — Implement multi-source search → `34-multi-source-search.md`
-- [ ] 35 — Add search results display → `35-search-results.md`
-- [ ] 36 — Build search history with persistent storage → `36-search-history.md`
+- [x] 06 — Implement multi-source search interface → `06-search.md`
+- [x] 33 — Create search interface → `33-search-interface.md`
+- [x] 34 — Implement multi-source search → `34-multi-source-search.md`
+- [x] 35 — Add search results display → `35-search-results.md`
+- [x] 36 — Build search history with persistent storage → `36-search-history.md`
 
 **Dependencies:** 05 -> 06 -> 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
@@ -87,11 +87,11 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 7: Discover Feed 🌟
 **Build discover page with popular shows**
 
-- [ ] 07 — Build discover feed with popular shows → `07-discover.md`
-- [ ] 37 — Create popular shows data structure → `37-popular-shows.md`
-- [ ] 38 — Build discover page component → `38-discover-page.md`
-- [ ] 39 — Add trending shows display → `39-trending-shows.md`
-- [ ] 40 — Implement category filtering → `40-category-filtering.md`
+- [x] 07 — Build discover feed with popular shows → `07-discover.md`
+- [x] 37 — Create popular shows data structure → `37-popular-shows.md`
+- [x] 38 — Build discover page component → `38-discover-page.md`
+- [x] 39 — Add trending shows display → `39-trending-shows.md`
+- [x] 40 — Implement category filtering → `40-category-filtering.md`
 
 **Dependencies:** 06 -> 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
@@ -100,11 +100,11 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 8: Player Component 🎵
 **Create player UI with waveform visualization**
 
-- [ ] 08 — Create player UI with waveform visualization → `08-player.md`
-- [ ] 41 — Create player UI layout → `41-player-layout.md`
-- [ ] 42 — Implement playback controls → `42-playback-controls.md`
-- [ ] 43 — Build ASCII waveform visualization → `43-waveform-visualization.md`
-- [ ] 44 — Add progress tracking and seek → `44-progress-tracking.md`
+- [x] 08 — Create player UI with waveform visualization → `08-player.md`
+- [x] 41 — Create player UI layout → `41-player-layout.md`
+- [x] 42 — Implement playback controls → `42-playback-controls.md`
+- [x] 43 — Build ASCII waveform visualization → `43-waveform-visualization.md`
+- [x] 44 — Add progress tracking and seek → `44-progress-tracking.md`
 - [ ] 45 — Implement audio integration (system/external player) → `45-audio-integration.md`
 
 **Dependencies:** 07 -> 08 -> 09 -> 10 -> 11 -> 12
@@ -114,11 +114,11 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 9: Settings & Configuration ⚙️
 **Build settings screen and preferences**
 
-- [ ] 09 — Build settings screen and preferences → `09-settings.md`
-- [ ] 46 — Create settings screen → `46-settings-screen.md`
-- [ ] 47 — Add source management UI → `47-source-management-ui.md`
-- [ ] 48 — Build user preferences → `48-user-preferences.md`
-- [ ] 49 — Implement data persistence (localStorage/file-based) → `49-data-persistence.md`
+- [x] 09 — Build settings screen and preferences → `09-settings.md`
+- [x] 46 — Create settings screen → `46-settings-screen.md`
+- [x] 47 — Add source management UI → `47-source-management-ui.md`
+- [x] 48 — Build user preferences → `48-user-preferences.md`
+- [x] 49 — Implement data persistence (localStorage/file-based) → `49-data-persistence.md`
 
 **Dependencies:** 08 -> 09 -> 10 -> 11 -> 12
 
@@ -127,14 +127,14 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 10: Theme System 🎨
 **Implement theming with Catppuccin, Gruvbox, Tokyo, Nord, and custom themes**
 
-- [ ] 59 — Create theme system architecture → `59-theme-system.md`
-- [ ] 60 — Implement default theme (system terminal) → `60-default-theme.md`
-- [ ] 61 — Add Catppuccin theme → `61-catppuccin-theme.md`
-- [ ] 62 — Add Gruvbox theme → `62-gruvbox-theme.md`
-- [ ] 63 — Add Tokyo theme → `63-tokyo-theme.md`
-- [ ] 64 — Add Nord theme → `64-nord-theme.md`
+- [x] 59 — Create theme system architecture → `59-theme-system.md`
+- [x] 60 — Implement default theme (system terminal) → `60-default-theme.md`
+- [x] 61 — Add Catppuccin theme → `61-catppuccin-theme.md`
+- [x] 62 — Add Gruvbox theme → `62-gruvbox-theme.md`
+- [x] 63 — Add Tokyo theme → `63-tokyo-theme.md`
+- [x] 64 — Add Nord theme → `64-nord-theme.md`
 - [ ] 65 — Implement custom theme editor → `65-custom-theme.md`
-- [ ] 66 — Add theme selector in settings → `66-theme-selector.md`
+- [x] 66 — Add theme selector in settings → `66-theme-selector.md`
 
 **Dependencies:** 09 -> 59 -> 60 -> 61 -> 62 -> 63 -> 64 -> 65 -> 66 -> 10
 
@@ -143,11 +143,11 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 ## Phase 11: State Management & Data Layer 🗄️
 **Create global state store and data layer**
 
-- [ ] 10 — Create global state store and data layer → `10-state-management.md`
-- [ ] 50 — Create global state store (Signals) → `50-global-state-store.md`
-- [ ] 51 — Implement API client for podcast sources → `51-api-client.md`
-- [ ] 52 — Add data fetching and caching → `52-data-fetching-caching.md`
-- [ ] 53 — Build file-based storage for sync → `53-file-based-storage.md`
+- [x] 10 — Create global state store and data layer → `10-state-management.md`
+- [x] 50 — Create global state store (Signals) → `50-global-state-store.md`
+- [x] 51 — Implement API client for podcast sources → `51-api-client.md`
+- [x] 52 — Add data fetching and caching → `52-data-fetching-caching.md`
+- [x] 53 — Build file-based storage for sync → `53-file-based-storage.md`
 
 **Dependencies:** 66 -> 10
 
@@ -160,8 +160,8 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 - [ ] 54 — Set up testing framework (snapshot testing) → `54-testing-framework.md`
 - [ ] 55 — Write component tests → `55-component-tests.md`
 - [ ] 56 — Add keyboard interaction tests → `56-keyboard-tests.md`
-- [ ] 57 — Implement error handling → `57-error-handling.md`
-- [ ] 58 — Add loading states and transitions → `58-loading-states.md`
+- [x] 57 — Implement error handling → `57-error-handling.md`
+- [x] 58 — Add loading states and transitions → `58-loading-states.md`
 
 **Dependencies:** 10 -> 11
 

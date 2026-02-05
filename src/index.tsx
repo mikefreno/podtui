@@ -33,4 +33,4 @@ render(() => (
       </ThemeProvider>
     </ToastProvider>
   </RendererSetup>
-))
+), { useThread: false })

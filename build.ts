@@ -30,7 +30,11 @@ const platformKey = `${platform}-${arch}`
 const platformPkg = platformMap[platformKey]
 
 if (platformPkg) {
-  const libName = platform === "win32" ? "opentui.dll" : "libopentui.dylib"
+  const libName = platform === "win32"
+    ? "opentui.dll"
+    : platform === "darwin"
+      ? "libopentui.dylib"
+      : "libopentui.so"
   const srcPath = join("node_modules", `@opentui/core-${platformPkg}`, libName)
   
   if (existsSync(srcPath)) {
