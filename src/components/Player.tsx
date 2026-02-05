@@ -1,12 +1,13 @@
-import { createSignal } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { PlaybackControls } from "./PlaybackControls"
 import { Waveform } from "./Waveform"
 import { createWaveform } from "../utils/waveform"
+import { useAudio } from "../hooks/useAudio"
 import type { Episode } from "../types/episode"
 
 type PlayerProps = {
   focused: boolean
+  episode?: Episode | null
   onExit?: () => void
 }
 
@@ -21,17 +22,27 @@ const SAMPLE_EPISODE: Episode = {
 }
 
 export function Player(props: PlayerProps) {
-  const [isPlaying, setIsPlaying] = createSignal(false)
-  const [position, setPosition] = createSignal(0)
-  const [volume, setVolume] = createSignal(0.7)
-  const [speed, setSpeed] = createSignal(1)
+  const audio = useAudio()
 
   const waveform = () => createWaveform(64)
+
+  // The episode to display — prefer a passed-in episode, then the
+  // currently-playing episode, then fall back to the sample.
+  const episode = () => props.episode ?? audio.currentEpisode() ?? SAMPLE_EPISODE
+  const dur = () => audio.duration() || episode().duration || 1
 
   useKeyboard((key: { name: string }) => {
     if (!props.focused) return
     if (key.name === "space") {
-      setIsPlaying((value: boolean) => !value)
+      if (audio.currentEpisode()) {
+        audio.togglePlayback()
+      } else {
+        // Nothing loaded yet — start playing the displayed episode
+        const ep = episode()
+        if (ep.audioUrl) {
+          audio.play(ep)
+        }
+      }
       return
     }
     if (key.name === "escape") {
@@ -39,23 +50,34 @@ export function Player(props: PlayerProps) {
       return
     }
     if (key.name === "left") {
-      setPosition((value: number) => Math.max(0, value - 10))
+      audio.seekRelative(-10)
     }
     if (key.name === "right") {
-      setPosition((value: number) => Math.min(SAMPLE_EPISODE.duration, value + 10))
+      audio.seekRelative(10)
     }
     if (key.name === "up") {
-      setVolume((value: number) => Math.min(1, Number((value + 0.05).toFixed(2))))
+      audio.setVolume(Math.min(1, Number((audio.volume() + 0.05).toFixed(2))))
     }
     if (key.name === "down") {
-      setVolume((value: number) => Math.max(0, Number((value - 0.05).toFixed(2))))
+      audio.setVolume(Math.max(0, Number((audio.volume() - 0.05).toFixed(2))))
     }
     if (key.name === "s") {
-      setSpeed((value: number) => (value >= 2 ? 0.5 : Number((value + 0.25).toFixed(2))))
+      const next = audio.speed() >= 2 ? 0.5 : Number((audio.speed() + 0.25).toFixed(2))
+      audio.setSpeed(next)
     }
   })
 
-  const progressPercent = () => Math.round((position() / SAMPLE_EPISODE.duration) * 100)
+  const progressPercent = () => {
+    const d = dur()
+    if (d <= 0) return 0
+    return Math.min(100, Math.round((audio.position() / d) * 100))
+  }
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = Math.floor(seconds % 60)
+    return `${m}:${String(s).padStart(2, "0")}`
+  }
 
   return (
     <box flexDirection="column" gap={1}>
@@ -64,15 +86,19 @@ export function Player(props: PlayerProps) {
           <strong>Now Playing</strong>
         </text>
         <text fg="gray">
-          Episode {Math.floor(position() / 60)}:{String(Math.floor(position() % 60)).padStart(2, "0")}
+          {formatTime(audio.position())} / {formatTime(dur())}
         </text>
       </box>
 
+      {audio.error() && (
+        <text fg="red">{audio.error()}</text>
+      )}
+
       <box border padding={1} flexDirection="column" gap={1}>
         <text fg="white">
-          <strong>{SAMPLE_EPISODE.title}</strong>
+          <strong>{episode().title}</strong>
         </text>
-        <text fg="gray">{SAMPLE_EPISODE.description}</text>
+        <text fg="gray">{episode().description}</text>
 
         <box flexDirection="column" gap={1}>
           <box flexDirection="row" gap={1} alignItems="center">
@@ -81,7 +107,7 @@ export function Player(props: PlayerProps) {
               <box
                 width={`${progressPercent()}%`}
                 height={1}
-                backgroundColor={isPlaying() ? "#6fa8ff" : "#7d8590"}
+                backgroundColor={audio.isPlaying() ? "#6fa8ff" : "#7d8590"}
               />
             </box>
             <text fg="gray">{progressPercent()}%</text>
@@ -89,26 +115,35 @@ export function Player(props: PlayerProps) {
 
           <Waveform
             data={waveform()}
-            position={position()}
-            duration={SAMPLE_EPISODE.duration}
-            isPlaying={isPlaying()}
-            onSeek={(next: number) => setPosition(next)}
+            position={audio.position()}
+            duration={dur()}
+            isPlaying={audio.isPlaying()}
+            onSeek={(next: number) => audio.seek(next)}
           />
         </box>
       </box>
 
       <PlaybackControls
-        isPlaying={isPlaying()}
-        volume={volume()}
-        speed={speed()}
-        onToggle={() => setIsPlaying((value: boolean) => !value)}
-        onPrev={() => setPosition(0)}
-        onNext={() => setPosition(SAMPLE_EPISODE.duration)}
-        onSpeedChange={setSpeed}
-        onVolumeChange={setVolume}
+        isPlaying={audio.isPlaying()}
+        volume={audio.volume()}
+        speed={audio.speed()}
+        backendName={audio.backendName()}
+        hasAudioUrl={!!episode().audioUrl}
+        onToggle={() => {
+          if (audio.currentEpisode()) {
+            audio.togglePlayback()
+          } else {
+            const ep = episode()
+            if (ep.audioUrl) audio.play(ep)
+          }
+        }}
+        onPrev={() => audio.seek(0)}
+        onNext={() => audio.seek(dur())}
+        onSpeedChange={(s: number) => audio.setSpeed(s)}
+        onVolumeChange={(v: number) => audio.setVolume(v)}
       />
 
-      <text fg="gray">Enter dive | Esc up | Space play/pause | Left/Right seek</text>
+      <text fg="gray">Space play/pause | Left/Right seek 10s | Up/Down volume | S speed | Esc back</text>
     </box>
   )
 }

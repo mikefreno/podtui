@@ -105,7 +105,7 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 - [x] 42 — Implement playback controls → `42-playback-controls.md`
 - [x] 43 — Build ASCII waveform visualization → `43-waveform-visualization.md`
 - [x] 44 — Add progress tracking and seek → `44-progress-tracking.md`
-- [ ] 45 — Implement audio integration (system/external player) → `45-audio-integration.md`
+- [x] 45 — Implement audio integration (system/external player) → `45-audio-integration.md`
 
 **Dependencies:** 07 -> 08 -> 09 -> 10 -> 11 -> 12
 
