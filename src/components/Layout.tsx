@@ -1,5 +1,7 @@
 import type { JSX } from "solid-js"
-import type { ThemeColors, LayerBackgrounds } from "../types/settings"
+import type { ThemeColors } from "../types/settings"
+import type { ColorValue } from "../types/theme-schema"
+import { resolveColorReference } from "../utils/theme-css"
 import { LayerIndicator } from "./LayerIndicator"
 
 type LayerConfig = {
@@ -17,6 +19,7 @@ type LayoutProps = {
 
 export function Layout(props: LayoutProps) {
   const theme = props.theme
+  const toColor = (value?: ColorValue) => (value ? resolveColorReference(value) : undefined)
 
   // Get layer configuration based on depth
   const getLayerConfig = (depth: number): LayerConfig => {
@@ -26,10 +29,10 @@ export function Layout(props: LayoutProps) {
 
     const backgrounds = theme.layerBackgrounds
     const depthMap: Record<number, LayerConfig> = {
-      0: { depth: 0, background: backgrounds.layer0 },
-      1: { depth: 1, background: backgrounds.layer1 },
-      2: { depth: 2, background: backgrounds.layer2 },
-      3: { depth: 3, background: backgrounds.layer3 },
+      0: { depth: 0, background: resolveColorReference(backgrounds.layer0) },
+      1: { depth: 1, background: resolveColorReference(backgrounds.layer1) },
+      2: { depth: 2, background: resolveColorReference(backgrounds.layer2) },
+      3: { depth: 3, background: resolveColorReference(backgrounds.layer3) },
     }
 
     return depthMap[depth] || { depth: 0, background: "transparent" }
@@ -43,14 +46,14 @@ export function Layout(props: LayoutProps) {
       flexDirection="column"
       width="100%"
       height="100%"
-      backgroundColor={theme?.background}
+      backgroundColor={toColor(theme?.background)}
     >
       {/* Header */}
       {props.header ? (
         <box
           style={{
             height: 4,
-            backgroundColor: theme?.surface,
+            backgroundColor: toColor(theme?.surface),
           }}
         >
           <box style={{ padding: 1 }}>
@@ -80,7 +83,7 @@ export function Layout(props: LayoutProps) {
         <box
           style={{
             height: 2,
-            backgroundColor: theme?.surface,
+            backgroundColor: toColor(theme?.surface),
           }}
         >
           <box style={{ padding: 1 }}>
@@ -96,7 +99,7 @@ export function Layout(props: LayoutProps) {
         <box
           style={{
             height: 1,
-            backgroundColor: theme?.surface,
+            backgroundColor: toColor(theme?.surface),
           }}
         >
           <box style={{ padding: 1 }}>

@@ -1,10 +1,12 @@
 import type {
   DesktopTheme,
   ThemeColors,
+  ThemeDefinition,
   ThemeName,
   ThemeToken,
   ThemeVariant,
 } from "../types/settings"
+import type { ColorValue } from "./theme-schema"
 
 // Base theme colors
 export const BASE_THEME_COLORS: ThemeColors = {
@@ -63,12 +65,12 @@ export const THEMES_DESKTOP: DesktopTheme = {
         warning: "#fab387",
         error: "#f38ba8",
         success: "#a6e3a1",
-        layerBackgrounds: {
-          layer0: "transparent",
-          layer1: "#181825",
-          layer2: "#11111b",
-          layer3: "#0a0a0f",
-        },
+  layerBackgrounds: {
+    layer0: "transparent",
+    layer1: "#181825",
+    layer2: "#11111b",
+    layer3: "#0a0a0f",
+  },
       },
     },
     {
@@ -149,4 +151,10 @@ export function getDefaultTheme(): ThemeVariant {
   return THEMES_DESKTOP.variants.find(
     (variant) => variant.name === THEMES_DESKTOP.defaultVariant
   )!
+}
+
+export type ThemeJsonFile = ThemeDefinition
+
+export function isColorReference(value: ColorValue): value is string {
+  return typeof value === "string" && !value.startsWith("#")
 }

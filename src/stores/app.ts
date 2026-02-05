@@ -1,6 +1,8 @@
 import { createSignal } from "solid-js"
-import { DEFAULT_THEME, THEMES } from "../constants/themes"
-import type { AppSettings, AppState, ThemeColors, ThemeName, UserPreferences } from "../types/settings"
+import { DEFAULT_THEME, THEME_JSON } from "../constants/themes"
+import type { AppSettings, AppState, ThemeColors, ThemeName, ThemeMode, UserPreferences } from "../types/settings"
+import { resolveTheme } from "../utils/theme-resolver"
+import type { ThemeJson } from "../types/theme-schema"
 
 const STORAGE_KEY = "podtui_app_state"
 
@@ -83,10 +85,13 @@ export function createAppStore() {
     updateSettings({ theme })
   }
 
-  const resolveTheme = (): ThemeColors => {
+  const resolveThemeColors = (): ThemeColors => {
     const theme = state().settings.theme
     if (theme === "custom") return state().customTheme
-    return THEMES[theme] ?? DEFAULT_THEME
+    if (theme === "system") return DEFAULT_THEME
+    const json = THEME_JSON[theme]
+    if (!json) return DEFAULT_THEME
+    return resolveTheme(json as ThemeJson, "dark" as ThemeMode) as unknown as ThemeColors
   }
 
   return {
@@ -95,7 +100,7 @@ export function createAppStore() {
     updatePreferences,
     updateCustomTheme,
     setTheme,
-    resolveTheme,
+    resolveTheme: resolveThemeColors,
   }
 }
 

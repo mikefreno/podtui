@@ -1,23 +1,26 @@
+import type { RGBA } from "@opentui/core"
+import type { ColorValue, ThemeJson, Variant } from "./theme-schema"
+
 export type ThemeName = "system" | "catppuccin" | "gruvbox" | "tokyo" | "nord" | "custom"
 
 export type LayerBackgrounds = {
-  layer0: string
-  layer1: string
-  layer2: string
-  layer3: string
+  layer0: ColorValue
+  layer1: ColorValue
+  layer2: ColorValue
+  layer3: ColorValue
 }
 
 export type ThemeColors = {
-  background: string
-  surface: string
-  primary: string
-  secondary: string
-  accent: string
-  text: string
-  muted: string
-  warning: string
-  error: string
-  success: string
+  background: ColorValue
+  surface: ColorValue
+  primary: ColorValue
+  secondary: ColorValue
+  accent: ColorValue
+  text: ColorValue
+  muted: ColorValue
+  warning: ColorValue
+  error: ColorValue
+  success: ColorValue
   layerBackgrounds?: LayerBackgrounds
 }
 
@@ -30,8 +33,10 @@ export type ThemeToken = {
   [key: string]: string
 }
 
-export type ResolvedTheme = ThemeColors & {
-  layerBackgrounds: LayerBackgrounds
+export type ResolvedTheme = Record<string, RGBA> & {
+  layerBackgrounds: Record<string, RGBA>
+  _hasSelectedListItemText: boolean
+  thinkingOpacity: number
 }
 
 export type DesktopTheme = {
@@ -58,3 +63,7 @@ export type AppState = {
   preferences: UserPreferences
   customTheme: ThemeColors
 }
+
+export type ThemeMode = "dark" | "light"
+export type ThemeVariantValue = Variant
+export type ThemeDefinition = ThemeJson
