@@ -5,6 +5,9 @@ import { ansiToRgba } from "./ansi-to-rgba"
 export type ThemeMode = "dark" | "light"
 
 export function resolveTheme(theme: ThemeJson, mode: ThemeMode) {
+  if (!theme || !theme.theme) {
+    throw new Error("Invalid theme: missing theme object")
+  }
   const defs = theme.defs ?? {}
 
   function resolveColor(value: ColorValue): RGBA {
@@ -38,8 +41,21 @@ export function resolveTheme(theme: ThemeJson, mode: ThemeMode) {
 
   const thinkingOpacity = theme.theme.thinkingOpacity ?? 0.6
 
+  const background = resolved.background
+  const backgroundPanel = resolved.backgroundPanel ?? background
+  const backgroundElement = resolved.backgroundElement ?? backgroundPanel
+  const backgroundMenu = resolved.backgroundMenu ?? backgroundElement
+
   return {
     ...resolved,
+    muted: resolved.textMuted ?? resolved.muted,
+    surface: resolved.backgroundPanel ?? resolved.surface,
+    layerBackgrounds: {
+      layer0: background,
+      layer1: backgroundPanel,
+      layer2: backgroundElement,
+      layer3: backgroundMenu,
+    },
     _hasSelectedListItemText: hasSelected,
     thinkingOpacity,
   }

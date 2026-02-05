@@ -1,41 +1,34 @@
 import type { JSX } from "solid-js"
-import type { ThemeColors } from "../types/settings"
-import type { ColorValue } from "../types/theme-schema"
-import { resolveColorReference } from "../utils/theme-css"
+import type { RGBA } from "@opentui/core"
+import { useTheme } from "../context/ThemeContext"
 import { LayerIndicator } from "./LayerIndicator"
 
 type LayerConfig = {
   depth: number
-  background: string
+  background: RGBA
 }
 
 type LayoutProps = {
   header?: JSX.Element
   footer?: JSX.Element
   children?: JSX.Element
-  theme?: ThemeColors
   layerDepth?: number
 }
 
 export function Layout(props: LayoutProps) {
-  const theme = props.theme
-  const toColor = (value?: ColorValue) => (value ? resolveColorReference(value) : undefined)
+  const { theme } = useTheme()
 
   // Get layer configuration based on depth
   const getLayerConfig = (depth: number): LayerConfig => {
-    if (!theme?.layerBackgrounds) {
-      return { depth: 0, background: "transparent" }
-    }
-
     const backgrounds = theme.layerBackgrounds
     const depthMap: Record<number, LayerConfig> = {
-      0: { depth: 0, background: resolveColorReference(backgrounds.layer0) },
-      1: { depth: 1, background: resolveColorReference(backgrounds.layer1) },
-      2: { depth: 2, background: resolveColorReference(backgrounds.layer2) },
-      3: { depth: 3, background: resolveColorReference(backgrounds.layer3) },
+      0: { depth: 0, background: backgrounds?.layer0 ?? theme.background },
+      1: { depth: 1, background: backgrounds?.layer1 ?? theme.backgroundPanel },
+      2: { depth: 2, background: backgrounds?.layer2 ?? theme.backgroundElement },
+      3: { depth: 3, background: backgrounds?.layer3 ?? theme.backgroundMenu },
     }
 
-    return depthMap[depth] || { depth: 0, background: "transparent" }
+    return depthMap[depth] || { depth: 0, background: theme.background }
   }
 
   // Get current layer background
@@ -46,14 +39,14 @@ export function Layout(props: LayoutProps) {
       flexDirection="column"
       width="100%"
       height="100%"
-      backgroundColor={toColor(theme?.background)}
+      backgroundColor={theme.background}
     >
       {/* Header */}
       {props.header ? (
         <box
           style={{
             height: 4,
-            backgroundColor: toColor(theme?.surface),
+            backgroundColor: theme.surface ?? theme.backgroundPanel,
           }}
         >
           <box style={{ padding: 1 }}>
@@ -83,7 +76,7 @@ export function Layout(props: LayoutProps) {
         <box
           style={{
             height: 2,
-            backgroundColor: toColor(theme?.surface),
+            backgroundColor: theme.surface ?? theme.backgroundPanel,
           }}
         >
           <box style={{ padding: 1 }}>
@@ -99,7 +92,7 @@ export function Layout(props: LayoutProps) {
         <box
           style={{
             height: 1,
-            backgroundColor: toColor(theme?.surface),
+            backgroundColor: theme.surface ?? theme.backgroundPanel,
           }}
         >
           <box style={{ padding: 1 }}>

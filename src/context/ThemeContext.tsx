@@ -1,4 +1,4 @@
-import { createContext, createEffect, createMemo, createSignal, useContext } from "solid-js"
+import { createContext, createEffect, createMemo, createSignal, Show, useContext } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useRenderer } from "@opentui/solid"
 import type { ThemeName } from "../types/settings"
@@ -7,13 +7,76 @@ import { useAppStore } from "../stores/app"
 import { THEME_JSON } from "../constants/themes"
 import { resolveTheme } from "../utils/theme-resolver"
 import { generateSyntax, generateSubtleSyntax } from "../utils/syntax-highlighter"
-import { generateSystemTheme } from "../utils/system-theme"
-import { getCustomThemes } from "../utils/custom-themes"
-import { setThemeAttribute } from "../utils/theme"
-import type { RGBA } from "@opentui/core"
+import { resolveTerminalTheme, loadThemes } from "../utils/theme"
+import type { RGBA, TerminalColors } from "@opentui/core"
+
+type ThemeResolved = {
+  primary: RGBA
+  secondary: RGBA
+  accent: RGBA
+  error: RGBA
+  warning: RGBA
+  success: RGBA
+  info: RGBA
+  text: RGBA
+  textMuted: RGBA
+  selectedListItemText: RGBA
+  background: RGBA
+  backgroundPanel: RGBA
+  backgroundElement: RGBA
+  backgroundMenu: RGBA
+  border: RGBA
+  borderActive: RGBA
+  borderSubtle: RGBA
+  diffAdded: RGBA
+  diffRemoved: RGBA
+  diffContext: RGBA
+  diffHunkHeader: RGBA
+  diffHighlightAdded: RGBA
+  diffHighlightRemoved: RGBA
+  diffAddedBg: RGBA
+  diffRemovedBg: RGBA
+  diffContextBg: RGBA
+  diffLineNumber: RGBA
+  diffAddedLineNumberBg: RGBA
+  diffRemovedLineNumberBg: RGBA
+  markdownText: RGBA
+  markdownHeading: RGBA
+  markdownLink: RGBA
+  markdownLinkText: RGBA
+  markdownCode: RGBA
+  markdownBlockQuote: RGBA
+  markdownEmph: RGBA
+  markdownStrong: RGBA
+  markdownHorizontalRule: RGBA
+  markdownListItem: RGBA
+  markdownListEnumeration: RGBA
+  markdownImage: RGBA
+  markdownImageText: RGBA
+  markdownCodeBlock: RGBA
+  syntaxComment: RGBA
+  syntaxKeyword: RGBA
+  syntaxFunction: RGBA
+  syntaxVariable: RGBA
+  syntaxString: RGBA
+  syntaxNumber: RGBA
+  syntaxType: RGBA
+  syntaxOperator: RGBA
+  syntaxPunctuation: RGBA
+  muted?: RGBA
+  surface?: RGBA
+  layerBackgrounds?: {
+    layer0: RGBA
+    layer1: RGBA
+    layer2: RGBA
+    layer3: RGBA
+  }
+  _hasSelectedListItemText?: boolean
+  thinkingOpacity?: number
+}
 
 type ThemeContextValue = {
-  theme: Record<string, unknown>
+  theme: ThemeResolved
   selected: () => string
   all: () => Record<string, ThemeJson>
   syntax: () => unknown
@@ -31,13 +94,14 @@ export function ThemeProvider({ children }: { children: any }) {
   const renderer = useRenderer()
   const [ready, setReady] = createSignal(false)
   const [store, setStore] = createStore({
-    themes: { ...THEME_JSON } as Record<string, ThemeJson>,
+    themes: {} as Record<string, ThemeJson>,
     mode: "dark" as "dark" | "light",
     active: appStore.state().settings.theme as ThemeName,
+    system: undefined as undefined | TerminalColors,
   })
 
   const init = () => {
-    getCustomThemes()
+    loadThemes()
       .then((custom) => {
         setStore(
           produce((draft) => {
@@ -52,26 +116,18 @@ export function ThemeProvider({ children }: { children: any }) {
 
   createEffect(() => {
     setStore("active", appStore.state().settings.theme)
-    setThemeAttribute(appStore.state().settings.theme)
   })
 
   createEffect(() => {
-    if (store.active !== "system") return
     renderer
       .getPalette({ size: 16 })
-      .then((colors) => {
-        setStore(
-          produce((draft) => {
-            draft.themes.system = generateSystemTheme(colors, store.mode)
-          })
-        )
-      })
+      .then((colors) => setStore("system", colors))
       .catch(() => {})
   })
 
   const values = createMemo(() => {
-    const theme = store.themes[store.active] ?? store.themes.opencode
-    return resolveTheme(theme, store.mode)
+    const themes = Object.keys(store.themes).length ? store.themes : THEME_JSON
+    return resolveTerminalTheme(themes, store.active, store.mode, store.system)
   })
 
   const syntax = createMemo(() => generateSyntax(values() as unknown as Record<string, RGBA>))
@@ -80,11 +136,11 @@ export function ThemeProvider({ children }: { children: any }) {
   )
 
   const context: ThemeContextValue = {
-    theme: new Proxy(values(), {
-      get(_target, prop) {
-        return values()[prop as keyof typeof values]
-      },
-    }),
+  theme: new Proxy(values(), {
+    get(_target, prop) {
+      return values()[prop as keyof typeof values]
+    },
+  }) as ThemeResolved,
     selected: () => store.active,
     all: () => store.themes,
     syntax,
@@ -95,7 +151,11 @@ export function ThemeProvider({ children }: { children: any }) {
     ready,
   }
 
-  return <ThemeContext.Provider value={context}>{children}</ThemeContext.Provider>
+  return (
+    <Show when={ready()}>
+      <ThemeContext.Provider value={context}>{children}</ThemeContext.Provider>
+    </Show>
+  )
 }
 
 export function useTheme() {

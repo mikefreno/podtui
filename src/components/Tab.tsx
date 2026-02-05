@@ -1,3 +1,5 @@
+import { useTheme } from "../context/ThemeContext"
+
 export type TabId = "discover" | "feeds" | "search" | "player" | "settings"
 
 export type TabDefinition = {
@@ -20,11 +22,12 @@ type TabProps = {
 }
 
 export function Tab(props: TabProps) {
+  const { theme } = useTheme()
   return (
     <box
       border
       onMouseDown={() => props.onSelect(props.tab.id)}
-      style={{ padding: 1, backgroundColor: props.active ? "var(--color-primary)" : "transparent" }}
+      style={{ padding: 1, backgroundColor: props.active ? theme.primary : "transparent" }}
     >
       <text>
         {props.active ? "[" : " "}

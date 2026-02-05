@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { useAppStore } from "../stores/app"
+import { useTheme } from "../context/ThemeContext"
 import type { ThemeName } from "../types/settings"
 
 type FocusField = "theme" | "font" | "speed" | "explicit" | "auto"
@@ -16,6 +17,7 @@ const THEME_LABELS: Array<{ value: ThemeName; label: string }> = [
 
 export function PreferencesPanel() {
   const appStore = useAppStore()
+  const { theme } = useTheme()
   const [focusField, setFocusField] = createSignal<FocusField>("theme")
 
   const settings = () => appStore.state().settings
@@ -76,55 +78,55 @@ export function PreferencesPanel() {
 
   return (
     <box flexDirection="column" gap={1}>
-      <text fg="var(--color-muted)">Preferences</text>
+      <text fg={theme.textMuted}>Preferences</text>
 
       <box flexDirection="column" gap={1}>
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "theme" ? "var(--color-primary)" : "var(--color-muted)"}>Theme:</text>
+          <text fg={focusField() === "theme" ? theme.primary : theme.textMuted}>Theme:</text>
           <box border padding={0}>
-            <text fg="var(--color-text)">{THEME_LABELS.find((t) => t.value === settings().theme)?.label}</text>
+            <text fg={theme.text}>{THEME_LABELS.find((t) => t.value === settings().theme)?.label}</text>
           </box>
-          <text fg="var(--color-muted)">[Left/Right]</text>
+          <text fg={theme.textMuted}>[Left/Right]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "font" ? "var(--color-primary)" : "var(--color-muted)"}>Font Size:</text>
+          <text fg={focusField() === "font" ? theme.primary : theme.textMuted}>Font Size:</text>
           <box border padding={0}>
-            <text fg="var(--color-text)">{settings().fontSize}px</text>
+            <text fg={theme.text}>{settings().fontSize}px</text>
           </box>
-          <text fg="var(--color-muted)">[Left/Right]</text>
+          <text fg={theme.textMuted}>[Left/Right]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "speed" ? "var(--color-primary)" : "var(--color-muted)"}>Playback:</text>
+          <text fg={focusField() === "speed" ? theme.primary : theme.textMuted}>Playback:</text>
           <box border padding={0}>
-            <text fg="var(--color-text)">{settings().playbackSpeed}x</text>
+            <text fg={theme.text}>{settings().playbackSpeed}x</text>
           </box>
-          <text fg="var(--color-muted)">[Left/Right]</text>
+          <text fg={theme.textMuted}>[Left/Right]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "explicit" ? "var(--color-primary)" : "var(--color-muted)"}>Show Explicit:</text>
+          <text fg={focusField() === "explicit" ? theme.primary : theme.textMuted}>Show Explicit:</text>
           <box border padding={0}>
-            <text fg={preferences().showExplicit ? "var(--color-success)" : "var(--color-muted)"}>
+            <text fg={preferences().showExplicit ? theme.success : theme.textMuted}>
               {preferences().showExplicit ? "On" : "Off"}
             </text>
           </box>
-          <text fg="var(--color-muted)">[Space]</text>
+          <text fg={theme.textMuted}>[Space]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "auto" ? "var(--color-primary)" : "var(--color-muted)"}>Auto Download:</text>
+          <text fg={focusField() === "auto" ? theme.primary : theme.textMuted}>Auto Download:</text>
           <box border padding={0}>
-            <text fg={preferences().autoDownload ? "var(--color-success)" : "var(--color-muted)"}>
+            <text fg={preferences().autoDownload ? theme.success : theme.textMuted}>
               {preferences().autoDownload ? "On" : "Off"}
             </text>
           </box>
-          <text fg="var(--color-muted)">[Space]</text>
+          <text fg={theme.textMuted}>[Space]</text>
         </box>
       </box>
 
-      <text fg="var(--color-muted)">Tab to move focus, Left/Right to adjust</text>
+      <text fg={theme.textMuted}>Tab to move focus, Left/Right to adjust</text>
     </box>
   )
 }

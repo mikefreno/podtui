@@ -3,9 +3,13 @@
  * Handles dynamic theme switching by updating CSS custom properties
  */
 
-import { RGBA } from "@opentui/core"
+import { RGBA, type TerminalColors } from "@opentui/core"
 import type { ThemeColors } from "../types/settings"
-import type { ColorValue } from "../types/theme-schema"
+import type { ColorValue, ThemeJson } from "../types/theme-schema"
+import { THEME_JSON } from "../constants/themes"
+import { getCustomThemes } from "./custom-themes"
+import { resolveTheme as resolveThemeJson } from "./theme-resolver"
+import { generateSystemTheme } from "./system-theme"
 
 const toCss = (value: ColorValue | RGBA) => {
   if (value instanceof RGBA) {
@@ -59,4 +63,33 @@ export function setThemeAttribute(themeName: string) {
   if (typeof document === "undefined") return
   const root = document.documentElement
   root.setAttribute("data-theme", themeName)
+}
+
+export async function loadThemes() {
+  return await getCustomThemes()
+}
+
+export async function loadTheme(name: string) {
+  const themes = await loadThemes()
+  return themes[name]
+}
+
+export function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
+  return resolveThemeJson(theme, mode)
+}
+
+export function resolveTerminalTheme(
+  themes: Record<string, ThemeJson>,
+  name: string,
+  mode: "dark" | "light",
+  system?: TerminalColors
+) {
+  if (name === "system" && system) {
+    return resolveThemeJson(generateSystemTheme(system, mode), mode)
+  }
+  const theme = themes[name] ?? themes.opencode
+  if (!theme) {
+    return resolveThemeJson(THEME_JSON.opencode, mode)
+  }
+  return resolveThemeJson(theme, mode)
 }

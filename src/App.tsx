@@ -11,7 +11,6 @@ import { SearchPage } from "./components/SearchPage";
 import { DiscoverPage } from "./components/DiscoverPage";
 import { Player } from "./components/Player";
 import { SettingsScreen } from "./components/SettingsScreen";
-import { ThemeProvider } from "./context/ThemeContext";
 import { useAuthStore } from "./stores/auth";
 import { useFeedStore } from "./stores/feed";
 import { useAppStore } from "./stores/app";
@@ -185,16 +184,14 @@ export function App() {
   };
 
   return (
-    <ThemeProvider>
-      <Layout
-        layerDepth={layerDepth()}
-        header={
-          <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
-        }
-        footer={<Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />}
-      >
-        <box style={{ padding: 1 }}>{renderContent()}</box>
-      </Layout>
-    </ThemeProvider>
+    <Layout
+      layerDepth={layerDepth()}
+      header={
+        <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
+      }
+      footer={<Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />}
+    >
+      <box style={{ padding: 1 }}>{renderContent()}</box>
+    </Layout>
   );
 }

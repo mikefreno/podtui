@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { SourceManager } from "./SourceManager"
+import { useTheme } from "../context/ThemeContext"
 import { PreferencesPanel } from "./PreferencesPanel"
 import { SyncPanel } from "./SyncPanel"
 
@@ -21,6 +22,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
 ]
 
 export function SettingsScreen(props: SettingsScreenProps) {
+  const { theme } = useTheme()
   const [activeSection, setActiveSection] = createSignal<SectionId>("sync")
 
   useKeyboard((key) => {
@@ -50,7 +52,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
         <text>
           <strong>Settings</strong>
         </text>
-        <text fg="var(--color-muted)">[Tab] Switch section | 1-4 jump | Esc up</text>
+        <text fg={theme.textMuted}>[Tab] Switch section | 1-4 jump | Esc up</text>
       </box>
 
       <box flexDirection="row" gap={1}>
@@ -58,10 +60,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
           <box
             border
             padding={0}
-            backgroundColor={activeSection() === section.id ? "var(--color-primary)" : undefined}
+            backgroundColor={activeSection() === section.id ? theme.primary : undefined}
             onMouseDown={() => setActiveSection(section.id)}
           >
-            <text fg={activeSection() === section.id ? "var(--color-text)" : "var(--color-muted)"}>
+            <text fg={activeSection() === section.id ? theme.text : theme.textMuted}>
               [{index + 1}] {section.label}
             </text>
           </box>
@@ -74,21 +76,21 @@ export function SettingsScreen(props: SettingsScreenProps) {
         {activeSection() === "preferences" && <PreferencesPanel />}
         {activeSection() === "account" && (
           <box flexDirection="column" gap={1}>
-            <text fg="var(--color-muted)">Account</text>
+            <text fg={theme.textMuted}>Account</text>
             <box flexDirection="row" gap={2} alignItems="center">
-              <text fg="var(--color-muted)">Status:</text>
-              <text fg={props.accountStatus === "signed-in" ? "var(--color-success)" : "var(--color-warning)"}>
+              <text fg={theme.textMuted}>Status:</text>
+              <text fg={props.accountStatus === "signed-in" ? theme.success : theme.warning}>
                 {props.accountLabel}
               </text>
             </box>
             <box border padding={0} onMouseDown={() => props.onOpenAccount?.()}>
-              <text fg="var(--color-primary)">[A] Manage Account</text>
+              <text fg={theme.primary}>[A] Manage Account</text>
             </box>
           </box>
         )}
       </box>
 
-      <text fg="var(--color-muted)">Enter to dive | Esc up</text>
+      <text fg={theme.textMuted}>Enter to dive | Esc up</text>
     </box>
   )
 }

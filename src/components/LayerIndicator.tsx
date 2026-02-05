@@ -1,13 +1,13 @@
-import { useRenderer } from "@opentui/solid"
+import { useTheme } from "../context/ThemeContext"
 
 export function LayerIndicator({ layerDepth }: { layerDepth: number }) {
-  const renderer = useRenderer()
+  const { theme } = useTheme()
 
   const getLayerIndicator = () => {
     const indicators = []
     for (let i = 0; i < 4; i++) {
       const isActive = i <= layerDepth
-      const color = isActive ? "var(--color-accent)" : "var(--color-muted)"
+      const color = isActive ? theme.accent : theme.textMuted
       const size = isActive ? "●" : "○"
       indicators.push(
         <text fg={color} marginRight={1}>
@@ -20,9 +20,9 @@ export function LayerIndicator({ layerDepth }: { layerDepth: number }) {
 
   return (
     <box flexDirection="row" alignItems="center">
-      <text fg="var(--color-muted)" marginRight={1}>Depth:</text>
+      <text fg={theme.textMuted} marginRight={1}>Depth:</text>
       {getLayerIndicator()}
-      <text fg="var(--color-muted)" marginLeft={1}>
+      <text fg={theme.textMuted} marginLeft={1}>
         {layerDepth}
       </text>
     </box>

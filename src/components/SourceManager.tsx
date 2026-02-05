@@ -5,6 +5,7 @@
 
 import { createSignal, For } from "solid-js"
 import { useFeedStore } from "../stores/feed"
+import { useTheme } from "../context/ThemeContext"
 import { SourceType } from "../types/source"
 import type { PodcastSource } from "../types/source"
 
@@ -17,6 +18,7 @@ type FocusArea = "list" | "add" | "url" | "country" | "explicit" | "language"
 
 export function SourceManager(props: SourceManagerProps) {
   const feedStore = useFeedStore()
+  const { theme } = useTheme()
   const [selectedIndex, setSelectedIndex] = createSignal(0)
   const [focusArea, setFocusArea] = createSignal<FocusArea>("list")
   const [newSourceUrl, setNewSourceUrl] = createSignal("")
@@ -155,15 +157,15 @@ export function SourceManager(props: SourceManagerProps) {
           <strong>Podcast Sources</strong>
         </text>
         <box border padding={0} onMouseDown={props.onClose}>
-          <text fg="var(--color-primary)">[Esc] Close</text>
+          <text fg={theme.primary}>[Esc] Close</text>
         </box>
       </box>
 
-        <text fg="var(--color-muted)">Manage where to search for podcasts</text>
+        <text fg={theme.textMuted}>Manage where to search for podcasts</text>
 
       {/* Source list */}
       <box border padding={1} flexDirection="column" gap={1}>
-        <text fg={focusArea() === "list" ? "var(--color-primary)" : "var(--color-muted)"}>Sources:</text>
+        <text fg={focusArea() === "list" ? theme.primary : theme.textMuted}>Sources:</text>
         <scrollbox height={6}>
           <For each={sources()}>
             {(source, index) => (
@@ -173,7 +175,7 @@ export function SourceManager(props: SourceManagerProps) {
                 padding={0}
                 backgroundColor={
                   focusArea() === "list" && index() === selectedIndex()
-                    ? "var(--color-primary)"
+                    ? theme.primary
                     : undefined
                 }
                 onMouseDown={() => {
@@ -184,21 +186,21 @@ export function SourceManager(props: SourceManagerProps) {
               >
                 <text fg={
                   focusArea() === "list" && index() === selectedIndex()
-                    ? "var(--color-primary)"
-                    : "var(--color-muted)"
+                    ? theme.primary
+                    : theme.textMuted
                 }>
                   {focusArea() === "list" && index() === selectedIndex()
                     ? ">"
                     : " "}
                 </text>
-                <text fg={source.enabled ? "var(--color-success)" : "var(--color-error)"}>
+                <text fg={source.enabled ? theme.success : theme.error}>
                   {source.enabled ? "[x]" : "[ ]"}
                 </text>
-                <text fg="var(--color-accent)">{getSourceIcon(source)}</text>
+                <text fg={theme.accent}>{getSourceIcon(source)}</text>
                 <text
                   fg={
                     focusArea() === "list" && index() === selectedIndex()
-                      ? "var(--color-text)"
+                      ? theme.text
                       : undefined
                   }
                 >
@@ -208,54 +210,54 @@ export function SourceManager(props: SourceManagerProps) {
             )}
           </For>
         </scrollbox>
-        <text fg="var(--color-muted)">Space/Enter to toggle, d to delete, a to add</text>
+        <text fg={theme.textMuted}>Space/Enter to toggle, d to delete, a to add</text>
 
         {/* API settings */}
         <box flexDirection="column" gap={1}>
-          <text fg={isApiSource() ? "var(--color-muted)" : "var(--color-accent)"}>
+          <text fg={isApiSource() ? theme.textMuted : theme.accent}>
             {isApiSource() ? "API Settings" : "API Settings (select an API source)"}
           </text>
           <box flexDirection="row" gap={2}>
             <box
               border
               padding={0}
-              backgroundColor={focusArea() === "country" ? "var(--color-primary)" : undefined}
+              backgroundColor={focusArea() === "country" ? theme.primary : undefined}
             >
-              <text fg={focusArea() === "country" ? "var(--color-primary)" : "var(--color-muted)"}>
+              <text fg={focusArea() === "country" ? theme.primary : theme.textMuted}>
                 Country: {sourceCountry()}
               </text>
             </box>
             <box
               border
               padding={0}
-              backgroundColor={focusArea() === "language" ? "var(--color-primary)" : undefined}
+              backgroundColor={focusArea() === "language" ? theme.primary : undefined}
             >
-              <text fg={focusArea() === "language" ? "var(--color-primary)" : "var(--color-muted)"}>
+              <text fg={focusArea() === "language" ? theme.primary : theme.textMuted}>
                 Language: {sourceLanguage() === "ja_jp" ? "Japanese" : "English"}
               </text>
             </box>
             <box
               border
               padding={0}
-              backgroundColor={focusArea() === "explicit" ? "var(--color-primary)" : undefined}
+              backgroundColor={focusArea() === "explicit" ? theme.primary : undefined}
             >
-              <text fg={focusArea() === "explicit" ? "var(--color-primary)" : "var(--color-muted)"}>
+              <text fg={focusArea() === "explicit" ? theme.primary : theme.textMuted}>
                 Explicit: {sourceExplicit() ? "Yes" : "No"}
               </text>
             </box>
           </box>
-          <text fg="var(--color-muted)">Enter/Space to toggle focused setting</text>
+          <text fg={theme.textMuted}>Enter/Space to toggle focused setting</text>
         </box>
       </box>
 
       {/* Add new source form */}
       <box border padding={1} flexDirection="column" gap={1}>
-        <text fg={focusArea() === "add" || focusArea() === "url" ? "var(--color-primary)" : "var(--color-muted)"}>
+        <text fg={focusArea() === "add" || focusArea() === "url" ? theme.primary : theme.textMuted}>
           Add New Source:
         </text>
 
         <box flexDirection="row" gap={1}>
-          <text fg="var(--color-muted)">Name:</text>
+          <text fg={theme.textMuted}>Name:</text>
           <input
             value={newSourceName()}
             onInput={setNewSourceName}
@@ -266,7 +268,7 @@ export function SourceManager(props: SourceManagerProps) {
         </box>
 
         <box flexDirection="row" gap={1}>
-          <text fg="var(--color-muted)">URL:</text>
+          <text fg={theme.textMuted}>URL:</text>
           <input
             value={newSourceUrl()}
             onInput={(v) => {
@@ -285,16 +287,16 @@ export function SourceManager(props: SourceManagerProps) {
           width={15}
           onMouseDown={handleAddSource}
         >
-          <text fg="var(--color-success)">[+] Add Source</text>
+          <text fg={theme.success}>[+] Add Source</text>
         </box>
       </box>
 
       {/* Error message */}
       {error() && (
-        <text fg="var(--color-error)">{error()}</text>
+        <text fg={theme.error}>{error()}</text>
       )}
 
-      <text fg="var(--color-muted)">Tab to switch sections, Esc to close</text>
+      <text fg={theme.textMuted}>Tab to switch sections, Esc to close</text>
     </box>
   )
 }
