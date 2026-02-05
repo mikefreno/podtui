@@ -6,6 +6,7 @@
 import { createSignal, For } from "solid-js"
 import { useFeedStore } from "../stores/feed"
 import { SourceType } from "../types/source"
+import { createColorResolver } from "../utils/color"
 import type { PodcastSource } from "../types/source"
 
 interface SourceManagerProps {
@@ -148,6 +149,8 @@ export function SourceManager(props: SourceManagerProps) {
   const sourceExplicit = () => selectedSource()?.allowExplicit !== false
   const sourceLanguage = () => selectedSource()?.language || "en_us"
 
+  const resolveColor = createColorResolver({})
+
   return (
     <box flexDirection="column" border padding={1} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
@@ -155,15 +158,15 @@ export function SourceManager(props: SourceManagerProps) {
           <strong>Podcast Sources</strong>
         </text>
         <box border padding={0} onMouseDown={props.onClose}>
-          <text fg="var(--color-primary)">[Esc] Close</text>
+          <text fg={resolveColor("--color-primary")}>[Esc] Close</text>
         </box>
       </box>
 
-        <text fg="var(--color-muted)">Manage where to search for podcasts</text>
+        <text fg={resolveColor("--color-muted")}>Manage where to search for podcasts</text>
 
       {/* Source list */}
       <box border padding={1} flexDirection="column" gap={1}>
-        <text fg={focusArea() === "list" ? "var(--color-primary)" : "var(--color-muted)"}>Sources:</text>
+        <text fg={focusArea() === "list" ? resolveColor("--color-primary") : resolveColor("--color-muted")}>Sources:</text>
         <scrollbox height={6}>
           <For each={sources()}>
             {(source, index) => (
@@ -173,7 +176,7 @@ export function SourceManager(props: SourceManagerProps) {
                 padding={0}
                 backgroundColor={
                   focusArea() === "list" && index() === selectedIndex()
-                    ? "var(--color-primary)"
+                    ? resolveColor("--color-primary")
                     : undefined
                 }
                 onMouseDown={() => {
@@ -184,21 +187,21 @@ export function SourceManager(props: SourceManagerProps) {
               >
                 <text fg={
                   focusArea() === "list" && index() === selectedIndex()
-                    ? "var(--color-primary)"
-                    : "var(--color-muted)"
+                    ? resolveColor("--color-primary")
+                    : resolveColor("--color-muted")
                 }>
                   {focusArea() === "list" && index() === selectedIndex()
                     ? ">"
                     : " "}
                 </text>
-                <text fg={source.enabled ? "var(--color-success)" : "var(--color-error)"}>
+                <text fg={source.enabled ? resolveColor("--color-success") : resolveColor("--color-error")}>
                   {source.enabled ? "[x]" : "[ ]"}
                 </text>
-                <text fg="var(--color-accent)">{getSourceIcon(source)}</text>
+                <text fg={resolveColor("--color-accent")}>{getSourceIcon(source)}</text>
                 <text
                   fg={
                     focusArea() === "list" && index() === selectedIndex()
-                      ? "var(--color-text)"
+                      ? resolveColor("--color-text")
                       : undefined
                   }
                 >
@@ -208,7 +211,7 @@ export function SourceManager(props: SourceManagerProps) {
             )}
           </For>
         </scrollbox>
-        <text fg="var(--color-muted)">Space/Enter to toggle, d to delete, a to add</text>
+        <text fg={resolveColor("--color-muted")}>Space/Enter to toggle, d to delete, a to add</text>
 
         {/* API settings */}
         <box flexDirection="column" gap={1}>

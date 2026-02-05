@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { useAppStore } from "../stores/app"
+import { createColorResolver } from "../utils/color"
 import type { ThemeName } from "../types/settings"
 
 type FocusField = "theme" | "font" | "speed" | "explicit" | "auto"
@@ -20,6 +21,8 @@ export function PreferencesPanel() {
 
   const settings = () => appStore.state().settings
   const preferences = () => appStore.state().preferences
+
+  const resolveColor = createColorResolver(appStore.resolveTheme())
 
   const handleKey = (key: { name: string; shift?: boolean }) => {
     if (key.name === "tab") {
@@ -76,55 +79,55 @@ export function PreferencesPanel() {
 
   return (
     <box flexDirection="column" gap={1}>
-      <text fg="var(--color-muted)">Preferences</text>
+      <text fg={resolveColor("--color-muted")}>Preferences</text>
 
       <box flexDirection="column" gap={1}>
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "theme" ? "var(--color-primary)" : "var(--color-muted)"}>Theme:</text>
+          <text fg={focusField() === "theme" ? resolveColor("--color-primary") : resolveColor("--color-muted")}>Theme:</text>
           <box border padding={0}>
-            <text fg="var(--color-text)">{THEME_LABELS.find((t) => t.value === settings().theme)?.label}</text>
+            <text fg={resolveColor("--color-text")}>{THEME_LABELS.find((t) => t.value === settings().theme)?.label}</text>
           </box>
-          <text fg="var(--color-muted)">[Left/Right]</text>
+          <text fg={resolveColor("--color-muted")}>[Left/Right]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "font" ? "var(--color-primary)" : "var(--color-muted)"}>Font Size:</text>
+          <text fg={focusField() === "font" ? resolveColor("--color-primary") : resolveColor("--color-muted")}>Font Size:</text>
           <box border padding={0}>
-            <text fg="var(--color-text)">{settings().fontSize}px</text>
+            <text fg={resolveColor("--color-text")}>{settings().fontSize}px</text>
           </box>
-          <text fg="var(--color-muted)">[Left/Right]</text>
+          <text fg={resolveColor("--color-muted")}>[Left/Right]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "speed" ? "var(--color-primary)" : "var(--color-muted)"}>Playback:</text>
+          <text fg={focusField() === "speed" ? resolveColor("--color-primary") : resolveColor("--color-muted")}>Playback:</text>
           <box border padding={0}>
-            <text fg="var(--color-text)">{settings().playbackSpeed}x</text>
+            <text fg={resolveColor("--color-text")}>{settings().playbackSpeed}x</text>
           </box>
-          <text fg="var(--color-muted)">[Left/Right]</text>
+          <text fg={resolveColor("--color-muted")}>[Left/Right]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "explicit" ? "var(--color-primary)" : "var(--color-muted)"}>Show Explicit:</text>
+          <text fg={focusField() === "explicit" ? resolveColor("--color-primary") : resolveColor("--color-muted")}>Show Explicit:</text>
           <box border padding={0}>
-            <text fg={preferences().showExplicit ? "var(--color-success)" : "var(--color-muted)"}>
+            <text fg={preferences().showExplicit ? resolveColor("--color-success") : resolveColor("--color-muted")}>
               {preferences().showExplicit ? "On" : "Off"}
             </text>
           </box>
-          <text fg="var(--color-muted)">[Space]</text>
+          <text fg={resolveColor("--color-muted")}>[Space]</text>
         </box>
 
         <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={focusField() === "auto" ? "var(--color-primary)" : "var(--color-muted)"}>Auto Download:</text>
+          <text fg={focusField() === "auto" ? resolveColor("--color-primary") : resolveColor("--color-muted")}>Auto Download:</text>
           <box border padding={0}>
-            <text fg={preferences().autoDownload ? "var(--color-success)" : "var(--color-muted)"}>
+            <text fg={preferences().autoDownload ? resolveColor("--color-success") : resolveColor("--color-muted")}>
               {preferences().autoDownload ? "On" : "Off"}
             </text>
           </box>
-          <text fg="var(--color-muted)">[Space]</text>
+          <text fg={resolveColor("--color-muted")}>[Space]</text>
         </box>
       </box>
 
-      <text fg="var(--color-muted)">Tab to move focus, Left/Right to adjust</text>
+      <text fg={resolveColor("--color-muted")}>Tab to move focus, Left/Right to adjust</text>
     </box>
   )
 }

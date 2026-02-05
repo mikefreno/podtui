@@ -42,18 +42,21 @@ export function ThemeProvider({ children }: { children: any }) {
   // Handle system theme changes
   createEffect(() => {
     if (isSystemTheme()) {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-      const handler = () => {
-        const newMode = getSystemThemeMode()
-        setCurrentMode(newMode)
-        setResolvedTheme(appStore.resolveTheme())
+      // Check if window and matchMedia are available
+      if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+        const handler = () => {
+          const newMode = getSystemThemeMode()
+          setCurrentMode(newMode)
+          setResolvedTheme(appStore.resolveTheme())
+        }
+
+        mediaQuery.addEventListener("change", handler)
+
+        onCleanup(() => {
+          mediaQuery.removeEventListener("change", handler)
+        })
       }
-
-      mediaQuery.addEventListener("change", handler)
-
-      onCleanup(() => {
-        mediaQuery.removeEventListener("change", handler)
-      })
     }
   })
 
