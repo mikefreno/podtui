@@ -9,7 +9,7 @@ import { generateSyntax, generateSubtleSyntax } from "../utils/syntax-highlighte
 import { resolveTerminalTheme, loadThemes } from "../utils/theme"
 import { createSimpleContext } from "./helper"
 import { setupThemeSignalHandler, emitThemeChanged, emitThemeModeChanged } from "../utils/theme-observer"
-import type { RGBA, TerminalColors } from "@opentui/core"
+import { createTerminalPalette, type RGBA, type TerminalColors } from "@opentui/core"
 
 type ThemeResolved = {
   primary: RGBA
@@ -121,44 +121,82 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         })
     }
 
-    function resolveSystemTheme() {
-      renderer
-        .getPalette({ size: 16 })
-        .then((colors) => {
-          if (!colors.palette[0]) {
-            // No system colors available, fall back to default
-            // This happens when the terminal doesn't support OSC palette queries
-            // (e.g., running inside tmux, or on unsupported terminals)
-            if (store.active === "system") {
-              setStore(
-                produce((draft) => {
-                  draft.active = "opencode"
-                  draft.ready = true
-                })
-              )
-            }
-            return
+    async function waitForCapabilities(timeoutMs = 300) {
+      if (renderer.capabilities) return
+      await new Promise<void>((resolve) => {
+        let done = false
+        const onCaps = () => {
+          if (done) return
+          done = true
+          renderer.off("capabilities", onCaps)
+          clearTimeout(timer)
+          resolve()
+        }
+        const timer = setTimeout(() => {
+          if (done) return
+          done = true
+          renderer.off("capabilities", onCaps)
+          resolve()
+        }, timeoutMs)
+        renderer.on("capabilities", onCaps)
+      })
+    }
+
+    async function resolveSystemTheme() {
+      if (process.env.TMUX) {
+        await waitForCapabilities()
+      }
+
+      let colors: TerminalColors | null = null
+
+      try {
+        colors = await renderer.getPalette({ size: 16 })
+      } catch {
+        colors = null
+      }
+
+      if (!colors?.palette?.[0] && process.env.TMUX) {
+        const writeOut = (renderer as unknown as { writeOut?: (data: string | Buffer) => boolean }).writeOut
+        const writeFn = typeof writeOut === "function" ? writeOut.bind(renderer) : process.stdout.write.bind(process.stdout)
+        const detector = createTerminalPalette(process.stdin, process.stdout, writeFn, true)
+        try {
+          const tmuxColors = await detector.detect({ size: 16, timeout: 1200 })
+          if (tmuxColors?.palette?.[0]) {
+            colors = tmuxColors
           }
+        } finally {
+          detector.cleanup()
+        }
+      }
+
+      const hasPalette = Boolean(colors?.palette?.some((value) => Boolean(value)))
+      const hasDefaultColors = Boolean(colors?.defaultBackground || colors?.defaultForeground)
+
+      if (!hasPalette && !hasDefaultColors) {
+        // No system colors available, fall back to default
+        // This happens when the terminal doesn't support OSC palette queries
+        // (e.g., running inside tmux, or on unsupported terminals)
+        if (store.active === "system") {
           setStore(
             produce((draft) => {
-              draft.system = colors
-              if (store.active === "system") {
-                draft.ready = true
-              }
+              draft.active = "opencode"
+              draft.ready = true
             })
           )
-        })
-        .catch(() => {
-          // On error, fall back to default theme if using system
-          if (store.active === "system") {
-            setStore(
-              produce((draft) => {
-                draft.active = "opencode"
-                draft.ready = true
-              })
-            )
-          }
-        })
+        }
+        return
+      }
+
+      if (colors) {
+        setStore(
+          produce((draft) => {
+            draft.system = colors
+            if (store.active === "system") {
+              draft.ready = true
+            }
+          })
+        )
+      }
     }
 
     onMount(init)

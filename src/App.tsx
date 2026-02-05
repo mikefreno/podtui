@@ -1,5 +1,4 @@
 import { createSignal } from "solid-js";
-import { useRenderer } from "@opentui/solid";
 import { Layout } from "./components/Layout";
 import { Navigation } from "./components/Navigation";
 import { TabNavigation } from "./components/TabNavigation";
