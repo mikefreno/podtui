@@ -12,13 +12,7 @@
     "types": ["bun-types"],
     "baseUrl": ".",
     "paths": {
-      "@/components/*": ["src/components/*"],
-      "@/stores/*": ["src/stores/*"],
-      "@/types/*": ["src/types/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/hooks/*": ["src/hooks/*"],
-      "@/api/*": ["src/api/*"],
-      "@/data/*": ["src/data/*"]
+      "@/*": ["src/*"],
     }
   },
   "include": ["src/**/*", "tests/**/*"]

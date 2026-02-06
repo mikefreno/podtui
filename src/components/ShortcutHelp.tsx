@@ -1,4 +1,4 @@
-import { shortcuts } from "../config/shortcuts"
+import { shortcuts } from "@/config/shortcuts";
 
 export function ShortcutHelp() {
   return (
@@ -22,5 +22,5 @@ export function ShortcutHelp() {
         </box>
       </box>
     </box>
-  )
+  );
 }

@@ -1,64 +1,63 @@
-import type { JSX } from "solid-js"
-import type { RGBA } from "@opentui/core"
-import { Show, For, createMemo } from "solid-js"
-import { useTheme } from "../context/ThemeContext"
+import type { JSX } from "solid-js";
+import type { RGBA } from "@opentui/core";
+import { Show, For } from "solid-js";
+import { useTheme } from "@/context/ThemeContext";
 
 type PanelConfig = {
   /** Panel content */
-  content: JSX.Element
+  content: JSX.Element;
   /** Panel title shown in header */
-  title?: string
+  title?: string;
   /** Fixed width (leave undefined for flex) */
-  width?: number
+  width?: number;
   /** Whether this panel is currently focused */
-  focused?: boolean
-}
+  focused?: boolean;
+};
 
 type LayoutProps = {
   /** Top tab bar */
-  header?: JSX.Element
+  header?: JSX.Element;
   /** Bottom status bar */
-  footer?: JSX.Element
+  footer?: JSX.Element;
   /** Panels to display left-to-right like a file explorer */
-  panels: PanelConfig[]
+  panels: PanelConfig[];
   /** Index of the currently active/focused panel */
-  activePanelIndex?: number
-}
+  activePanelIndex?: number;
+};
 
 export function Layout(props: LayoutProps) {
-  const context = useTheme()
-
   const panelBg = (index: number): RGBA => {
-    const backgrounds = context.theme.layerBackgrounds
+    const backgrounds = theme.layerBackgrounds;
     const layers = [
-      backgrounds?.layer0 ?? context.theme.background,
-      backgrounds?.layer1 ?? context.theme.backgroundPanel,
-      backgrounds?.layer2 ?? context.theme.backgroundElement,
-      backgrounds?.layer3 ?? context.theme.backgroundMenu,
-    ]
-    return layers[Math.min(index, layers.length - 1)]
-  }
+      backgrounds?.layer0 ?? theme.background,
+      backgrounds?.layer1 ?? theme.backgroundPanel,
+      backgrounds?.layer2 ?? theme.backgroundElement,
+      backgrounds?.layer3 ?? theme.backgroundMenu,
+    ];
+    return layers[Math.min(index, layers.length - 1)];
+  };
 
   const borderColor = (index: number): RGBA | string => {
-    const isActive = index === (props.activePanelIndex ?? 0)
+    const isActive = index === (props.activePanelIndex ?? 0);
     return isActive
-      ? (context.theme.accent ?? context.theme.primary)
-      : (context.theme.border ?? context.theme.textMuted)
-  }
+      ? (theme.accent ?? theme.primary)
+      : (theme.border ?? theme.textMuted);
+  };
+  const { theme } = useTheme();
 
   return (
     <box
       flexDirection="column"
       width="100%"
       height="100%"
-      backgroundColor={context.theme.background}
+      backgroundColor={theme.background}
     >
       {/* Header - tab bar */}
       <Show when={props.header}>
         <box
           style={{
             height: 3,
-            backgroundColor: context.theme.surface ?? context.theme.backgroundPanel,
+            backgroundColor: theme.surface ?? theme.backgroundPanel,
           }}
         >
           <box style={{ paddingLeft: 1, paddingTop: 0, paddingBottom: 0 }}>
@@ -68,16 +67,13 @@ export function Layout(props: LayoutProps) {
       </Show>
 
       {/* Main content: side-by-side panels */}
-      <box
-        flexDirection="row"
-        style={{ flexGrow: 1 }}
-      >
+      <box flexDirection="row" style={{ flexGrow: 1 }}>
         <For each={props.panels}>
           {(panel, index) => (
             <box
               flexDirection="column"
               border
-              borderColor={borderColor(index())}
+              borderColor={theme.border}
               backgroundColor={panelBg(index())}
               style={{
                 flexGrow: panel.width ? 0 : 1,
@@ -92,13 +88,18 @@ export function Layout(props: LayoutProps) {
                     height: 1,
                     paddingLeft: 1,
                     paddingRight: 1,
-                    backgroundColor: index() === (props.activePanelIndex ?? 0)
-                      ? (context.theme.accent ?? context.theme.primary)
-                      : (context.theme.surface ?? context.theme.backgroundPanel),
+                    backgroundColor:
+                      index() === (props.activePanelIndex ?? 0)
+                        ? (theme.accent ?? theme.primary)
+                        : (theme.surface ?? theme.backgroundPanel),
                   }}
                 >
                   <text
-                    fg={index() === (props.activePanelIndex ?? 0) ? "black" : undefined}
+                    fg={
+                      index() === (props.activePanelIndex ?? 0)
+                        ? "black"
+                        : undefined
+                    }
                   >
                     <strong>{panel.title}</strong>
                   </text>
@@ -124,14 +125,12 @@ export function Layout(props: LayoutProps) {
         <box
           style={{
             height: 2,
-            backgroundColor: context.theme.surface ?? context.theme.backgroundPanel,
+            backgroundColor: theme.surface ?? theme.backgroundPanel,
           }}
         >
-          <box style={{ padding: 1 }}>
-            {props.footer}
-          </box>
+          <box style={{ padding: 1 }}>{props.footer}</box>
         </box>
       </Show>
     </box>
-  )
+  );
 }
