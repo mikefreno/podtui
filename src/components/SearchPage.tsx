@@ -2,7 +2,7 @@
  * SearchPage component - Main search interface for PodTUI
  */
 
-import { createSignal, Show } from "solid-js"
+import { createSignal, createEffect, Show } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { useSearchStore } from "../stores/search"
 import { SearchResults } from "./SearchResults"
@@ -25,6 +25,12 @@ export function SearchPage(props: SearchPageProps) {
   const [resultIndex, setResultIndex] = createSignal(0)
   const [historyIndex, setHistoryIndex] = createSignal(0)
 
+  // Keep parent informed about input focus state
+  createEffect(() => {
+    const isInputFocused = props.focused && focusArea() === "input"
+    props.onInputFocusChange?.(isInputFocused)
+  })
+
   const handleSearch = async () => {
     const query = inputValue().trim()
     if (query) {
@@ -32,11 +38,7 @@ export function SearchPage(props: SearchPageProps) {
       if (searchStore.results().length > 0) {
         setFocusArea("results")
         setResultIndex(0)
-        props.onInputFocusChange?.(false)
       }
-    }
-    if (props.focused && focusArea() === "input") {
-      props.onInputFocusChange?.(true)
     }
   }
 
@@ -61,7 +63,7 @@ export function SearchPage(props: SearchPageProps) {
     const area = focusArea()
 
     // Enter to search from input
-    if (key.name === "enter" && area === "input") {
+    if ((key.name === "return" || key.name === "enter") && area === "input") {
       handleSearch()
       return
     }
@@ -71,21 +73,17 @@ export function SearchPage(props: SearchPageProps) {
       if (area === "input") {
         if (searchStore.results().length > 0) {
           setFocusArea("results")
-          props.onInputFocusChange?.(false)
         } else if (searchStore.history().length > 0) {
           setFocusArea("history")
-          props.onInputFocusChange?.(false)
         }
       } else if (area === "results") {
         if (searchStore.history().length > 0) {
           setFocusArea("history")
         } else {
           setFocusArea("input")
-          props.onInputFocusChange?.(true)
         }
       } else {
         setFocusArea("input")
-        props.onInputFocusChange?.(true)
       }
       return
     }
@@ -94,21 +92,17 @@ export function SearchPage(props: SearchPageProps) {
       if (area === "input") {
         if (searchStore.history().length > 0) {
           setFocusArea("history")
-          props.onInputFocusChange?.(false)
         } else if (searchStore.results().length > 0) {
           setFocusArea("results")
-          props.onInputFocusChange?.(false)
         }
       } else if (area === "history") {
         if (searchStore.results().length > 0) {
           setFocusArea("results")
         } else {
           setFocusArea("input")
-          props.onInputFocusChange?.(true)
         }
       } else {
         setFocusArea("input")
-        props.onInputFocusChange?.(true)
       }
       return
     }
@@ -124,7 +118,7 @@ export function SearchPage(props: SearchPageProps) {
         setResultIndex((i) => Math.max(i - 1, 0))
         return
       }
-      if (key.name === "enter") {
+      if (key.name === "return" || key.name === "enter") {
         const result = results[resultIndex()]
         if (result) handleResultSelect(result)
         return
@@ -141,7 +135,7 @@ export function SearchPage(props: SearchPageProps) {
         setHistoryIndex((i) => Math.max(i - 1, 0))
         return
       }
-      if (key.name === "enter") {
+      if (key.name === "return" || key.name === "enter") {
         const query = history[historyIndex()]
         if (query) handleHistorySelect(query)
         return
@@ -154,7 +148,7 @@ export function SearchPage(props: SearchPageProps) {
         props.onExit?.()
       } else {
         setFocusArea("input")
-        props.onInputFocusChange?.(true)
+        key.stopPropagation()
       }
       return
     }
@@ -162,7 +156,6 @@ export function SearchPage(props: SearchPageProps) {
     // "/" focuses search input
     if (key.name === "/" && area !== "input") {
       setFocusArea("input")
-      props.onInputFocusChange?.(true)
       return
     }
   })
@@ -182,9 +175,6 @@ export function SearchPage(props: SearchPageProps) {
             value={inputValue()}
             onInput={(value) => {
               setInputValue(value)
-              if (props.focused && focusArea() === "input") {
-                props.onInputFocusChange?.(true)
-              }
             }}
             placeholder="Enter podcast name, topic, or author..."
             focused={props.focused && focusArea() === "input"}

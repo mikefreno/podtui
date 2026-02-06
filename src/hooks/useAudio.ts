@@ -22,6 +22,7 @@ import {
 } from "../utils/audio-player"
 import { emit, on } from "../utils/event-bus"
 import { useAppStore } from "../stores/app"
+import { useProgressStore } from "../stores/progress"
 import type { Episode } from "../types/episode"
 
 export interface AudioControls {
@@ -53,6 +54,7 @@ export interface AudioControls {
 let backend: AudioBackend | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let refCount = 0
+let pollCount = 0 // Counts poll ticks for throttling progress saves
 
 const [isPlaying, setIsPlaying] = createSignal(false)
 const [position, setPosition] = createSignal(0)
@@ -76,6 +78,7 @@ function ensureBackend(): AudioBackend {
 
 function startPolling(): void {
   stopPolling()
+  pollCount = 0
   pollTimer = setInterval(async () => {
     if (!backend || !isPlaying()) return
     try {
@@ -84,10 +87,26 @@ function startPolling(): void {
       setPosition(pos)
       if (dur > 0) setDuration(dur)
 
+      // Save progress every ~5 seconds (10 ticks * 500ms)
+      pollCount++
+      if (pollCount % 10 === 0) {
+        const ep = currentEpisode()
+        if (ep) {
+          const progressStore = useProgressStore()
+          progressStore.update(ep.id, pos, dur > 0 ? dur : duration(), speed())
+        }
+      }
+
       // Check if backend stopped playing (track ended)
       if (!backend.isPlaying() && isPlaying()) {
         setIsPlaying(false)
         stopPolling()
+        // Save final position on track end
+        const ep = currentEpisode()
+        if (ep) {
+          const progressStore = useProgressStore()
+          progressStore.update(ep.id, pos, dur > 0 ? dur : duration(), speed())
+        }
       }
     } catch {
       // Backend may have been disposed
@@ -113,18 +132,27 @@ async function play(episode: Episode): Promise<void> {
 
   try {
     const appStore = useAppStore()
+    const progressStore = useProgressStore()
     const storeSpeed = appStore.state().settings.playbackSpeed
     const vol = volume()
     const spd = storeSpeed || speed()
 
+    // Resume from saved progress if available and not completed
+    const savedProgress = progressStore.get(episode.id)
+    let startPos = 0
+    if (savedProgress && !progressStore.isCompleted(episode.id)) {
+      startPos = savedProgress.position
+    }
+
     await b.play(episode.audioUrl, {
       volume: vol,
       speed: spd,
+      startPosition: startPos > 0 ? startPos : undefined,
     })
 
     setCurrentEpisode(episode)
     setIsPlaying(true)
-    setPosition(0)
+    setPosition(startPos)
     setSpeed(spd)
     if (episode.duration) setDuration(episode.duration)
 
@@ -143,7 +171,12 @@ async function pause(): Promise<void> {
     setIsPlaying(false)
     stopPolling()
     const ep = currentEpisode()
-    if (ep) emit("player.pause", { episodeId: ep.id })
+    if (ep) {
+      // Save progress on pause
+      const progressStore = useProgressStore()
+      progressStore.update(ep.id, position(), duration(), speed())
+      emit("player.pause", { episodeId: ep.id })
+    }
   } catch (err) {
     setError(err instanceof Error ? err.message : "Pause failed")
   }
@@ -173,6 +206,12 @@ async function togglePlayback(): Promise<void> {
 async function stop(): Promise<void> {
   if (!backend) return
   try {
+    // Save progress before stopping
+    const ep = currentEpisode()
+    if (ep) {
+      const progressStore = useProgressStore()
+      progressStore.update(ep.id, position(), duration(), speed())
+    }
     await backend.stop()
     setIsPlaying(false)
     setPosition(0)

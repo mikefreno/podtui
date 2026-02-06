@@ -63,6 +63,11 @@ export const { use: useKeybind, provider: KeybindProvider } = createSimpleContex
 
     // Handle leader key
     useKeyboard(async (evt) => {
+      // Don't intercept leader key when a text-editing renderable (input/textarea)
+      // has focus — let it handle text input (including space for the leader key).
+      const focused = renderer.currentFocusedRenderable
+      if (focused && "insertText" in focused) return
+
       if (!store.leader && result.match("leader", evt)) {
         leader(true)
         return

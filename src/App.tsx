@@ -15,10 +15,12 @@ import { SettingsScreen } from "./components/SettingsScreen";
 import { useAuthStore } from "./stores/auth";
 import { useFeedStore } from "./stores/feed";
 import { useAppStore } from "./stores/app";
+import { useAudio } from "./hooks/useAudio";
 import { FeedVisibility } from "./types/feed";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import type { TabId } from "./components/Tab";
 import type { AuthScreen } from "./types/auth";
+import type { Episode } from "./types/episode";
 
 export function App() {
   const [activeTab, setActiveTab] = createSignal<TabId>("feed");
@@ -29,12 +31,19 @@ export function App() {
   const auth = useAuthStore();
   const feedStore = useFeedStore();
   const appStore = useAppStore();
+  const audio = useAudio();
+
+  const handlePlayEpisode = (episode: Episode) => {
+    audio.play(episode);
+    setActiveTab("player");
+    setLayerDepth(1);
+  };
 
   // My Shows page returns panel renderers
   const myShows = MyShowsPage({
     get focused() { return activeTab() === "shows" && layerDepth() > 0 },
     onPlayEpisode: (episode, feed) => {
-      // TODO: play episode
+      handlePlayEpisode(episode);
     },
     onExit: () => setLayerDepth(0),
   });
@@ -44,9 +53,12 @@ export function App() {
     get activeTab() {
       return activeTab();
     },
-    onTabChange: setActiveTab,
-    inputFocused: inputFocused(),
-    navigationEnabled: layerDepth() === 0,
+    onTabChange: (tab: TabId) => {
+      setActiveTab(tab);
+      setInputFocused(false);
+    },
+    get inputFocused() { return inputFocused() },
+    get navigationEnabled() { return layerDepth() === 0 },
     layerDepth,
     onLayerChange: (newDepth) => {
       setLayerDepth(newDepth);
@@ -81,7 +93,7 @@ export function App() {
                 <FeedPage
                   focused={layerDepth() > 0}
                   onPlayEpisode={(episode, feed) => {
-                    // TODO: play episode
+                    handlePlayEpisode(episode);
                   }}
                   onExit={() => setLayerDepth(0)}
                 />

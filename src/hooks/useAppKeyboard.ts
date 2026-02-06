@@ -53,7 +53,7 @@ export function useAppKeyboard(options: ShortcutOptions) {
       return
     }
 
-    if (key.name === "enter") {
+    if (key.name === "return") {
       options.onAction?.("enter")
       return
     }

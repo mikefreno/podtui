@@ -136,6 +136,7 @@ export function MyShowsPage(props: MyShowsPageProps) {
         handleRefresh()
       } else if (key.name === "escape") {
         setFocusPane("shows")
+        key.stopPropagation()
       }
     }
   })

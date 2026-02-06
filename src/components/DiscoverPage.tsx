@@ -37,7 +37,7 @@ export function DiscoverPage(props: DiscoverPageProps) {
       return
     }
 
-    if (key.name === "enter" && area === "categories") {
+    if ((key.name === "return" || key.name === "enter") && area === "categories") {
       setFocusArea("shows")
       return
     }
@@ -60,7 +60,7 @@ export function DiscoverPage(props: DiscoverPageProps) {
         setShowIndex(0)
         return
       }
-      if (key.name === "enter") {
+      if (key.name === "return" || key.name === "enter") {
         // Select category and move to shows
         setFocusArea("shows")
         return
@@ -92,7 +92,7 @@ export function DiscoverPage(props: DiscoverPageProps) {
         }
         return
       }
-      if (key.name === "enter") {
+      if (key.name === "return" || key.name === "enter") {
         // Subscribe/unsubscribe
         const podcast = shows[showIndex()]
         if (podcast) {
@@ -105,6 +105,7 @@ export function DiscoverPage(props: DiscoverPageProps) {
     if (key.name === "escape") {
       if (area === "shows") {
         setFocusArea("categories")
+        key.stopPropagation()
       } else {
         props.onExit?.()
       }
