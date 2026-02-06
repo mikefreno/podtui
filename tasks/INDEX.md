@@ -45,11 +45,16 @@ Each feature has its own directory with:
 **Tasks:** 5 tasks
 **Directory:** `tasks/config-persistence/`
 
+### 8. Audio Playback Fix
+**Feature:** Fix non-functional volume/speed controls and add multimedia key support
+**Tasks:** 5 tasks
+**Directory:** `tasks/audio-playback-fix/`
+
 ## Task Summary
 
-**Total Features:** 7
-**Total Tasks:** 27
-**Critical Path:** Feature 7 (Config Persistence) - 5 tasks
+**Total Features:** 8
+**Total Tasks:** 32
+**Critical Path:** Feature 7 (Config Persistence) - 5 tasks, Feature 8 (Audio Playback Fix) - 5 tasks
 
 ## Task Dependencies
 
@@ -82,11 +87,17 @@ Each feature has its own directory with:
 - 21 → 22
 
 ### Feature 7: Config Persistence to XDG_CONFIG_HOME
-- 23 → 24
-- 23 → 25
-- 24 → 26
-- 25 → 26
-- 26 → 27
+- 23 -> 24
+- 23 -> 25
+- 24 -> 26
+- 25 -> 26
+- 26 -> 27
+
+### Feature 8: Audio Playback Fix
+- 28 -> 29
+- 29 -> 30
+- 30 -> 31
+- 31 -> 32
 
 ## Priority Overview
 
@@ -95,19 +106,23 @@ Each feature has its own directory with:
 - 24: Refactor feeds persistence to JSON file
 - 25: Refactor theme persistence to JSON file
 - 26: Add config file validation and migration
+- 28: Fix volume and speed controls in audio backends
+- 32: Test multimedia controls across platforms
 
 **P2 (High):**
-- All other tasks (01-22, 27)
+- All other tasks (01-22, 27, 29-31)
 
 **P3 (Medium):**
 - 09: Optimize waveform rendering performance
 - 13: Add loading indicator for pagination
 - 19: Create download queue management
+- 30: Add multimedia key detection and handling
+- 31: Implement platform-specific media stream integration
 
 ## Next Steps
 
 1. Review all task files for accuracy
 2. Confirm task dependencies
-3. Start with P1 tasks (Feature 7)
+3. Start with P1 tasks (Feature 7 or Feature 8)
 4. Follow dependency order within each feature
 5. Mark tasks complete as they're finished

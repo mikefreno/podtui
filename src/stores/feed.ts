@@ -20,11 +20,17 @@ import {
   migrateSourcesFromLocalStorage,
 } from "../utils/feeds-persistence"
 
-/** Max episodes to fetch on refresh */
+/** Max episodes to load per page/chunk */
 const MAX_EPISODES_REFRESH = 50
 
 /** Max episodes to fetch on initial subscribe */
 const MAX_EPISODES_SUBSCRIBE = 20
+
+/** Cache of all parsed episodes per feed (feedId -> Episode[]) */
+const fullEpisodeCache = new Map<string, Episode[]>()
+
+/** Track how many episodes are currently loaded per feed */
+const episodeLoadCount = new Map<string, number>()
 
 /** Save feeds to file (async, fire-and-forget) */
 function saveFeeds(feeds: Feed[]): void {
@@ -56,6 +62,7 @@ export function createFeedStore() {
     sortDirection: "desc",
   })
   const [selectedFeedId, setSelectedFeedId] = createSignal<string | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = createSignal(false)
 
   /** Get filtered and sorted feeds */
   const getFilteredFeeds = (): Feed[] => {
@@ -132,8 +139,8 @@ export function createFeedStore() {
     return allEpisodes
   }
 
-  /** Fetch latest episodes from an RSS feed URL */
-  const fetchEpisodes = async (feedUrl: string, limit: number): Promise<Episode[]> => {
+  /** Fetch latest episodes from an RSS feed URL, caching all parsed episodes */
+  const fetchEpisodes = async (feedUrl: string, limit: number, feedId?: string): Promise<Episode[]> => {
     try {
       const response = await fetch(feedUrl, {
         headers: {
@@ -144,7 +151,15 @@ export function createFeedStore() {
       if (!response.ok) return []
       const xml = await response.text()
       const parsed = parseRSSFeed(xml, feedUrl)
-      return parsed.episodes.slice(0, limit)
+      const allEpisodes = parsed.episodes
+
+      // Cache all parsed episodes for pagination
+      if (feedId) {
+        fullEpisodeCache.set(feedId, allEpisodes)
+        episodeLoadCount.set(feedId, Math.min(limit, allEpisodes.length))
+      }
+
+      return allEpisodes.slice(0, limit)
     } catch {
       return []
     }
@@ -152,9 +167,10 @@ export function createFeedStore() {
 
   /** Add a new feed and auto-fetch latest 20 episodes */
   const addFeed = async (podcast: Podcast, sourceId: string, visibility: FeedVisibility = FeedVisibility.PUBLIC) => {
-    const episodes = await fetchEpisodes(podcast.feedUrl, MAX_EPISODES_SUBSCRIBE)
+    const feedId = crypto.randomUUID()
+    const episodes = await fetchEpisodes(podcast.feedUrl, MAX_EPISODES_SUBSCRIBE, feedId)
     const newFeed: Feed = {
-      id: crypto.randomUUID(),
+      id: feedId,
       podcast,
       episodes,
       visibility,
@@ -174,7 +190,7 @@ export function createFeedStore() {
   const refreshFeed = async (feedId: string) => {
     const feed = getFeed(feedId)
     if (!feed) return
-    const episodes = await fetchEpisodes(feed.podcast.feedUrl, MAX_EPISODES_REFRESH)
+    const episodes = await fetchEpisodes(feed.podcast.feedUrl, MAX_EPISODES_REFRESH, feedId)
     setFeeds((prev) => {
       const updated = prev.map((f) =>
         f.id === feedId ? { ...f, episodes, lastUpdated: new Date() } : f
@@ -194,6 +210,8 @@ export function createFeedStore() {
 
   /** Remove a feed */
   const removeFeed = (feedId: string) => {
+    fullEpisodeCache.delete(feedId)
+    episodeLoadCount.delete(feedId)
     setFeeds((prev) => {
       const updated = prev.filter((f) => f.id !== feedId)
       saveFeeds(updated)
@@ -283,18 +301,76 @@ export function createFeedStore() {
     return id ? getFeed(id) : undefined
   }
 
+  /** Check if a feed has more episodes available beyond what's currently loaded */
+  const hasMoreEpisodes = (feedId: string): boolean => {
+    const cached = fullEpisodeCache.get(feedId)
+    if (!cached) return false
+    const loaded = episodeLoadCount.get(feedId) ?? 0
+    return loaded < cached.length
+  }
+
+  /** Load the next chunk of episodes for a feed from the cache.
+   *  If no cache exists (e.g. app restart), re-fetches from the RSS feed. */
+  const loadMoreEpisodes = async (feedId: string) => {
+    if (isLoadingMore()) return
+    const feed = getFeed(feedId)
+    if (!feed) return
+
+    setIsLoadingMore(true)
+    try {
+      let cached = fullEpisodeCache.get(feedId)
+
+      // If no cache, re-fetch and parse the full feed
+      if (!cached) {
+        const response = await fetch(feed.podcast.feedUrl, {
+          headers: {
+            "Accept-Encoding": "identity",
+            "Accept": "application/rss+xml, application/xml, text/xml, */*",
+          },
+        })
+        if (!response.ok) return
+        const xml = await response.text()
+        const parsed = parseRSSFeed(xml, feed.podcast.feedUrl)
+        cached = parsed.episodes
+        fullEpisodeCache.set(feedId, cached)
+        // Set current load count to match what's already displayed
+        episodeLoadCount.set(feedId, feed.episodes.length)
+      }
+
+      const currentCount = episodeLoadCount.get(feedId) ?? feed.episodes.length
+      const newCount = Math.min(currentCount + MAX_EPISODES_REFRESH, cached.length)
+
+      if (newCount <= currentCount) return // nothing more to load
+
+      episodeLoadCount.set(feedId, newCount)
+      const episodes = cached.slice(0, newCount)
+
+      setFeeds((prev) => {
+        const updated = prev.map((f) =>
+          f.id === feedId ? { ...f, episodes } : f
+        )
+        saveFeeds(updated)
+        return updated
+      })
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
   return {
     // State
     feeds,
     sources,
     filter,
     selectedFeedId,
+    isLoadingMore,
     
     // Computed
     getFilteredFeeds,
     getAllEpisodesChronological,
     getFeed,
     getSelectedFeed,
+    hasMoreEpisodes,
     
     // Actions
     setFilter,
@@ -305,6 +381,7 @@ export function createFeedStore() {
     togglePinned,
     refreshFeed,
     refreshAllFeeds,
+    loadMoreEpisodes,
     addSource,
     removeSource,
     toggleSource,

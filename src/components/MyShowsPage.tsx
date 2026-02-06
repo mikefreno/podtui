@@ -4,7 +4,7 @@
  * Right panel: episodes for the selected show
  */
 
-import { createSignal, For, Show, createMemo } from "solid-js"
+import { createSignal, For, Show, createMemo, createEffect } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { useFeedStore } from "../stores/feed"
 import { format } from "date-fns"
@@ -26,6 +26,9 @@ export function MyShowsPage(props: MyShowsPageProps) {
   const [episodeIndex, setEpisodeIndex] = createSignal(0)
   const [isRefreshing, setIsRefreshing] = createSignal(false)
 
+  /** Threshold: load more when within this many items of the end */
+  const LOAD_MORE_THRESHOLD = 5
+
   const shows = () => feedStore.getFilteredFeeds()
 
   const selectedShow = createMemo(() => {
@@ -40,6 +43,19 @@ export function MyShowsPage(props: MyShowsPageProps) {
     return [...show.episodes].sort(
       (a, b) => b.pubDate.getTime() - a.pubDate.getTime()
     )
+  })
+
+  // Detect when user navigates near the bottom and load more episodes
+  createEffect(() => {
+    const idx = episodeIndex()
+    const eps = episodes()
+    const show = selectedShow()
+    if (!show || eps.length === 0) return
+
+    const nearBottom = idx >= eps.length - LOAD_MORE_THRESHOLD
+    if (nearBottom && feedStore.hasMoreEpisodes(show.id) && !feedStore.isLoadingMore()) {
+      feedStore.loadMoreEpisodes(show.id)
+    }
   })
 
   const formatDate = (date: Date): string => {
@@ -231,6 +247,16 @@ export function MyShowsPage(props: MyShowsPageProps) {
                   </box>
                 )}
               </For>
+              <Show when={feedStore.isLoadingMore()}>
+                <box paddingLeft={2} paddingTop={1}>
+                  <text fg="yellow">Loading more episodes...</text>
+                </box>
+              </Show>
+              <Show when={!feedStore.isLoadingMore() && selectedShow() && feedStore.hasMoreEpisodes(selectedShow()!.id)}>
+                <box paddingLeft={2} paddingTop={1}>
+                  <text fg="gray">Scroll down for more episodes</text>
+                </box>
+              </Show>
             </scrollbox>
           </Show>
         </Show>

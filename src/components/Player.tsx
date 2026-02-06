@@ -1,7 +1,6 @@
 import { useKeyboard } from "@opentui/solid"
 import { PlaybackControls } from "./PlaybackControls"
-import { Waveform } from "./Waveform"
-import { createWaveform } from "../utils/waveform"
+import { MergedWaveform } from "./MergedWaveform"
 import { useAudio } from "../hooks/useAudio"
 import type { Episode } from "../types/episode"
 
@@ -23,8 +22,6 @@ const SAMPLE_EPISODE: Episode = {
 
 export function Player(props: PlayerProps) {
   const audio = useAudio()
-
-  const waveform = () => createWaveform(64)
 
   // The episode to display — prefer a passed-in episode, then the
   // currently-playing episode, then fall back to the sample.
@@ -86,7 +83,7 @@ export function Player(props: PlayerProps) {
           <strong>Now Playing</strong>
         </text>
         <text fg="gray">
-          {formatTime(audio.position())} / {formatTime(dur())}
+          {formatTime(audio.position())} / {formatTime(dur())} ({progressPercent()}%)
         </text>
       </box>
 
@@ -100,27 +97,13 @@ export function Player(props: PlayerProps) {
         </text>
         <text fg="gray">{episode().description}</text>
 
-        <box flexDirection="column" gap={1}>
-          <box flexDirection="row" gap={1} alignItems="center">
-            <text fg="gray">Progress:</text>
-            <box flexGrow={1} height={1} backgroundColor="#2a2f3a">
-              <box
-                width={`${progressPercent()}%`}
-                height={1}
-                backgroundColor={audio.isPlaying() ? "#6fa8ff" : "#7d8590"}
-              />
-            </box>
-            <text fg="gray">{progressPercent()}%</text>
-          </box>
-
-          <Waveform
-            data={waveform()}
-            position={audio.position()}
-            duration={dur()}
-            isPlaying={audio.isPlaying()}
-            onSeek={(next: number) => audio.seek(next)}
-          />
-        </box>
+        <MergedWaveform
+          audioUrl={episode().audioUrl}
+          position={audio.position()}
+          duration={dur()}
+          isPlaying={audio.isPlaying()}
+          onSeek={(next: number) => audio.seek(next)}
+        />
       </box>
 
       <PlaybackControls
