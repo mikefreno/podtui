@@ -10,6 +10,13 @@ import type { Podcast } from "../types/podcast"
 import type { Episode, EpisodeStatus } from "../types/episode"
 import type { PodcastSource, SourceType } from "../types/source"
 import { DEFAULT_SOURCES } from "../types/source"
+import { parseRSSFeed } from "../api/rss-parser"
+
+/** Max episodes to fetch on refresh */
+const MAX_EPISODES_REFRESH = 50
+
+/** Max episodes to fetch on initial subscribe */
+const MAX_EPISODES_SUBSCRIBE = 20
 
 /** Storage keys */
 const STORAGE_KEYS = {
@@ -17,125 +24,10 @@ const STORAGE_KEYS = {
   sources: "podtui_sources",
 }
 
-/** Create initial mock feeds for demonstration */
-function createMockFeeds(): Feed[] {
-  const now = new Date()
-  return [
-    {
-      id: "1",
-      podcast: {
-        id: "p1",
-        title: "The Daily Tech News",
-        description: "Your daily dose of technology news and insights from around the world. We cover the latest in AI, software, hardware, and digital culture.",
-        feedUrl: "https://example.com/tech.rss",
-        author: "Tech Media Inc",
-        categories: ["Technology", "News"],
-        lastUpdated: now,
-        isSubscribed: true,
-      },
-      episodes: createMockEpisodes("p1", 25),
-      visibility: "public" as FeedVisibility,
-      sourceId: "rss",
-      lastUpdated: now,
-      isPinned: true,
-    },
-    {
-      id: "2",
-      podcast: {
-        id: "p2",
-        title: "Code & Coffee",
-        description: "Weekly discussions about programming, software development, and the developer lifestyle. Best enjoyed with your morning coffee.",
-        feedUrl: "https://example.com/code.rss",
-        author: "Developer Collective",
-        categories: ["Technology", "Programming"],
-        lastUpdated: new Date(Date.now() - 86400000),
-        isSubscribed: true,
-      },
-      episodes: createMockEpisodes("p2", 50),
-      visibility: "private" as FeedVisibility,
-      sourceId: "rss",
-      lastUpdated: new Date(Date.now() - 86400000),
-      isPinned: false,
-    },
-    {
-      id: "3",
-      podcast: {
-        id: "p3",
-        title: "Science Explained",
-        description: "Breaking down complex scientific topics for curious minds. From quantum physics to biology, we make science accessible.",
-        feedUrl: "https://example.com/science.rss",
-        author: "Science Network",
-        categories: ["Science", "Education"],
-        lastUpdated: new Date(Date.now() - 172800000),
-        isSubscribed: true,
-      },
-      episodes: createMockEpisodes("p3", 120),
-      visibility: "public" as FeedVisibility,
-      sourceId: "itunes",
-      lastUpdated: new Date(Date.now() - 172800000),
-      isPinned: false,
-    },
-    {
-      id: "4",
-      podcast: {
-        id: "p4",
-        title: "History Uncovered",
-        description: "Deep dives into fascinating historical events and figures you never learned about in school.",
-        feedUrl: "https://example.com/history.rss",
-        author: "History Channel",
-        categories: ["History", "Education"],
-        lastUpdated: new Date(Date.now() - 259200000),
-        isSubscribed: true,
-      },
-      episodes: createMockEpisodes("p4", 80),
-      visibility: "public" as FeedVisibility,
-      sourceId: "rss",
-      lastUpdated: new Date(Date.now() - 259200000),
-      isPinned: true,
-    },
-    {
-      id: "5",
-      podcast: {
-        id: "p5",
-        title: "Startup Stories",
-        description: "Founders share their journey from idea to exit. Learn from their successes and failures.",
-        feedUrl: "https://example.com/startup.rss",
-        author: "Entrepreneur Media",
-        categories: ["Business", "Technology"],
-        lastUpdated: new Date(Date.now() - 345600000),
-        isSubscribed: true,
-      },
-      episodes: createMockEpisodes("p5", 45),
-      visibility: "private" as FeedVisibility,
-      sourceId: "itunes",
-      lastUpdated: new Date(Date.now() - 345600000),
-      isPinned: false,
-    },
-  ]
-}
-
-/** Create mock episodes for a podcast */
-function createMockEpisodes(podcastId: string, count: number): Episode[] {
-  const episodes: Episode[] = []
-  for (let i = 0; i < count; i++) {
-    episodes.push({
-      id: `${podcastId}-ep-${i + 1}`,
-      podcastId,
-      title: `Episode ${count - i}: Sample Episode Title`,
-      description: `This is the description for episode ${count - i}. It contains interesting content about various topics.`,
-      audioUrl: `https://example.com/audio/${podcastId}/${i + 1}.mp3`,
-      duration: 1800 + Math.random() * 3600, // 30-90 minutes
-      pubDate: new Date(Date.now() - i * 604800000), // Weekly episodes
-      episodeNumber: count - i,
-    })
-  }
-  return episodes
-}
-
 /** Load feeds from localStorage */
 function loadFeeds(): Feed[] {
   if (typeof localStorage === "undefined") {
-    return createMockFeeds()
+    return []
   }
 
   try {
@@ -160,7 +52,7 @@ function loadFeeds(): Feed[] {
     // Ignore errors
   }
 
-  return createMockFeeds()
+  return []
 }
 
 /** Save feeds to localStorage */
@@ -287,12 +179,31 @@ export function createFeedStore() {
     return allEpisodes
   }
 
-  /** Add a new feed */
-  const addFeed = (podcast: Podcast, sourceId: string, visibility: FeedVisibility = FeedVisibility.PUBLIC) => {
+  /** Fetch latest episodes from an RSS feed URL */
+  const fetchEpisodes = async (feedUrl: string, limit: number): Promise<Episode[]> => {
+    try {
+      const response = await fetch(feedUrl, {
+        headers: {
+          "Accept-Encoding": "identity",
+          "Accept": "application/rss+xml, application/xml, text/xml, */*",
+        },
+      })
+      if (!response.ok) return []
+      const xml = await response.text()
+      const parsed = parseRSSFeed(xml, feedUrl)
+      return parsed.episodes.slice(0, limit)
+    } catch {
+      return []
+    }
+  }
+
+  /** Add a new feed and auto-fetch latest 20 episodes */
+  const addFeed = async (podcast: Podcast, sourceId: string, visibility: FeedVisibility = FeedVisibility.PUBLIC) => {
+    const episodes = await fetchEpisodes(podcast.feedUrl, MAX_EPISODES_SUBSCRIBE)
     const newFeed: Feed = {
       id: crypto.randomUUID(),
       podcast,
-      episodes: [],
+      episodes,
       visibility,
       sourceId,
       lastUpdated: new Date(),
@@ -304,6 +215,28 @@ export function createFeedStore() {
       return updated
     })
     return newFeed
+  }
+
+  /** Refresh a single feed - re-fetch latest 50 episodes */
+  const refreshFeed = async (feedId: string) => {
+    const feed = getFeed(feedId)
+    if (!feed) return
+    const episodes = await fetchEpisodes(feed.podcast.feedUrl, MAX_EPISODES_REFRESH)
+    setFeeds((prev) => {
+      const updated = prev.map((f) =>
+        f.id === feedId ? { ...f, episodes, lastUpdated: new Date() } : f
+      )
+      saveFeeds(updated)
+      return updated
+    })
+  }
+
+  /** Refresh all feeds */
+  const refreshAllFeeds = async () => {
+    const currentFeeds = feeds()
+    for (const feed of currentFeeds) {
+      await refreshFeed(feed.id)
+    }
   }
 
   /** Remove a feed */
@@ -417,6 +350,8 @@ export function createFeedStore() {
     removeFeed,
     updateFeed,
     togglePinned,
+    refreshFeed,
+    refreshAllFeeds,
     addSource,
     removeSource,
     toggleSource,

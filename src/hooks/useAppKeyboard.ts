@@ -7,7 +7,7 @@ import { useKeyboard, useRenderer } from "@opentui/solid"
 import type { TabId } from "../components/Tab"
 import type { Accessor } from "solid-js"
 
-const TAB_ORDER: TabId[] = ["discover", "feeds", "search", "player", "settings"]
+const TAB_ORDER: TabId[] = ["feed", "shows", "discover", "search", "player", "settings"]
 
 type ShortcutOptions = {
   activeTab: TabId
@@ -89,24 +89,28 @@ export function useAppKeyboard(options: ShortcutOptions) {
       return
     }
 
-    // Number keys for direct tab access (1-5)
+    // Number keys for direct tab access (1-6)
     if (key.name === "1") {
-      options.onTabChange("discover")
+      options.onTabChange("feed")
       return
     }
     if (key.name === "2") {
-      options.onTabChange("feeds")
+      options.onTabChange("shows")
       return
     }
     if (key.name === "3") {
-      options.onTabChange("search")
+      options.onTabChange("discover")
       return
     }
     if (key.name === "4") {
-      options.onTabChange("player")
+      options.onTabChange("search")
       return
     }
     if (key.name === "5") {
+      options.onTabChange("player")
+      return
+    }
+    if (key.name === "6") {
       options.onTabChange("settings")
       return
     }

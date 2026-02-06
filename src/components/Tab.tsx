@@ -1,6 +1,6 @@
 import { useTheme } from "../context/ThemeContext"
 
-export type TabId = "discover" | "feeds" | "search" | "player" | "settings"
+export type TabId = "feed" | "shows" | "discover" | "search" | "player" | "settings"
 
 export type TabDefinition = {
   id: TabId
@@ -8,8 +8,9 @@ export type TabDefinition = {
 }
 
 export const tabs: TabDefinition[] = [
+  { id: "feed", label: "Feed" },
+  { id: "shows", label: "My Shows" },
   { id: "discover", label: "Discover" },
-  { id: "feeds", label: "My Feeds" },
   { id: "search", label: "Search" },
   { id: "player", label: "Player" },
   { id: "settings", label: "Settings" },

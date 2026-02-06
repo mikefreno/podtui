@@ -1,40 +1,51 @@
 import type { JSX } from "solid-js"
 import type { RGBA } from "@opentui/core"
-import { Show, createMemo } from "solid-js"
+import { Show, For, createMemo } from "solid-js"
 import { useTheme } from "../context/ThemeContext"
-import { LayerIndicator } from "./LayerIndicator"
 
-type LayerConfig = {
-  depth: number
-  background: RGBA
+type PanelConfig = {
+  /** Panel content */
+  content: JSX.Element
+  /** Panel title shown in header */
+  title?: string
+  /** Fixed width (leave undefined for flex) */
+  width?: number
+  /** Whether this panel is currently focused */
+  focused?: boolean
 }
 
 type LayoutProps = {
+  /** Top tab bar */
   header?: JSX.Element
+  /** Bottom status bar */
   footer?: JSX.Element
-  children?: JSX.Element
-  layerDepth?: number
+  /** Panels to display left-to-right like a file explorer */
+  panels: PanelConfig[]
+  /** Index of the currently active/focused panel */
+  activePanelIndex?: number
 }
 
 export function Layout(props: LayoutProps) {
   const context = useTheme()
 
-  // Get layer configuration based on depth - wrapped in createMemo for reactivity
-  const currentLayer = createMemo((): LayerConfig => {
-    const depth = props.layerDepth || 0
+  const panelBg = (index: number): RGBA => {
     const backgrounds = context.theme.layerBackgrounds
-    const depthMap: Record<number, LayerConfig> = {
-      0: { depth: 0, background: backgrounds?.layer0 ?? context.theme.background },
-      1: { depth: 1, background: backgrounds?.layer1 ?? context.theme.backgroundPanel },
-      2: { depth: 2, background: backgrounds?.layer2 ?? context.theme.backgroundElement },
-      3: { depth: 3, background: backgrounds?.layer3 ?? context.theme.backgroundMenu },
-    }
+    const layers = [
+      backgrounds?.layer0 ?? context.theme.background,
+      backgrounds?.layer1 ?? context.theme.backgroundPanel,
+      backgrounds?.layer2 ?? context.theme.backgroundElement,
+      backgrounds?.layer3 ?? context.theme.backgroundMenu,
+    ]
+    return layers[Math.min(index, layers.length - 1)]
+  }
 
-    return depthMap[depth] || { depth: 0, background: context.theme.background }
-  })
+  const borderColor = (index: number): RGBA | string => {
+    const isActive = index === (props.activePanelIndex ?? 0)
+    return isActive
+      ? (context.theme.accent ?? context.theme.primary)
+      : (context.theme.border ?? context.theme.textMuted)
+  }
 
-  // Note: No need for a ready check here - the ThemeProvider uses
-  // createSimpleContext which gates children rendering until ready
   return (
     <box
       flexDirection="column"
@@ -42,36 +53,74 @@ export function Layout(props: LayoutProps) {
       height="100%"
       backgroundColor={context.theme.background}
     >
-      {/* Header */}
-      <Show when={props.header} fallback={<box style={{ height: 4 }} />}>
+      {/* Header - tab bar */}
+      <Show when={props.header}>
         <box
           style={{
-            height: 4,
+            height: 3,
             backgroundColor: context.theme.surface ?? context.theme.backgroundPanel,
           }}
         >
-          <box style={{ padding: 1 }}>
+          <box style={{ paddingLeft: 1, paddingTop: 0, paddingBottom: 0 }}>
             {props.header}
           </box>
         </box>
       </Show>
 
-      {/* Main content area with layer background */}
+      {/* Main content: side-by-side panels */}
       <box
-        style={{
-          flexGrow: 1,
-          backgroundColor: currentLayer().background,
-          paddingLeft: 2,
-          paddingRight: 2,
-        }}
+        flexDirection="row"
+        style={{ flexGrow: 1 }}
       >
-        <box style={{ flexGrow: 1 }}>
-          {props.children}
-        </box>
+        <For each={props.panels}>
+          {(panel, index) => (
+            <box
+              flexDirection="column"
+              border
+              borderColor={borderColor(index())}
+              backgroundColor={panelBg(index())}
+              style={{
+                flexGrow: panel.width ? 0 : 1,
+                width: panel.width,
+                height: "100%",
+              }}
+            >
+              {/* Panel header */}
+              <Show when={panel.title}>
+                <box
+                  style={{
+                    height: 1,
+                    paddingLeft: 1,
+                    paddingRight: 1,
+                    backgroundColor: index() === (props.activePanelIndex ?? 0)
+                      ? (context.theme.accent ?? context.theme.primary)
+                      : (context.theme.surface ?? context.theme.backgroundPanel),
+                  }}
+                >
+                  <text
+                    fg={index() === (props.activePanelIndex ?? 0) ? "black" : undefined}
+                  >
+                    <strong>{panel.title}</strong>
+                  </text>
+                </box>
+              </Show>
+
+              {/* Panel body */}
+              <box
+                style={{
+                  flexGrow: 1,
+                  padding: 1,
+                }}
+              >
+                {panel.content}
+              </box>
+            </box>
+          )}
+        </For>
       </box>
 
-      {/* Footer */}
-      <Show when={props.footer} fallback={<box style={{ height: 2 }} />}>
+      {/* Footer - status/nav bar */}
+      <Show when={props.footer}>
         <box
           style={{
             height: 2,
@@ -80,20 +129,6 @@ export function Layout(props: LayoutProps) {
         >
           <box style={{ padding: 1 }}>
             {props.footer}
-          </box>
-        </box>
-      </Show>
-
-      {/* Layer indicator */}
-      <Show when={props.layerDepth !== undefined}>
-        <box
-          style={{
-            height: 1,
-            backgroundColor: context.theme.surface ?? context.theme.backgroundPanel,
-          }}
-        >
-          <box style={{ padding: 1 }}>
-            <LayerIndicator layerDepth={props.layerDepth as number} />
           </box>
         </box>
       </Show>
