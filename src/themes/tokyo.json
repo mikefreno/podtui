@@ -1,7 +1,6 @@
 {
-  "$schema": "https://opencode.ai/theme.json",
   "defs": {
-    "background": "transparent",
+    "background": "#0f0f15",
     "surface": "#1a1b26",
     "primary": "#7aa2f7",
     "secondary": "#bb9af7",
@@ -11,7 +10,7 @@
     "warning": "#e0af68",
     "error": "#f7768e",
     "success": "#9ece6a",
-    "layer0": "transparent",
+    "layer0": "#0f0f15",
     "layer1": "#16161e",
     "layer2": "#0f0f15",
     "layer3": "#08080b"

@@ -93,9 +93,6 @@ type ThemeResolved = {
  * This ensures children are NOT rendered until the theme is ready,
  * preventing "useTheme must be used within a ThemeProvider" errors.
  *
- * The key insight from opencode's implementation is that the provider
- * uses `<Show when={ready}>` to gate rendering, so components can
- * safely call useTheme() without checking ready state.
  */
 export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
   name: "Theme",
@@ -121,8 +118,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
           );
         })
         .catch(() => {
-          // If custom themes fail to load, fall back to opencode theme
-          setStore("active", "opencode");
+          setStore("active", "catppuccin");
         })
         .finally(() => {
           // Only set ready if not waiting for system theme
@@ -206,7 +202,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         if (store.active === "system") {
           setStore(
             produce((draft) => {
-              draft.active = "opencode";
+              draft.active = "catppuccin";
               draft.ready = true;
             }),
           );

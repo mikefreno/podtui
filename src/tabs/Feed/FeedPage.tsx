@@ -9,6 +9,8 @@ import { useFeedStore } from "@/stores/feed";
 import { format } from "date-fns";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
+import { useTheme } from "@/context/ThemeContext";
+import { htmlToText } from "@/utils/html-to-text";
 
 type FeedPageProps = {
   focused: boolean;
@@ -67,8 +69,13 @@ export function FeedPage(props: FeedPageProps) {
     }
   });
 
+  const { theme } = useTheme();
   return (
-    <box flexDirection="column" height="100%">
+    <box
+      backgroundColor={theme.background}
+      flexDirection="column"
+      height="100%"
+    >
       {/* Status line */}
       <Show when={isRefreshing()}>
         <text fg="yellow">Refreshing feeds...</text>
@@ -104,7 +111,7 @@ export function FeedPage(props: FeedPageProps) {
                   <text fg={index() === selectedIndex() ? "cyan" : "gray"}>
                     {index() === selectedIndex() ? ">" : " "}
                   </text>
-                  <text fg={index() === selectedIndex() ? "white" : undefined}>
+                  <text fg={index() === selectedIndex() ? "white" : theme.text}>
                     {item.episode.title}
                   </text>
                 </box>

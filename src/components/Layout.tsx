@@ -50,7 +50,7 @@ export function Layout(props: LayoutProps) {
       flexDirection="column"
       width="100%"
       height="100%"
-      backgroundColor={theme.background}
+      backgroundColor={theme.surface}
     >
       {/* Header - tab bar */}
       <Show when={props.header}>
@@ -119,18 +119,6 @@ export function Layout(props: LayoutProps) {
           )}
         </For>
       </box>
-
-      {/* Footer - status/nav bar */}
-      <Show when={props.footer}>
-        <box
-          style={{
-            height: 2,
-            backgroundColor: theme.surface ?? theme.backgroundPanel,
-          }}
-        >
-          <box style={{ padding: 1 }}>{props.footer}</box>
-        </box>
-      </Show>
     </box>
   );
 }

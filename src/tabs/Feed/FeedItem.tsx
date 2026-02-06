@@ -5,6 +5,8 @@
 
 import type { Feed, FeedVisibility } from "@/types/feed";
 import { format } from "date-fns";
+import { htmlToText } from "@/utils/html-to-text";
+import { useTheme } from "@/context/ThemeContext";
 
 interface FeedItemProps {
   feed: Feed;
@@ -36,6 +38,7 @@ export function FeedItem(props: FeedItemProps) {
   const pinnedIndicator = () => {
     return props.feed.isPinned ? "*" : " ";
   };
+  const { theme } = useTheme();
 
   if (props.compact) {
     // Compact single-line view
@@ -51,8 +54,8 @@ export function FeedItem(props: FeedItemProps) {
           {props.isSelected ? ">" : " "}
         </text>
         <text fg={visibilityColor()}>{visibilityIcon()}</text>
-        <text fg={props.isSelected ? "white" : undefined}>
-          {props.feed.customName || props.feed.podcast.title}
+        <text fg={props.isSelected ? "white" : theme.accent}>
+          {htmlToText(props.feed.customName || props.feed.podcast.title)}
         </text>
         {props.showEpisodeCount && <text fg="gray">({episodeCount()})</text>}
       </box>
@@ -76,12 +79,13 @@ export function FeedItem(props: FeedItemProps) {
         </text>
         <text fg={visibilityColor()}>{visibilityIcon()}</text>
         <text fg="yellow">{pinnedIndicator()}</text>
-        <text fg={props.isSelected ? "white" : undefined}>
-          <strong>{props.feed.customName || props.feed.podcast.title}</strong>
+        <text fg={props.isSelected ? "white" : theme.text}>
+          <strong>
+            {htmlToText(props.feed.customName || props.feed.podcast.title)}
+          </strong>
         </text>
       </box>
 
-      {/* Details row */}
       <box flexDirection="row" gap={2} paddingLeft={4}>
         {props.showEpisodeCount && (
           <text fg="gray">
@@ -93,7 +97,6 @@ export function FeedItem(props: FeedItemProps) {
         )}
       </box>
 
-      {/* Description (truncated) */}
       {props.feed.podcast.description && (
         <box paddingLeft={4} paddingTop={0}>
           <text fg="gray">
