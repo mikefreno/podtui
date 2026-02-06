@@ -3,174 +3,193 @@
  * Manages feed data, sources, and filtering
  */
 
-import { createSignal } from "solid-js"
-import { FeedVisibility } from "../types/feed"
-import type { Feed, FeedFilter, FeedSortField } from "../types/feed"
-import type { Podcast } from "../types/podcast"
-import type { Episode, EpisodeStatus } from "../types/episode"
-import type { PodcastSource, SourceType } from "../types/source"
-import { DEFAULT_SOURCES } from "../types/source"
-import { parseRSSFeed } from "../api/rss-parser"
+import { createSignal } from "solid-js";
+import { FeedVisibility } from "../types/feed";
+import type { Feed, FeedFilter, FeedSortField } from "../types/feed";
+import type { Podcast } from "../types/podcast";
+import type { Episode, EpisodeStatus } from "../types/episode";
+import type { PodcastSource, SourceType } from "../types/source";
+import { DEFAULT_SOURCES } from "../types/source";
+import { parseRSSFeed } from "../api/rss-parser";
 import {
   loadFeedsFromFile,
   saveFeedsToFile,
   loadSourcesFromFile,
   saveSourcesToFile,
-  migrateFeedsFromLocalStorage,
-  migrateSourcesFromLocalStorage,
-} from "../utils/feeds-persistence"
-import { useDownloadStore } from "./download"
-import { DownloadStatus } from "../types/episode"
+} from "../utils/feeds-persistence";
+import { useDownloadStore } from "./download";
+import { DownloadStatus } from "../types/episode";
 
 /** Max episodes to load per page/chunk */
-const MAX_EPISODES_REFRESH = 50
+const MAX_EPISODES_REFRESH = 50;
 
 /** Max episodes to fetch on initial subscribe */
-const MAX_EPISODES_SUBSCRIBE = 20
+const MAX_EPISODES_SUBSCRIBE = 20;
 
 /** Cache of all parsed episodes per feed (feedId -> Episode[]) */
-const fullEpisodeCache = new Map<string, Episode[]>()
+const fullEpisodeCache = new Map<string, Episode[]>();
 
 /** Track how many episodes are currently loaded per feed */
-const episodeLoadCount = new Map<string, number>()
+const episodeLoadCount = new Map<string, number>();
 
 /** Save feeds to file (async, fire-and-forget) */
 function saveFeeds(feeds: Feed[]): void {
-  saveFeedsToFile(feeds).catch(() => {})
+  saveFeedsToFile(feeds).catch(() => {});
 }
 
 /** Save sources to file (async, fire-and-forget) */
 function saveSources(sources: PodcastSource[]): void {
-  saveSourcesToFile(sources).catch(() => {})
+  saveSourcesToFile(sources).catch(() => {});
 }
 
 /** Create feed store */
 export function createFeedStore() {
-  const [feeds, setFeeds] = createSignal<Feed[]>([])
-  const [sources, setSources] = createSignal<PodcastSource[]>([...DEFAULT_SOURCES])
+  const [feeds, setFeeds] = createSignal<Feed[]>([]);
+  const [sources, setSources] = createSignal<PodcastSource[]>([
+    ...DEFAULT_SOURCES,
+  ]);
 
-  // Async initialization: migrate from localStorage, then load from file
-  ;(async () => {
-    await migrateFeedsFromLocalStorage()
-    await migrateSourcesFromLocalStorage()
-    const loadedFeeds = await loadFeedsFromFile()
-    if (loadedFeeds.length > 0) setFeeds(loadedFeeds)
-    const loadedSources = await loadSourcesFromFile<PodcastSource>()
-    if (loadedSources && loadedSources.length > 0) setSources(loadedSources)
-  })()
+  (async () => {
+    const loadedFeeds = await loadFeedsFromFile();
+    if (loadedFeeds.length > 0) setFeeds(loadedFeeds);
+    const loadedSources = await loadSourcesFromFile<PodcastSource>();
+    if (loadedSources && loadedSources.length > 0) setSources(loadedSources);
+  })();
   const [filter, setFilter] = createSignal<FeedFilter>({
     visibility: "all",
     sortBy: "updated" as FeedSortField,
     sortDirection: "desc",
-  })
-  const [selectedFeedId, setSelectedFeedId] = createSignal<string | null>(null)
-  const [isLoadingMore, setIsLoadingMore] = createSignal(false)
+  });
+  const [selectedFeedId, setSelectedFeedId] = createSignal<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = createSignal(false);
 
   /** Get filtered and sorted feeds */
   const getFilteredFeeds = (): Feed[] => {
-    let result = [...feeds()]
-    const f = filter()
+    let result = [...feeds()];
+    const f = filter();
 
     // Filter by visibility
     if (f.visibility && f.visibility !== "all") {
-      result = result.filter((feed) => feed.visibility === f.visibility)
+      result = result.filter((feed) => feed.visibility === f.visibility);
     }
 
     // Filter by source
     if (f.sourceId) {
-      result = result.filter((feed) => feed.sourceId === f.sourceId)
+      result = result.filter((feed) => feed.sourceId === f.sourceId);
     }
 
     // Filter by pinned
     if (f.pinnedOnly) {
-      result = result.filter((feed) => feed.isPinned)
+      result = result.filter((feed) => feed.isPinned);
     }
 
     // Filter by search query
     if (f.searchQuery) {
-      const query = f.searchQuery.toLowerCase()
+      const query = f.searchQuery.toLowerCase();
       result = result.filter(
         (feed) =>
           feed.podcast.title.toLowerCase().includes(query) ||
           feed.customName?.toLowerCase().includes(query) ||
-          feed.podcast.description?.toLowerCase().includes(query)
-      )
+          feed.podcast.description?.toLowerCase().includes(query),
+      );
     }
 
     // Sort by selected field
-    const sortDir = f.sortDirection === "asc" ? 1 : -1
+    const sortDir = f.sortDirection === "asc" ? 1 : -1;
     result.sort((a, b) => {
       switch (f.sortBy) {
         case "title":
-          return sortDir * (a.customName || a.podcast.title).localeCompare(b.customName || b.podcast.title)
+          return (
+            sortDir *
+            (a.customName || a.podcast.title).localeCompare(
+              b.customName || b.podcast.title,
+            )
+          );
         case "episodeCount":
-          return sortDir * (a.episodes.length - b.episodes.length)
+          return sortDir * (a.episodes.length - b.episodes.length);
         case "latestEpisode":
-          const aLatest = a.episodes[0]?.pubDate?.getTime() || 0
-          const bLatest = b.episodes[0]?.pubDate?.getTime() || 0
-          return sortDir * (aLatest - bLatest)
+          const aLatest = a.episodes[0]?.pubDate?.getTime() || 0;
+          const bLatest = b.episodes[0]?.pubDate?.getTime() || 0;
+          return sortDir * (aLatest - bLatest);
         case "updated":
         default:
-          return sortDir * (a.lastUpdated.getTime() - b.lastUpdated.getTime())
+          return sortDir * (a.lastUpdated.getTime() - b.lastUpdated.getTime());
       }
-    })
+    });
 
     // Pinned feeds always first
     result.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1
-      if (!a.isPinned && b.isPinned) return 1
-      return 0
-    })
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return 0;
+    });
 
-    return result
-  }
+    return result;
+  };
 
   /** Get episodes in reverse chronological order across all feeds */
-  const getAllEpisodesChronological = (): Array<{ episode: Episode; feed: Feed }> => {
-    const allEpisodes: Array<{ episode: Episode; feed: Feed }> = []
-    
+  const getAllEpisodesChronological = (): Array<{
+    episode: Episode;
+    feed: Feed;
+  }> => {
+    const allEpisodes: Array<{ episode: Episode; feed: Feed }> = [];
+
     for (const feed of feeds()) {
       for (const episode of feed.episodes) {
-        allEpisodes.push({ episode, feed })
+        allEpisodes.push({ episode, feed });
       }
     }
 
     // Sort by publication date (newest first)
-    allEpisodes.sort((a, b) => b.episode.pubDate.getTime() - a.episode.pubDate.getTime())
+    allEpisodes.sort(
+      (a, b) => b.episode.pubDate.getTime() - a.episode.pubDate.getTime(),
+    );
 
-    return allEpisodes
-  }
+    return allEpisodes;
+  };
 
   /** Fetch latest episodes from an RSS feed URL, caching all parsed episodes */
-  const fetchEpisodes = async (feedUrl: string, limit: number, feedId?: string): Promise<Episode[]> => {
+  const fetchEpisodes = async (
+    feedUrl: string,
+    limit: number,
+    feedId?: string,
+  ): Promise<Episode[]> => {
     try {
       const response = await fetch(feedUrl, {
         headers: {
           "Accept-Encoding": "identity",
-          "Accept": "application/rss+xml, application/xml, text/xml, */*",
+          Accept: "application/rss+xml, application/xml, text/xml, */*",
         },
-      })
-      if (!response.ok) return []
-      const xml = await response.text()
-      const parsed = parseRSSFeed(xml, feedUrl)
-      const allEpisodes = parsed.episodes
+      });
+      if (!response.ok) return [];
+      const xml = await response.text();
+      const parsed = parseRSSFeed(xml, feedUrl);
+      const allEpisodes = parsed.episodes;
 
       // Cache all parsed episodes for pagination
       if (feedId) {
-        fullEpisodeCache.set(feedId, allEpisodes)
-        episodeLoadCount.set(feedId, Math.min(limit, allEpisodes.length))
+        fullEpisodeCache.set(feedId, allEpisodes);
+        episodeLoadCount.set(feedId, Math.min(limit, allEpisodes.length));
       }
 
-      return allEpisodes.slice(0, limit)
+      return allEpisodes.slice(0, limit);
     } catch {
-      return []
+      return [];
     }
-  }
+  };
 
   /** Add a new feed and auto-fetch latest 20 episodes */
-  const addFeed = async (podcast: Podcast, sourceId: string, visibility: FeedVisibility = FeedVisibility.PUBLIC) => {
-    const feedId = crypto.randomUUID()
-    const episodes = await fetchEpisodes(podcast.feedUrl, MAX_EPISODES_SUBSCRIBE, feedId)
+  const addFeed = async (
+    podcast: Podcast,
+    sourceId: string,
+    visibility: FeedVisibility = FeedVisibility.PUBLIC,
+  ) => {
+    const feedId = crypto.randomUUID();
+    const episodes = await fetchEpisodes(
+      podcast.feedUrl,
+      MAX_EPISODES_SUBSCRIBE,
+      feedId,
+    );
     const newFeed: Feed = {
       id: feedId,
       podcast,
@@ -179,220 +198,238 @@ export function createFeedStore() {
       sourceId,
       lastUpdated: new Date(),
       isPinned: false,
-    }
+    };
     setFeeds((prev) => {
-      const updated = [...prev, newFeed]
-      saveFeeds(updated)
-      return updated
-    })
-    return newFeed
-  }
+      const updated = [...prev, newFeed];
+      saveFeeds(updated);
+      return updated;
+    });
+    return newFeed;
+  };
 
   /** Auto-download newest episodes for a feed */
-  const autoDownloadEpisodes = (feedId: string, newEpisodes: Episode[], count: number) => {
+  const autoDownloadEpisodes = (
+    feedId: string,
+    newEpisodes: Episode[],
+    count: number,
+  ) => {
     try {
-      const dlStore = useDownloadStore()
+      const dlStore = useDownloadStore();
       // Sort by pubDate descending (newest first)
       const sorted = [...newEpisodes].sort(
-        (a, b) => b.pubDate.getTime() - a.pubDate.getTime()
-      )
+        (a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
+      );
       // count = 0 means download all new episodes
-      const toDownload = count > 0 ? sorted.slice(0, count) : sorted
+      const toDownload = count > 0 ? sorted.slice(0, count) : sorted;
       for (const ep of toDownload) {
-        const status = dlStore.getDownloadStatus(ep.id)
-        if (status === DownloadStatus.NONE || status === DownloadStatus.FAILED) {
-          dlStore.startDownload(ep, feedId)
+        const status = dlStore.getDownloadStatus(ep.id);
+        if (
+          status === DownloadStatus.NONE ||
+          status === DownloadStatus.FAILED
+        ) {
+          dlStore.startDownload(ep, feedId);
         }
       }
     } catch {
       // Download store may not be available yet
     }
-  }
+  };
 
   /** Refresh a single feed - re-fetch latest 50 episodes */
   const refreshFeed = async (feedId: string) => {
-    const feed = getFeed(feedId)
-    if (!feed) return
-    const oldEpisodeIds = new Set(feed.episodes.map((e) => e.id))
-    const episodes = await fetchEpisodes(feed.podcast.feedUrl, MAX_EPISODES_REFRESH, feedId)
+    const feed = getFeed(feedId);
+    if (!feed) return;
+    const oldEpisodeIds = new Set(feed.episodes.map((e) => e.id));
+    const episodes = await fetchEpisodes(
+      feed.podcast.feedUrl,
+      MAX_EPISODES_REFRESH,
+      feedId,
+    );
     setFeeds((prev) => {
       const updated = prev.map((f) =>
-        f.id === feedId ? { ...f, episodes, lastUpdated: new Date() } : f
-      )
-      saveFeeds(updated)
-      return updated
-    })
+        f.id === feedId ? { ...f, episodes, lastUpdated: new Date() } : f,
+      );
+      saveFeeds(updated);
+      return updated;
+    });
 
     // Auto-download new episodes if enabled for this feed
     if (feed.autoDownload) {
-      const newEpisodes = episodes.filter((e) => !oldEpisodeIds.has(e.id))
+      const newEpisodes = episodes.filter((e) => !oldEpisodeIds.has(e.id));
       if (newEpisodes.length > 0) {
-        autoDownloadEpisodes(feedId, newEpisodes, feed.autoDownloadCount ?? 0)
+        autoDownloadEpisodes(feedId, newEpisodes, feed.autoDownloadCount ?? 0);
       }
     }
-  }
+  };
 
   /** Refresh all feeds */
   const refreshAllFeeds = async () => {
-    const currentFeeds = feeds()
+    const currentFeeds = feeds();
     for (const feed of currentFeeds) {
-      await refreshFeed(feed.id)
+      await refreshFeed(feed.id);
     }
-  }
+  };
 
   /** Remove a feed */
   const removeFeed = (feedId: string) => {
-    fullEpisodeCache.delete(feedId)
-    episodeLoadCount.delete(feedId)
+    fullEpisodeCache.delete(feedId);
+    episodeLoadCount.delete(feedId);
     setFeeds((prev) => {
-      const updated = prev.filter((f) => f.id !== feedId)
-      saveFeeds(updated)
-      return updated
-    })
-  }
+      const updated = prev.filter((f) => f.id !== feedId);
+      saveFeeds(updated);
+      return updated;
+    });
+  };
 
   /** Update a feed */
   const updateFeed = (feedId: string, updates: Partial<Feed>) => {
     setFeeds((prev) => {
       const updated = prev.map((f) =>
-        f.id === feedId ? { ...f, ...updates, lastUpdated: new Date() } : f
-      )
-      saveFeeds(updated)
-      return updated
-    })
-  }
+        f.id === feedId ? { ...f, ...updates, lastUpdated: new Date() } : f,
+      );
+      saveFeeds(updated);
+      return updated;
+    });
+  };
 
   /** Toggle feed pinned status */
   const togglePinned = (feedId: string) => {
     setFeeds((prev) => {
       const updated = prev.map((f) =>
-        f.id === feedId ? { ...f, isPinned: !f.isPinned } : f
-      )
-      saveFeeds(updated)
-      return updated
-    })
-  }
+        f.id === feedId ? { ...f, isPinned: !f.isPinned } : f,
+      );
+      saveFeeds(updated);
+      return updated;
+    });
+  };
 
   /** Add a source */
   const addSource = (source: Omit<PodcastSource, "id">) => {
     const newSource: PodcastSource = {
       ...source,
       id: crypto.randomUUID(),
-    }
+    };
     setSources((prev) => {
-      const updated = [...prev, newSource]
-      saveSources(updated)
-      return updated
-    })
-    return newSource
-  }
+      const updated = [...prev, newSource];
+      saveSources(updated);
+      return updated;
+    });
+    return newSource;
+  };
 
   /** Update a source */
   const updateSource = (sourceId: string, updates: Partial<PodcastSource>) => {
     setSources((prev) => {
       const updated = prev.map((source) =>
-        source.id === sourceId ? { ...source, ...updates } : source
-      )
-      saveSources(updated)
-      return updated
-    })
-  }
+        source.id === sourceId ? { ...source, ...updates } : source,
+      );
+      saveSources(updated);
+      return updated;
+    });
+  };
 
   /** Remove a source */
   const removeSource = (sourceId: string) => {
     // Don't remove default sources
-    if (sourceId === "itunes" || sourceId === "rss") return false
-    
+    if (sourceId === "itunes" || sourceId === "rss") return false;
+
     setSources((prev) => {
-      const updated = prev.filter((s) => s.id !== sourceId)
-      saveSources(updated)
-      return updated
-    })
-    return true
-  }
+      const updated = prev.filter((s) => s.id !== sourceId);
+      saveSources(updated);
+      return updated;
+    });
+    return true;
+  };
 
   /** Toggle source enabled status */
   const toggleSource = (sourceId: string) => {
     setSources((prev) => {
       const updated = prev.map((s) =>
-        s.id === sourceId ? { ...s, enabled: !s.enabled } : s
-      )
-      saveSources(updated)
-      return updated
-    })
-  }
+        s.id === sourceId ? { ...s, enabled: !s.enabled } : s,
+      );
+      saveSources(updated);
+      return updated;
+    });
+  };
 
   /** Get feed by ID */
   const getFeed = (feedId: string): Feed | undefined => {
-    return feeds().find((f) => f.id === feedId)
-  }
+    return feeds().find((f) => f.id === feedId);
+  };
 
   /** Get selected feed */
   const getSelectedFeed = (): Feed | undefined => {
-    const id = selectedFeedId()
-    return id ? getFeed(id) : undefined
-  }
+    const id = selectedFeedId();
+    return id ? getFeed(id) : undefined;
+  };
 
   /** Check if a feed has more episodes available beyond what's currently loaded */
   const hasMoreEpisodes = (feedId: string): boolean => {
-    const cached = fullEpisodeCache.get(feedId)
-    if (!cached) return false
-    const loaded = episodeLoadCount.get(feedId) ?? 0
-    return loaded < cached.length
-  }
+    const cached = fullEpisodeCache.get(feedId);
+    if (!cached) return false;
+    const loaded = episodeLoadCount.get(feedId) ?? 0;
+    return loaded < cached.length;
+  };
 
   /** Load the next chunk of episodes for a feed from the cache.
    *  If no cache exists (e.g. app restart), re-fetches from the RSS feed. */
   const loadMoreEpisodes = async (feedId: string) => {
-    if (isLoadingMore()) return
-    const feed = getFeed(feedId)
-    if (!feed) return
+    if (isLoadingMore()) return;
+    const feed = getFeed(feedId);
+    if (!feed) return;
 
-    setIsLoadingMore(true)
+    setIsLoadingMore(true);
     try {
-      let cached = fullEpisodeCache.get(feedId)
+      let cached = fullEpisodeCache.get(feedId);
 
       // If no cache, re-fetch and parse the full feed
       if (!cached) {
         const response = await fetch(feed.podcast.feedUrl, {
           headers: {
             "Accept-Encoding": "identity",
-            "Accept": "application/rss+xml, application/xml, text/xml, */*",
+            Accept: "application/rss+xml, application/xml, text/xml, */*",
           },
-        })
-        if (!response.ok) return
-        const xml = await response.text()
-        const parsed = parseRSSFeed(xml, feed.podcast.feedUrl)
-        cached = parsed.episodes
-        fullEpisodeCache.set(feedId, cached)
+        });
+        if (!response.ok) return;
+        const xml = await response.text();
+        const parsed = parseRSSFeed(xml, feed.podcast.feedUrl);
+        cached = parsed.episodes;
+        fullEpisodeCache.set(feedId, cached);
         // Set current load count to match what's already displayed
-        episodeLoadCount.set(feedId, feed.episodes.length)
+        episodeLoadCount.set(feedId, feed.episodes.length);
       }
 
-      const currentCount = episodeLoadCount.get(feedId) ?? feed.episodes.length
-      const newCount = Math.min(currentCount + MAX_EPISODES_REFRESH, cached.length)
+      const currentCount = episodeLoadCount.get(feedId) ?? feed.episodes.length;
+      const newCount = Math.min(
+        currentCount + MAX_EPISODES_REFRESH,
+        cached.length,
+      );
 
-      if (newCount <= currentCount) return // nothing more to load
+      if (newCount <= currentCount) return; // nothing more to load
 
-      episodeLoadCount.set(feedId, newCount)
-      const episodes = cached.slice(0, newCount)
+      episodeLoadCount.set(feedId, newCount);
+      const episodes = cached.slice(0, newCount);
 
       setFeeds((prev) => {
         const updated = prev.map((f) =>
-          f.id === feedId ? { ...f, episodes } : f
-        )
-        saveFeeds(updated)
-        return updated
-      })
+          f.id === feedId ? { ...f, episodes } : f,
+        );
+        saveFeeds(updated);
+        return updated;
+      });
     } finally {
-      setIsLoadingMore(false)
+      setIsLoadingMore(false);
     }
-  }
+  };
 
   /** Set auto-download settings for a feed */
-  const setAutoDownload = (feedId: string, enabled: boolean, count: number = 0) => {
-    updateFeed(feedId, { autoDownload: enabled, autoDownloadCount: count })
-  }
+  const setAutoDownload = (
+    feedId: string,
+    enabled: boolean,
+    count: number = 0,
+  ) => {
+    updateFeed(feedId, { autoDownload: enabled, autoDownloadCount: count });
+  };
 
   return {
     // State
@@ -401,14 +438,14 @@ export function createFeedStore() {
     filter,
     selectedFeedId,
     isLoadingMore,
-    
+
     // Computed
     getFilteredFeeds,
     getAllEpisodesChronological,
     getFeed,
     getSelectedFeed,
     hasMoreEpisodes,
-    
+
     // Actions
     setFilter,
     setSelectedFeedId,
@@ -424,15 +461,15 @@ export function createFeedStore() {
     toggleSource,
     updateSource,
     setAutoDownload,
-  }
+  };
 }
 
 /** Singleton feed store */
-let feedStoreInstance: ReturnType<typeof createFeedStore> | null = null
+let feedStoreInstance: ReturnType<typeof createFeedStore> | null = null;
 
 export function useFeedStore() {
   if (!feedStoreInstance) {
-    feedStoreInstance = createFeedStore()
+    feedStoreInstance = createFeedStore();
   }
-  return feedStoreInstance
+  return feedStoreInstance;
 }

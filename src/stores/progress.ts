@@ -5,55 +5,56 @@
  * Tracks position, duration, completion, and last-played timestamp.
  */
 
-import { createSignal } from "solid-js"
-import type { Progress } from "../types/episode"
+import { createSignal } from "solid-js";
+import type { Progress } from "../types/episode";
 import {
   loadProgressFromFile,
   saveProgressToFile,
-  migrateProgressFromLocalStorage,
-} from "../utils/app-persistence"
+} from "../utils/app-persistence";
 
 /** Threshold (fraction 0-1) at which an episode is considered completed */
-const COMPLETION_THRESHOLD = 0.95
+const COMPLETION_THRESHOLD = 0.95;
 
 /** Minimum seconds of progress before persisting */
-const MIN_POSITION_TO_SAVE = 5
+const MIN_POSITION_TO_SAVE = 5;
 
 // --- Singleton store ---
 
-const [progressMap, setProgressMap] = createSignal<Record<string, Progress>>({})
+const [progressMap, setProgressMap] = createSignal<Record<string, Progress>>(
+  {},
+);
 
 /** Persist current progress map to file (fire-and-forget) */
 function persist(): void {
-  saveProgressToFile(progressMap()).catch(() => {})
+  saveProgressToFile(progressMap()).catch(() => {});
 }
 
 /** Parse raw progress entries from file, reviving Date objects */
-function parseProgressEntries(raw: Record<string, unknown>): Record<string, Progress> {
-  const result: Record<string, Progress> = {}
+function parseProgressEntries(
+  raw: Record<string, unknown>,
+): Record<string, Progress> {
+  const result: Record<string, Progress> = {};
   for (const [key, value] of Object.entries(raw)) {
-    const p = value as Record<string, unknown>
+    const p = value as Record<string, unknown>;
     result[key] = {
       episodeId: p.episodeId as string,
       position: p.position as number,
       duration: p.duration as number,
       timestamp: new Date(p.timestamp as string),
       playbackSpeed: p.playbackSpeed as number | undefined,
-    }
+    };
   }
-  return result
+  return result;
 }
 
-/** Async initialisation — migrate from localStorage then load from file */
 async function initProgress(): Promise<void> {
-  await migrateProgressFromLocalStorage()
-  const raw = await loadProgressFromFile()
-  const parsed = parseProgressEntries(raw as Record<string, unknown>)
-  setProgressMap(parsed)
+  const raw = await loadProgressFromFile();
+  const parsed = parseProgressEntries(raw as Record<string, unknown>);
+  setProgressMap(parsed);
 }
 
 // Fire-and-forget init
-initProgress()
+initProgress();
 
 function createProgressStore() {
   return {
@@ -61,14 +62,14 @@ function createProgressStore() {
      * Get progress for a specific episode.
      */
     get(episodeId: string): Progress | undefined {
-      return progressMap()[episodeId]
+      return progressMap()[episodeId];
     },
 
     /**
      * Get all progress entries.
      */
     all(): Record<string, Progress> {
-      return progressMap()
+      return progressMap();
     },
 
     /**
@@ -80,7 +81,7 @@ function createProgressStore() {
       duration: number,
       playbackSpeed?: number,
     ): void {
-      if (position < MIN_POSITION_TO_SAVE && duration > 0) return
+      if (position < MIN_POSITION_TO_SAVE && duration > 0) return;
 
       setProgressMap((prev) => ({
         ...prev,
@@ -91,34 +92,34 @@ function createProgressStore() {
           timestamp: new Date(),
           playbackSpeed,
         },
-      }))
-      persist()
+      }));
+      persist();
     },
 
     /**
      * Check if an episode is completed.
      */
     isCompleted(episodeId: string): boolean {
-      const p = progressMap()[episodeId]
-      if (!p || p.duration <= 0) return false
-      return p.position / p.duration >= COMPLETION_THRESHOLD
+      const p = progressMap()[episodeId];
+      if (!p || p.duration <= 0) return false;
+      return p.position / p.duration >= COMPLETION_THRESHOLD;
     },
 
     /**
      * Get progress percentage (0-100) for an episode.
      */
     getPercent(episodeId: string): number {
-      const p = progressMap()[episodeId]
-      if (!p || p.duration <= 0) return 0
-      return Math.min(100, Math.round((p.position / p.duration) * 100))
+      const p = progressMap()[episodeId];
+      if (!p || p.duration <= 0) return 0;
+      return Math.min(100, Math.round((p.position / p.duration) * 100));
     },
 
     /**
      * Mark an episode as completed (set position to duration).
      */
     markCompleted(episodeId: string): void {
-      const p = progressMap()[episodeId]
-      const duration = p?.duration ?? 0
+      const p = progressMap()[episodeId];
+      const duration = p?.duration ?? 0;
       setProgressMap((prev) => ({
         ...prev,
         [episodeId]: {
@@ -128,8 +129,8 @@ function createProgressStore() {
           timestamp: new Date(),
           playbackSpeed: p?.playbackSpeed,
         },
-      }))
-      persist()
+      }));
+      persist();
     },
 
     /**
@@ -137,29 +138,29 @@ function createProgressStore() {
      */
     remove(episodeId: string): void {
       setProgressMap((prev) => {
-        const next = { ...prev }
-        delete next[episodeId]
-        return next
-      })
-      persist()
+        const next = { ...prev };
+        delete next[episodeId];
+        return next;
+      });
+      persist();
     },
 
     /**
      * Clear all progress data.
      */
     clear(): void {
-      setProgressMap({})
-      persist()
+      setProgressMap({});
+      persist();
     },
-  }
+  };
 }
 
 // Singleton instance
-let instance: ReturnType<typeof createProgressStore> | null = null
+let instance: ReturnType<typeof createProgressStore> | null = null;
 
 export function useProgressStore() {
   if (!instance) {
-    instance = createProgressStore()
+    instance = createProgressStore();
   }
-  return instance
+  return instance;
 }
