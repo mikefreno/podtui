@@ -53,7 +53,9 @@ export function App() {
 
   // My Shows page returns panel renderers
   const myShows = MyShowsPage({
-    get focused() { return activeTab() === "shows" && layerDepth() > 0 },
+    get focused() {
+      return activeTab() === "shows" && layerDepth() > 0;
+    },
     onPlayEpisode: (episode, feed) => {
       handlePlayEpisode(episode);
     },
@@ -69,8 +71,12 @@ export function App() {
       setActiveTab(tab);
       setInputFocused(false);
     },
-    get inputFocused() { return inputFocused() },
-    get navigationEnabled() { return layerDepth() === 0 },
+    get inputFocused() {
+      return inputFocused();
+    },
+    get navigationEnabled() {
+      return layerDepth() === 0;
+    },
     layerDepth,
     onLayerChange: (newDepth) => {
       setLayerDepth(newDepth);
@@ -94,18 +100,20 @@ export function App() {
 
   // Copy selected text to clipboard when selection ends (mouse release)
   useSelectionHandler((selection: any) => {
-    if (!selection) return
-    const text = selection.getSelectedText?.()
-    if (!text || text.trim().length === 0) return
+    if (!selection) return;
+    const text = selection.getSelectedText?.();
+    if (!text || text.trim().length === 0) return;
 
-    Clipboard.copy(text).then(() => {
-      emit("toast.show", {
-        message: "Copied to clipboard",
-        variant: "info",
-        duration: 1500,
+    Clipboard.copy(text)
+      .then(() => {
+        emit("toast.show", {
+          message: "Copied to clipboard",
+          variant: "info",
+          duration: 1500,
+        });
       })
-    }).catch(() => {})
-  })
+      .catch(() => {});
+  });
 
   const getPanels = createMemo(() => {
     const tab = activeTab();
@@ -156,19 +164,21 @@ export function App() {
         if (showAuthPanel()) {
           if (auth.isAuthenticated) {
             return {
-              panels: [{
-                title: "Account",
-                content: (
-                  <SyncProfile
-                    focused={layerDepth() > 0}
-                    onLogout={() => {
-                      auth.logout();
-                      setShowAuthPanel(false);
-                    }}
-                    onManageSync={() => setShowAuthPanel(false)}
-                  />
-                ),
-              }],
+              panels: [
+                {
+                  title: "Account",
+                  content: (
+                    <SyncProfile
+                      focused={layerDepth() > 0}
+                      onLogout={() => {
+                        auth.logout();
+                        setShowAuthPanel(false);
+                      }}
+                      onManageSync={() => setShowAuthPanel(false)}
+                    />
+                  ),
+                },
+              ],
               activePanelIndex: 0,
               hint: "Esc back",
             };
@@ -203,104 +213,121 @@ export function App() {
           };
 
           return {
-            panels: [{
-              title: "Sign In",
-              content: authContent(),
-            }],
+            panels: [
+              {
+                title: "Sign In",
+                content: authContent(),
+              },
+            ],
             activePanelIndex: 0,
             hint: "Esc back",
           };
         }
 
         return {
-          panels: [{
-            title: "Settings",
-            content: (
-              <SettingsScreen
-                onOpenAccount={() => setShowAuthPanel(true)}
-                accountLabel={
-                  auth.isAuthenticated
-                    ? `Signed in as ${auth.user?.email}`
-                    : "Not signed in"
-                }
-                accountStatus={auth.isAuthenticated ? "signed-in" : "signed-out"}
-                onExit={() => setLayerDepth(0)}
-              />
-            ),
-          }],
+          panels: [
+            {
+              title: "Settings",
+              content: (
+                <SettingsScreen
+                  onOpenAccount={() => setShowAuthPanel(true)}
+                  accountLabel={
+                    auth.isAuthenticated
+                      ? `Signed in as ${auth.user?.email}`
+                      : "Not signed in"
+                  }
+                  accountStatus={
+                    auth.isAuthenticated ? "signed-in" : "signed-out"
+                  }
+                  onExit={() => setLayerDepth(0)}
+                />
+              ),
+            },
+          ],
           activePanelIndex: 0,
           hint: "j/k navigate | Enter select | Esc back",
         };
 
       case "discover":
         return {
-          panels: [{
-            title: "Discover",
-            content: (
-              <DiscoverPage
-                focused={layerDepth() > 0}
-                onExit={() => setLayerDepth(0)}
-              />
-            ),
-          }],
+          panels: [
+            {
+              title: "Discover",
+              content: (
+                <DiscoverPage
+                  focused={layerDepth() > 0}
+                  onExit={() => setLayerDepth(0)}
+                />
+              ),
+            },
+          ],
           activePanelIndex: 0,
           hint: "Tab switch focus | j/k navigate | Enter subscribe | r refresh | Esc back",
         };
 
       case "search":
         return {
-          panels: [{
-            title: "Search",
-            content: (
-              <SearchPage
-                focused={layerDepth() > 0}
-                onInputFocusChange={setInputFocused}
-                onExit={() => setLayerDepth(0)}
-                onSubscribe={(result) => {
-                  const feeds = feedStore.feeds();
-                  const alreadySubscribed = feeds.some(
-                    (feed) =>
-                      feed.podcast.id === result.podcast.id ||
-                      feed.podcast.feedUrl === result.podcast.feedUrl,
-                  );
-
-                  if (!alreadySubscribed) {
-                    feedStore.addFeed(
-                      { ...result.podcast, isSubscribed: true },
-                      result.sourceId,
-                      FeedVisibility.PUBLIC,
+          panels: [
+            {
+              title: "Search",
+              content: (
+                <SearchPage
+                  focused={layerDepth() > 0}
+                  onInputFocusChange={setInputFocused}
+                  onExit={() => setLayerDepth(0)}
+                  onSubscribe={(result) => {
+                    const feeds = feedStore.feeds();
+                    const alreadySubscribed = feeds.some(
+                      (feed) =>
+                        feed.podcast.id === result.podcast.id ||
+                        feed.podcast.feedUrl === result.podcast.feedUrl,
                     );
-                  }
-                }}
-              />
-            ),
-          }],
+
+                    if (!alreadySubscribed) {
+                      feedStore.addFeed(
+                        { ...result.podcast, isSubscribed: true },
+                        result.sourceId,
+                        FeedVisibility.PUBLIC,
+                      );
+                    }
+                  }}
+                />
+              ),
+            },
+          ],
           activePanelIndex: 0,
           hint: "Tab switch focus | / search | Enter select | Esc back",
         };
 
       case "player":
         return {
-          panels: [{
-            title: "Player",
-            content: (
-              <Player focused={layerDepth() > 0} onExit={() => setLayerDepth(0)} />
-            ),
-          }],
+          panels: [
+            {
+              title: "Player",
+              content: (
+                <Player
+                  focused={layerDepth() > 0}
+                  onExit={() => setLayerDepth(0)}
+                />
+              ),
+            },
+          ],
           activePanelIndex: 0,
           hint: "Space play/pause | Esc back",
         };
 
       default:
         return {
-          panels: [{
-            title: tab,
-            content: (
-              <box padding={2}>
-                <text>Coming soon</text>
-              </box>
-            ),
-          }],
+          panels: [
+            {
+              title: tab,
+              content: (
+                <box padding={2}>
+                  <text>Coming soon</text>
+                </box>
+              ),
+            },
+          ],
           activePanelIndex: 0,
           hint: "",
         };
@@ -308,23 +335,20 @@ export function App() {
   });
 
   return (
-    <ErrorBoundary fallback={(err) => (
-      <box border padding={2}>
-        <text fg="red">
-          Error: {err?.message ?? String(err)}{"\n"}
-          Press a number key (1-6) to switch tabs.
-        </text>
-      </box>
-    )}>
+    <ErrorBoundary
+      fallback={(err) => (
+        <box border padding={2}>
+          <text fg="red">
+            Error: {err?.message ?? String(err)}
+            {"\n"}
+            Press a number key (1-6) to switch tabs.
+          </text>
+        </box>
+      )}
+    >
       <Layout
         header={
           <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
-        }
-        footer={
-          <box flexDirection="row" justifyContent="space-between" width="100%">
-            <Navigation activeTab={activeTab()} onTabSelect={setActiveTab} />
-            <text fg="gray">{getPanels().hint}</text>
-          </box>
         }
         panels={getPanels().panels}
         activePanelIndex={getPanels().activePanelIndex}
