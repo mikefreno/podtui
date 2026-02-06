@@ -20,7 +20,8 @@ import { useMultimediaKeys } from "@/hooks/useMultimediaKeys";
 import { FeedVisibility } from "@/types/feed";
 import { useAppKeyboard } from "@/hooks/useAppKeyboard";
 import { Clipboard } from "@/utils/clipboard";
-import { emit } from "@/utils/event-bus";
+import { useToast } from "@/ui/toast";
+import { useRenderer } from "@opentui/solid";
 import type { TabId } from "@/components/Tab";
 import type { AuthScreen } from "@/types/auth";
 import type { Episode } from "@/types/episode";
@@ -35,6 +36,8 @@ export function App() {
   const feedStore = useFeedStore();
   const appStore = useAppStore();
   const audio = useAudio();
+  const toast = useToast();
+  const renderer = useRenderer();
 
   // Global multimedia key handling — active when Player tab is NOT
   // focused (Player.tsx handles its own keys when focused).
@@ -105,13 +108,12 @@ export function App() {
 
     Clipboard.copy(text)
       .then(() => {
-        emit("toast.show", {
-          message: "Copied to clipboard",
-          variant: "info",
-          duration: 1500,
-        });
+        toast.show({ message: "Copied to Clipboard!", variant: "info" });
       })
-      .catch(() => {});
+      .catch(toast.error)
+      .finally(() => {
+        renderer.clearSelection();
+      });
   });
 
   const getPanels = createMemo(() => {
