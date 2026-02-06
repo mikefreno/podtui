@@ -1,7 +1,9 @@
 import { useKeyboard } from "@opentui/solid"
 import { PlaybackControls } from "./PlaybackControls"
 import { MergedWaveform } from "./MergedWaveform"
+import { RealtimeWaveform, isCavacoreAvailable } from "./RealtimeWaveform"
 import { useAudio } from "../hooks/useAudio"
+import { useAppStore } from "../stores/app"
 import type { Episode } from "../types/episode"
 
 type PlayerProps = {
@@ -97,13 +99,32 @@ export function Player(props: PlayerProps) {
         </text>
         <text fg="gray">{episode().description}</text>
 
-        <MergedWaveform
-          audioUrl={episode().audioUrl}
-          position={audio.position()}
-          duration={dur()}
-          isPlaying={audio.isPlaying()}
-          onSeek={(next: number) => audio.seek(next)}
-        />
+        {isCavacoreAvailable() ? (
+          <RealtimeWaveform
+            audioUrl={episode().audioUrl}
+            position={audio.position()}
+            duration={dur()}
+            isPlaying={audio.isPlaying()}
+            onSeek={(next: number) => audio.seek(next)}
+            visualizerConfig={(() => {
+              const viz = useAppStore().state().settings.visualizer
+              return {
+                bars: viz.bars,
+                noiseReduction: viz.noiseReduction,
+                lowCutOff: viz.lowCutOff,
+                highCutOff: viz.highCutOff,
+              }
+            })()}
+          />
+        ) : (
+          <MergedWaveform
+            audioUrl={episode().audioUrl}
+            position={audio.position()}
+            duration={dur()}
+            isPlaying={audio.isPlaying()}
+            onSeek={(next: number) => audio.seek(next)}
+          />
+        )}
       </box>
 
       <PlaybackControls

@@ -7,7 +7,7 @@
 
 import { ensureConfigDir, getConfigFilePath } from "./config-dir"
 import { backupConfigFile } from "./config-backup"
-import type { AppState, AppSettings, UserPreferences, ThemeColors } from "../types/settings"
+import type { AppState, AppSettings, UserPreferences, ThemeColors, VisualizerSettings } from "../types/settings"
 import { DEFAULT_THEME } from "../constants/themes"
 
 const APP_STATE_FILE = "app-state.json"
@@ -18,11 +18,20 @@ const LEGACY_PROGRESS_KEY = "podtui_progress"
 
 // --- Defaults ---
 
+const defaultVisualizerSettings: VisualizerSettings = {
+  bars: 32,
+  sensitivity: 1,
+  noiseReduction: 0.77,
+  lowCutOff: 50,
+  highCutOff: 10000,
+}
+
 const defaultSettings: AppSettings = {
   theme: "system",
   fontSize: 14,
   playbackSpeed: 1,
   downloadPath: "",
+  visualizer: defaultVisualizerSettings,
 }
 
 const defaultPreferences: UserPreferences = {

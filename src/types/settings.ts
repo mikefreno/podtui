@@ -46,11 +46,25 @@ export type DesktopTheme = {
   tokens: ThemeToken
 }
 
+export type VisualizerSettings = {
+  /** Number of frequency bars (8–128, default: 32) */
+  bars: number
+  /** Automatic sensitivity: 1 = enabled, 0 = disabled (default: 1) */
+  sensitivity: number
+  /** Noise reduction factor 0.0–1.0 (default: 0.77) */
+  noiseReduction: number
+  /** Low frequency cutoff in Hz (default: 50) */
+  lowCutOff: number
+  /** High frequency cutoff in Hz (default: 10000) */
+  highCutOff: number
+}
+
 export type AppSettings = {
   theme: ThemeName
   fontSize: number
   playbackSpeed: number
   downloadPath: string
+  visualizer: VisualizerSettings
 }
 
 export type UserPreferences = {

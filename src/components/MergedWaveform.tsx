@@ -24,8 +24,8 @@ type MergedWaveformProps = {
   onSeek?: (seconds: number) => void;
 };
 
-/** Block characters for waveform amplitude levels */
-const BARS = [".", "-", "~", "=", "#"];
+/** Unicode lower block elements: space (silence) through full block (max) */
+const BARS = [" ", "\u2581", "\u2582", "\u2583", "\u2584", "\u2585", "\u2586", "\u2587", "\u2588"];
 
 export function MergedWaveform(props: MergedWaveformProps) {
   const resolution = () => props.resolution ?? 64;

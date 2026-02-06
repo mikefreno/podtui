@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js"
 import { DEFAULT_THEME, THEME_JSON } from "../constants/themes"
-import type { AppSettings, AppState, ThemeColors, ThemeName, ThemeMode, UserPreferences } from "../types/settings"
+import type { AppSettings, AppState, ThemeColors, ThemeName, ThemeMode, UserPreferences, VisualizerSettings } from "../types/settings"
 import { resolveTheme } from "../utils/theme-resolver"
 import type { ThemeJson } from "../types/theme-schema"
 import {
@@ -9,11 +9,20 @@ import {
   migrateAppStateFromLocalStorage,
 } from "../utils/app-persistence"
 
+const defaultVisualizerSettings: VisualizerSettings = {
+  bars: 32,
+  sensitivity: 1,
+  noiseReduction: 0.77,
+  lowCutOff: 50,
+  highCutOff: 10000,
+}
+
 const defaultSettings: AppSettings = {
   theme: "system",
   fontSize: 14,
   playbackSpeed: 1,
   downloadPath: "",
+  visualizer: defaultVisualizerSettings,
 }
 
 const defaultPreferences: UserPreferences = {
@@ -72,6 +81,12 @@ export function createAppStore() {
     updateState(next)
   }
 
+  const updateVisualizer = (updates: Partial<VisualizerSettings>) => {
+    updateSettings({
+      visualizer: { ...state().settings.visualizer, ...updates },
+    })
+  }
+
   const setTheme = (theme: ThemeName) => {
     updateSettings({ theme })
   }
@@ -90,6 +105,7 @@ export function createAppStore() {
     updateSettings,
     updatePreferences,
     updateCustomTheme,
+    updateVisualizer,
     setTheme,
     resolveTheme: resolveThemeColors,
   }

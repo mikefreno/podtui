@@ -4,6 +4,7 @@ import { SourceManager } from "./SourceManager"
 import { useTheme } from "../context/ThemeContext"
 import { PreferencesPanel } from "./PreferencesPanel"
 import { SyncPanel } from "./SyncPanel"
+import { VisualizerSettings } from "./VisualizerSettings"
 
 type SettingsScreenProps = {
   accountLabel: string
@@ -12,12 +13,13 @@ type SettingsScreenProps = {
   onExit?: () => void
 }
 
-type SectionId = "sync" | "sources" | "preferences" | "account"
+type SectionId = "sync" | "sources" | "preferences" | "visualizer" | "account"
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "sync", label: "Sync" },
   { id: "sources", label: "Sources" },
   { id: "preferences", label: "Preferences" },
+  { id: "visualizer", label: "Visualizer" },
   { id: "account", label: "Account" },
 ]
 
@@ -43,7 +45,8 @@ export function SettingsScreen(props: SettingsScreenProps) {
     if (key.name === "1") setActiveSection("sync")
     if (key.name === "2") setActiveSection("sources")
     if (key.name === "3") setActiveSection("preferences")
-    if (key.name === "4") setActiveSection("account")
+    if (key.name === "4") setActiveSection("visualizer")
+    if (key.name === "5") setActiveSection("account")
   })
 
   return (
@@ -52,7 +55,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
         <text>
           <strong>Settings</strong>
         </text>
-        <text fg={theme.textMuted}>[Tab] Switch section | 1-4 jump | Esc up</text>
+        <text fg={theme.textMuted}>[Tab] Switch section | 1-5 jump | Esc up</text>
       </box>
 
       <box flexDirection="row" gap={1}>
@@ -76,6 +79,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
         {activeSection() === "sync" && <SyncPanel />}
         {activeSection() === "sources" && <SourceManager focused />}
         {activeSection() === "preferences" && <PreferencesPanel />}
+        {activeSection() === "visualizer" && <VisualizerSettings />}
         {activeSection() === "account" && (
           <box flexDirection="column" gap={1}>
             <text fg={theme.textMuted}>Account</text>
