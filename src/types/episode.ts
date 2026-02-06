@@ -84,3 +84,34 @@ export interface EpisodeListItem {
   /** Progress percentage (0-100) */
   progressPercent: number
 }
+
+/** Download status for an episode */
+export enum DownloadStatus {
+  NONE = "none",
+  QUEUED = "queued",
+  DOWNLOADING = "downloading",
+  COMPLETED = "completed",
+  FAILED = "failed",
+}
+
+/** Metadata for a downloaded episode */
+export interface DownloadedEpisode {
+  /** Episode ID */
+  episodeId: string
+  /** Feed ID the episode belongs to */
+  feedId: string
+  /** Current download status */
+  status: DownloadStatus
+  /** Download progress 0-100 */
+  progress: number
+  /** Absolute path to the downloaded file */
+  filePath: string | null
+  /** When the download completed */
+  downloadedAt: Date | null
+  /** Download speed in bytes/sec (while downloading) */
+  speed: number
+  /** File size in bytes */
+  fileSize: number
+  /** Error message if failed */
+  error: string | null
+}

@@ -1,4 +1,4 @@
-# 21. Fix Category State Synchronization
+# 21. Fix Category State Synchronization [x]
 
 meta:
   id: discover-categories-fix-21

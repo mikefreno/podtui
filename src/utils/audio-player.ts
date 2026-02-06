@@ -452,12 +452,22 @@ class FfplayBackend implements AudioBackend {
 
   async setVolume(volume: number): Promise<void> {
     this._volume = Math.round(volume * 100)
-    // ffplay can't change volume at runtime; apply on next play
+    // ffplay has no runtime IPC; volume will apply on next play/resume.
+    // Restart the process to apply immediately if currently playing.
+    if (this._playing && this._url) {
+      this.stopPolling()
+      if (this.proc) {
+        try { this.proc.kill() } catch {}
+        this.proc = null
+      }
+      this.spawnProcess()
+    }
   }
 
   async setSpeed(speed: number): Promise<void> {
     this._speed = speed
-    // ffplay doesn't support runtime speed changes
+    // ffplay doesn't support runtime speed changes; no restart possible
+    // since ffplay has no speed CLI flag. Speed only affects position tracking.
   }
 
   async getPosition(): Promise<number> {
@@ -588,10 +598,28 @@ class AfplayBackend implements AudioBackend {
 
   async setVolume(volume: number): Promise<void> {
     this._volume = volume
+    // Restart the process with new volume to apply immediately
+    if (this._playing && this._url) {
+      this.stopPolling()
+      if (this.proc) {
+        try { this.proc.kill() } catch {}
+        this.proc = null
+      }
+      this.spawnProcess()
+    }
   }
 
   async setSpeed(speed: number): Promise<void> {
     this._speed = speed
+    // Restart the process with new rate to apply immediately
+    if (this._playing && this._url) {
+      this.stopPolling()
+      if (this.proc) {
+        try { this.proc.kill() } catch {}
+        this.proc = null
+      }
+      this.spawnProcess()
+    }
   }
 
   async getPosition(): Promise<number> {

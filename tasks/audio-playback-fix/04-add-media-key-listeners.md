@@ -1,4 +1,4 @@
-# 04. Add media key listeners to audio hook
+# 04. Add media key listeners to audio hook [x]
 
 meta:
   id: audio-playback-fix-04

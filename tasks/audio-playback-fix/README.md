@@ -5,11 +5,11 @@ Objective: Fix volume and speed controls and add multimedia key support with pla
 Status legend: [ ] todo, [~] in-progress, [x] done
 
 Tasks
-- [ ] 01 — Fix volume and speed controls in audio backends → `01-fix-volume-speed-controls.md`
-- [ ] 02 — Add multimedia key detection and handling → `02-add-multimedia-key-detection.md`
-- [ ] 03 — Implement platform-specific media stream integration → `03-implement-platform-media-integration.md`
-- [ ] 04 — Add media key listeners to audio hook → `04-add-media-key-listeners.md`
-- [ ] 05 — Test multimedia controls across platforms → `05-test-multimedia-controls.md`
+- [x] 01 — Fix volume and speed controls in audio backends → `01-fix-volume-speed-controls.md`
+- [x] 02 — Add multimedia key detection and handling → `02-add-multimedia-key-detection.md`
+- [x] 03 — Implement platform-specific media stream integration → `03-implement-platform-media-integration.md`
+- [x] 04 — Add media key listeners to audio hook → `04-add-media-key-listeners.md`
+- [x] 05 — Test multimedia controls across platforms → `05-test-multimedia-controls.md`
 
 Dependencies
 - 01 depends on 02

@@ -1,4 +1,4 @@
-# 01. Fix volume and speed controls in audio backends
+# 01. Fix volume and speed controls in audio backends [x]
 
 meta:
   id: audio-playback-fix-01

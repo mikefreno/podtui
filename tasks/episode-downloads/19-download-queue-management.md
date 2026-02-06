@@ -1,4 +1,4 @@
-# 19. Create Download Queue Management
+# 19. Create Download Queue Management [x]
 
 meta:
   id: episode-downloads-19

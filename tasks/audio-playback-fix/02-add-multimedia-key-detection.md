@@ -1,4 +1,4 @@
-# 02. Add multimedia key detection and handling
+# 02. Add multimedia key detection and handling [x]
 
 meta:
   id: audio-playback-fix-02

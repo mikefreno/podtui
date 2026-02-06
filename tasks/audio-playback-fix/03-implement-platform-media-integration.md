@@ -1,4 +1,4 @@
-# 03. Implement platform-specific media stream integration
+# 03. Implement platform-specific media stream integration [x]
 
 meta:
   id: audio-playback-fix-03

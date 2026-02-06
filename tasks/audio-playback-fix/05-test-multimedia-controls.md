@@ -1,4 +1,4 @@
-# 05. Test multimedia controls across platforms
+# 05. Test multimedia controls across platforms [x]
 
 meta:
   id: audio-playback-fix-05
@@ -76,3 +76,63 @@ notes:
 - Consider using test doubles for platform-specific APIs
 - Document any platform-specific issues or limitations found
 - Reference: Test patterns from existing test files in src/utils/
+
+## Implementation Notes (Completed)
+
+### Manual Validation Steps
+
+1. **Volume controls (all backends)**
+   - Launch app, load an episode, press Up/Down arrows on Player tab
+   - Volume indicator in PlaybackControls should update (0.00 - 1.00)
+   - Audio output volume should change audibly
+   - Test on non-Player tabs: Up/Down should still adjust volume via global media keys
+
+2. **Speed controls (mpv, afplay)**
+   - Press `S` to cycle speed: 1.0 -> 1.25 -> 1.5 -> 1.75 -> 2.0 -> 0.5
+   - Speed indicator should update in PlaybackControls
+   - Audible pitch/speed change on mpv and afplay
+   - ffplay: speed changes require track restart (documented limitation)
+
+3. **Seek controls**
+   - Press Left/Right arrows to seek -10s / +10s
+   - Position indicator should update
+   - Works on Player tab (local) and other tabs (global media keys)
+
+4. **Global media keys (non-Player tabs)**
+   - Navigate to Feed, Shows, or Discover tab
+   - Start playing an episode from Player tab first
+   - Switch to another tab
+   - Press Space to toggle play/pause
+   - Press Up/Down to adjust volume
+   - Press Left/Right to seek
+   - Press S to cycle speed
+
+5. **Platform media integration (macOS)**
+   - Install `nowplaying-cli`: `brew install nowplaying-cli`
+   - Track info should appear in macOS Now Playing widget
+   - If `nowplaying-cli` is not installed, graceful no-op (no errors)
+
+### Platform Limitations
+
+| Backend | Volume | Speed | Seek | Notes |
+|---------|--------|-------|------|-------|
+| **mpv** | Runtime (IPC) | Runtime (IPC) | Runtime (IPC) | Best support, uses Unix socket |
+| **afplay** | Restart required | Restart required | Not supported | Process restarts with new args |
+| **ffplay** | Restart required | Not supported | Not supported | No runtime speed flag |
+| **system** | Depends on OS | Depends on OS | Depends on OS | Uses `open`/`xdg-open` |
+| **noop** | No-op | No-op | No-op | Silent fallback |
+
+### Media Registry Platform Support
+
+| Platform | Integration | Status |
+|----------|------------|--------|
+| **macOS** | `nowplaying-cli` | Works if binary installed |
+| **Linux** | MPRIS D-Bus | Stub (no-op), upgradable |
+| **Windows** | None | No-op stub |
+
+### Key Architecture Decisions
+- Global media keys use event bus (`media.*` events) for decoupling
+- `useMultimediaKeys` hook is called once in App.tsx
+- Guards prevent double-handling when Player tab is focused (Player.tsx handles locally)
+- Guards prevent interference when text input is focused
+- MediaRegistry is a singleton, fire-and-forget, never throws

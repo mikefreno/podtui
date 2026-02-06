@@ -1,4 +1,4 @@
-# 17. Add Download Status in Episode List
+# 17. Add Download Status in Episode List [x]
 
 meta:
   id: episode-downloads-17

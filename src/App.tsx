@@ -17,6 +17,7 @@ import { useAuthStore } from "./stores/auth";
 import { useFeedStore } from "./stores/feed";
 import { useAppStore } from "./stores/app";
 import { useAudio } from "./hooks/useAudio";
+import { useMultimediaKeys } from "./hooks/useMultimediaKeys";
 import { FeedVisibility } from "./types/feed";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import { Clipboard } from "./utils/clipboard";
@@ -35,6 +36,14 @@ export function App() {
   const feedStore = useFeedStore();
   const appStore = useAppStore();
   const audio = useAudio();
+
+  // Global multimedia key handling — active when Player tab is NOT
+  // focused (Player.tsx handles its own keys when focused).
+  useMultimediaKeys({
+    playerFocused: () => activeTab() === "player" && layerDepth() > 0,
+    inputFocused: () => inputFocused(),
+    hasEpisode: () => !!audio.currentEpisode(),
+  });
 
   const handlePlayEpisode = (episode: Episode) => {
     audio.play(episode);

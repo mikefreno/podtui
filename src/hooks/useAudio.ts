@@ -23,6 +23,7 @@ import {
 import { emit, on } from "../utils/event-bus"
 import { useAppStore } from "../stores/app"
 import { useProgressStore } from "../stores/progress"
+import { useMediaRegistry } from "../utils/media-registry"
 import type { Episode } from "../types/episode"
 
 export interface AudioControls {
@@ -94,6 +95,10 @@ function startPolling(): void {
         if (ep) {
           const progressStore = useProgressStore()
           progressStore.update(ep.id, pos, dur > 0 ? dur : duration(), speed())
+
+          // Update platform media position
+          const media = useMediaRegistry()
+          media.setPosition(pos)
         }
       }
 
@@ -156,6 +161,16 @@ async function play(episode: Episode): Promise<void> {
     setSpeed(spd)
     if (episode.duration) setDuration(episode.duration)
 
+    // Register with platform media controls
+    const media = useMediaRegistry()
+    media.setNowPlaying({
+      title: episode.title,
+      artist: episode.podcastId,
+      duration: episode.duration,
+    })
+    media.setPlaybackState(true)
+    if (startPos > 0) media.setPosition(startPos)
+
     startPolling()
     emit("player.play", { episodeId: episode.id })
   } catch (err) {
@@ -176,6 +191,11 @@ async function pause(): Promise<void> {
       const progressStore = useProgressStore()
       progressStore.update(ep.id, position(), duration(), speed())
       emit("player.pause", { episodeId: ep.id })
+
+      // Update platform media controls
+      const media = useMediaRegistry()
+      media.setPlaybackState(false)
+      media.setPosition(position())
     }
   } catch (err) {
     setError(err instanceof Error ? err.message : "Pause failed")
@@ -189,7 +209,11 @@ async function resume(): Promise<void> {
     setIsPlaying(true)
     startPolling()
     const ep = currentEpisode()
-    if (ep) emit("player.play", { episodeId: ep.id })
+    if (ep) {
+      emit("player.play", { episodeId: ep.id })
+      const media = useMediaRegistry()
+      media.setPlaybackState(true)
+    }
   } catch (err) {
     setError(err instanceof Error ? err.message : "Resume failed")
   }
@@ -218,6 +242,10 @@ async function stop(): Promise<void> {
     setCurrentEpisode(null)
     stopPolling()
     emit("player.stop", {})
+
+    // Clear platform media controls
+    const media = useMediaRegistry()
+    media.clearNowPlaying()
   } catch (err) {
     setError(err instanceof Error ? err.message : "Stop failed")
   }
@@ -347,10 +375,42 @@ export function useAudio(): AudioControls {
     }
   })
 
+  // Listen for global multimedia key events (from useMultimediaKeys)
+  const unsubMediaToggle = on("media.toggle", async () => {
+    await togglePlayback()
+  })
+
+  const unsubMediaVolUp = on("media.volumeUp", async () => {
+    await doSetVolume(Math.min(1, Number((volume() + 0.05).toFixed(2))))
+  })
+
+  const unsubMediaVolDown = on("media.volumeDown", async () => {
+    await doSetVolume(Math.max(0, Number((volume() - 0.05).toFixed(2))))
+  })
+
+  const unsubMediaSeekFwd = on("media.seekForward", async () => {
+    await seekRelative(10)
+  })
+
+  const unsubMediaSeekBack = on("media.seekBackward", async () => {
+    await seekRelative(-10)
+  })
+
+  const unsubMediaSpeed = on("media.speedCycle", async () => {
+    const next = speed() >= 2 ? 0.5 : Number((speed() + 0.25).toFixed(2))
+    await doSetSpeed(next)
+  })
+
   onCleanup(() => {
     refCount--
     unsubPlay()
     unsubStop()
+    unsubMediaToggle()
+    unsubMediaVolUp()
+    unsubMediaVolDown()
+    unsubMediaSeekFwd()
+    unsubMediaSeekBack()
+    unsubMediaSpeed()
 
     if (refCount <= 0) {
       stopPolling()
@@ -358,6 +418,10 @@ export function useAudio(): AudioControls {
         backend.dispose()
         backend = null
       }
+      // Clear media registry on full teardown
+      const media = useMediaRegistry()
+      media.clearNowPlaying()
+
       refCount = 0
     }
   })

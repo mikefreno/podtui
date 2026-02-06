@@ -42,3 +42,31 @@ export async function ensureConfigDir(): Promise<string> {
   await mkdir(dir, { recursive: true })
   return dir
 }
+
+/** Resolve the XDG_DATA_HOME directory, defaulting to ~/.local/share */
+export function getXdgDataHome(): string {
+  const xdg = process.env.XDG_DATA_HOME
+  if (xdg) return xdg
+
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? ""
+  if (!home) throw new Error("Cannot determine home directory")
+
+  return path.join(home, ".local", "share")
+}
+
+/** Get the application-specific data directory path */
+export function getDataDir(): string {
+  return path.join(getXdgDataHome(), APP_DIR_NAME)
+}
+
+/** Get the downloads directory path */
+export function getDownloadsDir(): string {
+  return path.join(getDataDir(), "downloads")
+}
+
+/** Ensure the downloads directory exists */
+export async function ensureDownloadsDir(): Promise<string> {
+  const dir = getDownloadsDir()
+  await mkdir(dir, { recursive: true })
+  return dir
+}

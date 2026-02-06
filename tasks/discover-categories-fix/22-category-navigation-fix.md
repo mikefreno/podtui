@@ -1,4 +1,4 @@
-# 22. Fix Category Keyboard Navigation
+# 22. Fix Category Keyboard Navigation [x]
 
 meta:
   id: discover-categories-fix-22

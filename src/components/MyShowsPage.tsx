@@ -7,6 +7,8 @@
 import { createSignal, For, Show, createMemo, createEffect } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { useFeedStore } from "../stores/feed"
+import { useDownloadStore } from "../stores/download"
+import { DownloadStatus } from "../types/episode"
 import { format } from "date-fns"
 import type { Episode } from "../types/episode"
 import type { Feed } from "../types/feed"
@@ -21,6 +23,7 @@ type FocusPane = "shows" | "episodes"
 
 export function MyShowsPage(props: MyShowsPageProps) {
   const feedStore = useFeedStore()
+  const downloadStore = useDownloadStore()
   const [focusPane, setFocusPane] = createSignal<FocusPane>("shows")
   const [showIndex, setShowIndex] = createSignal(0)
   const [episodeIndex, setEpisodeIndex] = createSignal(0)
@@ -67,6 +70,42 @@ export function MyShowsPage(props: MyShowsPageProps) {
     const hrs = Math.floor(mins / 60)
     if (hrs > 0) return `${hrs}h ${mins % 60}m`
     return `${mins}m`
+  }
+
+  /** Get download status label for an episode */
+  const downloadLabel = (episodeId: string): string => {
+    const status = downloadStore.getDownloadStatus(episodeId)
+    switch (status) {
+      case DownloadStatus.QUEUED:
+        return "[Q]"
+      case DownloadStatus.DOWNLOADING: {
+        const pct = downloadStore.getDownloadProgress(episodeId)
+        return `[${pct}%]`
+      }
+      case DownloadStatus.COMPLETED:
+        return "[DL]"
+      case DownloadStatus.FAILED:
+        return "[ERR]"
+      default:
+        return ""
+    }
+  }
+
+  /** Get download status color */
+  const downloadColor = (episodeId: string): string => {
+    const status = downloadStore.getDownloadStatus(episodeId)
+    switch (status) {
+      case DownloadStatus.QUEUED:
+        return "yellow"
+      case DownloadStatus.DOWNLOADING:
+        return "cyan"
+      case DownloadStatus.COMPLETED:
+        return "green"
+      case DownloadStatus.FAILED:
+        return "red"
+      default:
+        return "gray"
+    }
   }
 
   const handleRefresh = async () => {
@@ -144,6 +183,17 @@ export function MyShowsPage(props: MyShowsPageProps) {
         const ep = eps[episodeIndex()]
         const show = selectedShow()
         if (ep && show) props.onPlayEpisode?.(ep, show)
+      } else if (key.name === "d") {
+        const ep = eps[episodeIndex()]
+        const show = selectedShow()
+        if (ep && show) {
+          const status = downloadStore.getDownloadStatus(ep.id)
+          if (status === DownloadStatus.NONE || status === DownloadStatus.FAILED) {
+            downloadStore.startDownload(ep, show.id)
+          } else if (status === DownloadStatus.DOWNLOADING || status === DownloadStatus.QUEUED) {
+            downloadStore.cancelDownload(ep.id)
+          }
+        }
       } else if (key.name === "pageup") {
         setEpisodeIndex((i) => Math.max(0, i - 10))
       } else if (key.name === "pagedown") {
@@ -243,6 +293,9 @@ export function MyShowsPage(props: MyShowsPageProps) {
                     <box flexDirection="row" gap={2} paddingLeft={2}>
                       <text fg="gray">{formatDate(episode.pubDate)}</text>
                       <text fg="gray">{formatDuration(episode.duration)}</text>
+                      <Show when={downloadLabel(episode.id)}>
+                        <text fg={downloadColor(episode.id)}>{downloadLabel(episode.id)}</text>
+                      </Show>
                     </box>
                   </box>
                 )}

@@ -19,6 +19,8 @@ import {
   migrateFeedsFromLocalStorage,
   migrateSourcesFromLocalStorage,
 } from "../utils/feeds-persistence"
+import { useDownloadStore } from "./download"
+import { DownloadStatus } from "../types/episode"
 
 /** Max episodes to load per page/chunk */
 const MAX_EPISODES_REFRESH = 50
@@ -186,10 +188,32 @@ export function createFeedStore() {
     return newFeed
   }
 
+  /** Auto-download newest episodes for a feed */
+  const autoDownloadEpisodes = (feedId: string, newEpisodes: Episode[], count: number) => {
+    try {
+      const dlStore = useDownloadStore()
+      // Sort by pubDate descending (newest first)
+      const sorted = [...newEpisodes].sort(
+        (a, b) => b.pubDate.getTime() - a.pubDate.getTime()
+      )
+      // count = 0 means download all new episodes
+      const toDownload = count > 0 ? sorted.slice(0, count) : sorted
+      for (const ep of toDownload) {
+        const status = dlStore.getDownloadStatus(ep.id)
+        if (status === DownloadStatus.NONE || status === DownloadStatus.FAILED) {
+          dlStore.startDownload(ep, feedId)
+        }
+      }
+    } catch {
+      // Download store may not be available yet
+    }
+  }
+
   /** Refresh a single feed - re-fetch latest 50 episodes */
   const refreshFeed = async (feedId: string) => {
     const feed = getFeed(feedId)
     if (!feed) return
+    const oldEpisodeIds = new Set(feed.episodes.map((e) => e.id))
     const episodes = await fetchEpisodes(feed.podcast.feedUrl, MAX_EPISODES_REFRESH, feedId)
     setFeeds((prev) => {
       const updated = prev.map((f) =>
@@ -198,6 +222,14 @@ export function createFeedStore() {
       saveFeeds(updated)
       return updated
     })
+
+    // Auto-download new episodes if enabled for this feed
+    if (feed.autoDownload) {
+      const newEpisodes = episodes.filter((e) => !oldEpisodeIds.has(e.id))
+      if (newEpisodes.length > 0) {
+        autoDownloadEpisodes(feedId, newEpisodes, feed.autoDownloadCount ?? 0)
+      }
+    }
   }
 
   /** Refresh all feeds */
@@ -357,6 +389,11 @@ export function createFeedStore() {
     }
   }
 
+  /** Set auto-download settings for a feed */
+  const setAutoDownload = (feedId: string, enabled: boolean, count: number = 0) => {
+    updateFeed(feedId, { autoDownload: enabled, autoDownloadCount: count })
+  }
+
   return {
     // State
     feeds,
@@ -386,6 +423,7 @@ export function createFeedStore() {
     removeSource,
     toggleSource,
     updateSource,
+    setAutoDownload,
   }
 }
 

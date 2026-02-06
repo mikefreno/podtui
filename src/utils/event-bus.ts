@@ -110,6 +110,14 @@ export type AppEvents = {
   "clipboard.copied": { text: string }
   "selection.start": { x: number; y: number }
   "selection.end": { text: string }
+
+  // Multimedia key events (emitted by useMultimediaKeys, consumed by useAudio)
+  "media.toggle": {}
+  "media.volumeUp": {}
+  "media.volumeDown": {}
+  "media.seekForward": {}
+  "media.seekBackward": {}
+  "media.speedCycle": {}
 }
 
 // Type-safe emit and on functions

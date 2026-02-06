@@ -1,4 +1,4 @@
-# 18. Implement Per-Feed Auto-Download Settings
+# 18. Implement Per-Feed Auto-Download Settings [x]
 
 meta:
   id: episode-downloads-18

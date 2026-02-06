@@ -146,7 +146,7 @@ export function createDiscoverStore() {
 
     return podcasts().filter((p) => {
       const cats = p.categories?.map((c) => c.toLowerCase()) ?? []
-      return cats.some((c) => c.includes(category.replace("-", " ")))
+      return cats.some((c) => c.includes(category.toLowerCase().replace("-", " ")))
     })
   }
 

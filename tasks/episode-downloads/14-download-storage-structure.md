@@ -1,4 +1,4 @@
-# 14. Define Download Storage Structure
+# 14. Define Download Storage Structure [x]
 
 meta:
   id: episode-downloads-14

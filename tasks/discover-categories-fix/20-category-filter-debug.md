@@ -1,4 +1,4 @@
-# 20. Debug Category Filter Implementation
+# 20. Debug Category Filter Implementation [x]
 
 meta:
   id: discover-categories-fix-20

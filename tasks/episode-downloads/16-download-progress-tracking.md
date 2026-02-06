@@ -1,4 +1,4 @@
-# 16. Implement Download Progress Tracking
+# 16. Implement Download Progress Tracking [x]
 
 meta:
   id: episode-downloads-16
