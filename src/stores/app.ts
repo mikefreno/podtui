@@ -3,8 +3,11 @@ import { DEFAULT_THEME, THEME_JSON } from "../constants/themes"
 import type { AppSettings, AppState, ThemeColors, ThemeName, ThemeMode, UserPreferences } from "../types/settings"
 import { resolveTheme } from "../utils/theme-resolver"
 import type { ThemeJson } from "../types/theme-schema"
-
-const STORAGE_KEY = "podtui_app_state"
+import {
+  loadAppStateFromFile,
+  saveAppStateToFile,
+  migrateAppStateFromLocalStorage,
+} from "../utils/app-persistence"
 
 const defaultSettings: AppSettings = {
   theme: "system",
@@ -24,33 +27,21 @@ const defaultState: AppState = {
   customTheme: DEFAULT_THEME,
 }
 
-const loadState = (): AppState => {
-  if (typeof localStorage === "undefined") return defaultState
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultState
-    const parsed = JSON.parse(raw) as Partial<AppState>
-    return {
-      settings: { ...defaultSettings, ...parsed.settings },
-      preferences: { ...defaultPreferences, ...parsed.preferences },
-      customTheme: { ...DEFAULT_THEME, ...parsed.customTheme },
-    }
-  } catch {
-    return defaultState
-  }
-}
-
-const saveState = (state: AppState) => {
-  if (typeof localStorage === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch {
-    // ignore storage errors
-  }
-}
-
 export function createAppStore() {
-  const [state, setState] = createSignal<AppState>(loadState())
+  // Start with defaults; async load will update once ready
+  const [state, setState] = createSignal<AppState>(defaultState)
+
+  // Fire-and-forget async initialisation
+  const init = async () => {
+    await migrateAppStateFromLocalStorage()
+    const loaded = await loadAppStateFromFile()
+    setState(loaded)
+  }
+  init()
+
+  const saveState = (next: AppState) => {
+    saveAppStateToFile(next).catch(() => {})
+  }
 
   const updateState = (next: AppState) => {
     setState(next)

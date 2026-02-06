@@ -1,4 +1,5 @@
 import { createSignal, ErrorBoundary } from "solid-js";
+import { useSelectionHandler } from "@opentui/solid";
 import { Layout } from "./components/Layout";
 import { Navigation } from "./components/Navigation";
 import { TabNavigation } from "./components/TabNavigation";
@@ -18,6 +19,8 @@ import { useAppStore } from "./stores/app";
 import { useAudio } from "./hooks/useAudio";
 import { FeedVisibility } from "./types/feed";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
+import { Clipboard } from "./utils/clipboard";
+import { emit } from "./utils/event-bus";
 import type { TabId } from "./components/Tab";
 import type { AuthScreen } from "./types/auth";
 import type { Episode } from "./types/episode";
@@ -79,6 +82,21 @@ export function App() {
       }
     },
   });
+
+  // Copy selected text to clipboard when selection ends (mouse release)
+  useSelectionHandler((selection: any) => {
+    if (!selection) return
+    const text = selection.getSelectedText?.()
+    if (!text || text.trim().length === 0) return
+
+    Clipboard.copy(text).then(() => {
+      emit("toast.show", {
+        message: "Copied to clipboard",
+        variant: "info",
+        duration: 1500,
+      })
+    }).catch(() => {})
+  })
 
   const getPanels = () => {
     const tab = activeTab();

@@ -1,14 +1,17 @@
 /**
  * Episode progress store for PodTUI
  *
- * Persists per-episode playback progress to localStorage.
+ * Persists per-episode playback progress to a JSON file in XDG_CONFIG_HOME.
  * Tracks position, duration, completion, and last-played timestamp.
  */
 
 import { createSignal } from "solid-js"
 import type { Progress } from "../types/episode"
-
-const STORAGE_KEY = "podtui_progress"
+import {
+  loadProgressFromFile,
+  saveProgressToFile,
+  migrateProgressFromLocalStorage,
+} from "../utils/app-persistence"
 
 /** Threshold (fraction 0-1) at which an episode is considered completed */
 const COMPLETION_THRESHOLD = 0.95
@@ -16,47 +19,41 @@ const COMPLETION_THRESHOLD = 0.95
 /** Minimum seconds of progress before persisting */
 const MIN_POSITION_TO_SAVE = 5
 
-// --- localStorage helpers ---
-
-function loadProgress(): Record<string, Progress> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    const result: Record<string, Progress> = {}
-    for (const [key, value] of Object.entries(parsed)) {
-      const p = value as Record<string, unknown>
-      result[key] = {
-        episodeId: p.episodeId as string,
-        position: p.position as number,
-        duration: p.duration as number,
-        timestamp: new Date(p.timestamp as string),
-        playbackSpeed: p.playbackSpeed as number | undefined,
-      }
-    }
-    return result
-  } catch {
-    return {}
-  }
-}
-
-function saveProgress(data: Record<string, Progress>): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    // Quota exceeded or unavailable — silently ignore
-  }
-}
-
 // --- Singleton store ---
 
-const [progressMap, setProgressMap] = createSignal<Record<string, Progress>>(
-  loadProgress(),
-)
+const [progressMap, setProgressMap] = createSignal<Record<string, Progress>>({})
 
+/** Persist current progress map to file (fire-and-forget) */
 function persist(): void {
-  saveProgress(progressMap())
+  saveProgressToFile(progressMap()).catch(() => {})
 }
+
+/** Parse raw progress entries from file, reviving Date objects */
+function parseProgressEntries(raw: Record<string, unknown>): Record<string, Progress> {
+  const result: Record<string, Progress> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    const p = value as Record<string, unknown>
+    result[key] = {
+      episodeId: p.episodeId as string,
+      position: p.position as number,
+      duration: p.duration as number,
+      timestamp: new Date(p.timestamp as string),
+      playbackSpeed: p.playbackSpeed as number | undefined,
+    }
+  }
+  return result
+}
+
+/** Async initialisation — migrate from localStorage then load from file */
+async function initProgress(): Promise<void> {
+  await migrateProgressFromLocalStorage()
+  const raw = await loadProgressFromFile()
+  const parsed = parseProgressEntries(raw as Record<string, unknown>)
+  setProgressMap(parsed)
+}
+
+// Fire-and-forget init
+initProgress()
 
 function createProgressStore() {
   return {

@@ -11,6 +11,14 @@ import type { Episode, EpisodeStatus } from "../types/episode"
 import type { PodcastSource, SourceType } from "../types/source"
 import { DEFAULT_SOURCES } from "../types/source"
 import { parseRSSFeed } from "../api/rss-parser"
+import {
+  loadFeedsFromFile,
+  saveFeedsToFile,
+  loadSourcesFromFile,
+  saveSourcesToFile,
+  migrateFeedsFromLocalStorage,
+  migrateSourcesFromLocalStorage,
+} from "../utils/feeds-persistence"
 
 /** Max episodes to fetch on refresh */
 const MAX_EPISODES_REFRESH = 50
@@ -18,85 +26,30 @@ const MAX_EPISODES_REFRESH = 50
 /** Max episodes to fetch on initial subscribe */
 const MAX_EPISODES_SUBSCRIBE = 20
 
-/** Storage keys */
-const STORAGE_KEYS = {
-  feeds: "podtui_feeds",
-  sources: "podtui_sources",
-}
-
-/** Load feeds from localStorage */
-function loadFeeds(): Feed[] {
-  if (typeof localStorage === "undefined") {
-    return []
-  }
-
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.feeds)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      // Convert date strings
-      return parsed.map((feed: Feed) => ({
-        ...feed,
-        lastUpdated: new Date(feed.lastUpdated),
-        podcast: {
-          ...feed.podcast,
-          lastUpdated: new Date(feed.podcast.lastUpdated),
-        },
-        episodes: feed.episodes.map((ep: Episode) => ({
-          ...ep,
-          pubDate: new Date(ep.pubDate),
-        })),
-      }))
-    }
-  } catch {
-    // Ignore errors
-  }
-
-  return []
-}
-
-/** Save feeds to localStorage */
+/** Save feeds to file (async, fire-and-forget) */
 function saveFeeds(feeds: Feed[]): void {
-  if (typeof localStorage === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEYS.feeds, JSON.stringify(feeds))
-  } catch {
-    // Ignore errors
-  }
+  saveFeedsToFile(feeds).catch(() => {})
 }
 
-/** Load sources from localStorage */
-function loadSources(): PodcastSource[] {
-  if (typeof localStorage === "undefined") {
-    return [...DEFAULT_SOURCES]
-  }
-
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.sources)
-    if (stored) {
-      return JSON.parse(stored)
-    }
-  } catch {
-    // Ignore errors
-  }
-
-  return [...DEFAULT_SOURCES]
-}
-
-/** Save sources to localStorage */
+/** Save sources to file (async, fire-and-forget) */
 function saveSources(sources: PodcastSource[]): void {
-  if (typeof localStorage === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEYS.sources, JSON.stringify(sources))
-  } catch {
-    // Ignore errors
-  }
+  saveSourcesToFile(sources).catch(() => {})
 }
 
 /** Create feed store */
 export function createFeedStore() {
-  const [feeds, setFeeds] = createSignal<Feed[]>(loadFeeds())
-  const [sources, setSources] = createSignal<PodcastSource[]>(loadSources())
+  const [feeds, setFeeds] = createSignal<Feed[]>([])
+  const [sources, setSources] = createSignal<PodcastSource[]>([...DEFAULT_SOURCES])
+
+  // Async initialization: migrate from localStorage, then load from file
+  ;(async () => {
+    await migrateFeedsFromLocalStorage()
+    await migrateSourcesFromLocalStorage()
+    const loadedFeeds = await loadFeedsFromFile()
+    if (loadedFeeds.length > 0) setFeeds(loadedFeeds)
+    const loadedSources = await loadSourcesFromFile<PodcastSource>()
+    if (loadedSources && loadedSources.length > 0) setSources(loadedSources)
+  })()
   const [filter, setFilter] = createSignal<FeedFilter>({
     visibility: "all",
     sortBy: "updated" as FeedSortField,

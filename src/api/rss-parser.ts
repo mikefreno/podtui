@@ -1,5 +1,7 @@
 import type { Podcast } from "../types/podcast"
 import type { Episode, EpisodeType } from "../types/episode"
+import { detectContentType, ContentType } from "../utils/rss-content-detector"
+import { htmlToText } from "../utils/html-to-text"
 
 const getTagValue = (xml: string, tag: string): string => {
   const match = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"))
@@ -21,6 +23,20 @@ const decodeEntities = (value: string) =>
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+
+/**
+ * Clean a description field: detect HTML vs plain text, and convert
+ * HTML to readable plain text. Plain text just gets entity decoding.
+ */
+const cleanDescription = (raw: string): string => {
+  if (!raw) return ""
+  const decoded = decodeEntities(raw)
+  const type = detectContentType(decoded)
+  if (type === ContentType.HTML) {
+    return htmlToText(decoded)
+  }
+  return decoded
+}
 
 /**
  * Parse an itunes:duration value which can be:
@@ -61,14 +77,14 @@ const parseEpisodeType = (raw: string): EpisodeType | undefined => {
 export const parseRSSFeed = (xml: string, feedUrl: string): Podcast & { episodes: Episode[] } => {
   const channel = xml.match(/<channel[\s\S]*?<\/channel>/i)?.[0] ?? xml
   const title = decodeEntities(getTagValue(channel, "title")) || "Untitled Podcast"
-  const description = decodeEntities(getTagValue(channel, "description"))
+  const description = cleanDescription(getTagValue(channel, "description"))
   const author = decodeEntities(getTagValue(channel, "itunes:author"))
   const lastUpdated = new Date()
 
   const items = channel.match(/<item[\s\S]*?<\/item>/gi) ?? []
   const episodes = items.map((item, index) => {
     const epTitle = decodeEntities(getTagValue(item, "title")) || `Episode ${index + 1}`
-    const epDescription = decodeEntities(getTagValue(item, "description"))
+    const epDescription = cleanDescription(getTagValue(item, "description"))
     const pubDate = new Date(getTagValue(item, "pubDate") || Date.now())
 
     // Audio URL + file size + MIME type from <enclosure>

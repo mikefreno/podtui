@@ -107,6 +107,9 @@ export type AppEvents = {
   "dialog.open": { dialogId: string }
   "dialog.close": { dialogId?: string }
   "command.execute": { command: string; args?: unknown }
+  "clipboard.copied": { text: string }
+  "selection.start": { x: number; y: number }
+  "selection.end": { text: string }
 }
 
 // Type-safe emit and on functions
