@@ -10,7 +10,6 @@ import { format } from "date-fns";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { useTheme } from "@/context/ThemeContext";
-import { htmlToText } from "@/utils/html-to-text";
 
 type FeedPageProps = {
   focused: boolean;

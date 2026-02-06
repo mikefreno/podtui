@@ -5,7 +5,6 @@
 
 import type { Feed, FeedVisibility } from "@/types/feed";
 import { format } from "date-fns";
-import { htmlToText } from "@/utils/html-to-text";
 import { useTheme } from "@/context/ThemeContext";
 
 interface FeedItemProps {
@@ -55,7 +54,7 @@ export function FeedItem(props: FeedItemProps) {
         </text>
         <text fg={visibilityColor()}>{visibilityIcon()}</text>
         <text fg={props.isSelected ? "white" : theme.accent}>
-          {htmlToText(props.feed.customName || props.feed.podcast.title)}
+          {props.feed.customName || props.feed.podcast.title}
         </text>
         {props.showEpisodeCount && <text fg="gray">({episodeCount()})</text>}
       </box>
@@ -81,7 +80,7 @@ export function FeedItem(props: FeedItemProps) {
         <text fg="yellow">{pinnedIndicator()}</text>
         <text fg={props.isSelected ? "white" : theme.text}>
           <strong>
-            {htmlToText(props.feed.customName || props.feed.podcast.title)}
+            {props.feed.customName || props.feed.podcast.title}
           </strong>
         </text>
       </box>

@@ -25,10 +25,10 @@ const decodeEntities = (value: string) =>
     .replace(/&#39;/g, "'")
 
 /**
- * Clean a description field: detect HTML vs plain text, and convert
+ * Clean a field (description or title): detect HTML vs plain text, and convert
  * HTML to readable plain text. Plain text just gets entity decoding.
  */
-const cleanDescription = (raw: string): string => {
+const cleanField = (raw: string): string => {
   if (!raw) return ""
   const decoded = decodeEntities(raw)
   const type = detectContentType(decoded)
@@ -76,15 +76,15 @@ const parseEpisodeType = (raw: string): EpisodeType | undefined => {
 
 export const parseRSSFeed = (xml: string, feedUrl: string): Podcast & { episodes: Episode[] } => {
   const channel = xml.match(/<channel[\s\S]*?<\/channel>/i)?.[0] ?? xml
-  const title = decodeEntities(getTagValue(channel, "title")) || "Untitled Podcast"
-  const description = cleanDescription(getTagValue(channel, "description"))
+  const title = cleanField(getTagValue(channel, "title")) || "Untitled Podcast"
+  const description = cleanField(getTagValue(channel, "description"))
   const author = decodeEntities(getTagValue(channel, "itunes:author"))
   const lastUpdated = new Date()
 
   const items = channel.match(/<item[\s\S]*?<\/item>/gi) ?? []
   const episodes = items.map((item, index) => {
-    const epTitle = decodeEntities(getTagValue(item, "title")) || `Episode ${index + 1}`
-    const epDescription = cleanDescription(getTagValue(item, "description"))
+    const epTitle = cleanField(getTagValue(item, "title")) || `Episode ${index + 1}`
+    const epDescription = cleanField(getTagValue(item, "description"))
     const pubDate = new Date(getTagValue(item, "pubDate") || Date.now())
 
     // Audio URL + file size + MIME type from <enclosure>
