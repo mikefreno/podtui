@@ -9,6 +9,7 @@
   "scripts": {
     "start": "bun src/index.tsx",
     "dev": "bun --watch src/index.tsx",
+    "build:native": "bash scripts/build-cavacore.sh",
     "build": "bun run build.ts",
     "dist": "bun dist/index.js",
     "test": "bun test",

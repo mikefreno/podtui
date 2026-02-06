@@ -44,4 +44,19 @@ if (platformPkg) {
   }
 }
 
+// Copy cavacore native library to dist
+const cavacoreLib = platform === "darwin"
+  ? "libcavacore.dylib"
+  : platform === "win32"
+    ? "cavacore.dll"
+    : "libcavacore.so"
+const cavacoreSrc = join("src", "native", cavacoreLib)
+
+if (existsSync(cavacoreSrc)) {
+  copyFileSync(cavacoreSrc, join("dist", cavacoreLib))
+  console.log(`Copied cavacore library: ${cavacoreLib}`)
+} else {
+  console.warn(`Warning: ${cavacoreSrc} not found — run scripts/build-cavacore.sh first`)
+}
+
 console.log("Build complete")
