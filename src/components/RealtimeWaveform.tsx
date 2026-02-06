@@ -10,7 +10,7 @@
  * Same prop interface as MergedWaveform for drop-in replacement.
  */
 
-import { createSignal, createEffect, onCleanup, on } from "solid-js"
+import { createSignal, createEffect, onCleanup, on, untrack } from "solid-js"
 import { loadCavaCore, type CavaCore, type CavaCoreConfig } from "../utils/cavacore"
 import { AudioStreamReader } from "../utils/audio-stream-reader"
 
@@ -25,6 +25,8 @@ export type RealtimeWaveformProps = {
   duration: number
   /** Whether audio is currently playing */
   isPlaying: boolean
+  /** Playback speed multiplier (default: 1) */
+  speed?: number
   /** Number of frequency bars / columns */
   resolution?: number
   /** Callback when user clicks to seek */
@@ -75,7 +77,7 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 
   // ── Start/stop the visualization pipeline ──────────────────────────
 
-  const startVisualization = (url: string, position: number) => {
+  const startVisualization = (url: string, position: number, speed: number) => {
     stopVisualization()
 
     if (!url || !initCava() || !cava) return
@@ -92,9 +94,12 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
     // Pre-allocate sample read buffer
     sampleBuffer = new Float64Array(SAMPLES_PER_FRAME)
 
-    // Start ffmpeg decode stream
-    reader = new AudioStreamReader({ url })
-    reader.start(position)
+    // Start ffmpeg decode stream (reuse reader if same URL, else create new)
+    if (!reader || reader.url !== url) {
+      if (reader) reader.stop()
+      reader = new AudioStreamReader({ url })
+    }
+    reader.start(position, speed)
 
     // Start render loop
     frameTimer = setInterval(renderFrame, FRAME_INTERVAL)
@@ -107,7 +112,7 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
     }
     if (reader) {
       reader.stop()
-      reader = null
+      // Don't null reader — we reuse it across start/stop cycles
     }
     if (cava?.isReady) {
       cava.destroy()
@@ -134,57 +139,70 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
     setBarData(Array.from(output))
   }
 
-  // ── Reactive effects: respond to prop changes ──────────────────────
+  // ── Single unified effect: respond to all prop changes ─────────────
+  //
+  // Instead of three competing effects that each independently call
+  // startVisualization() and race against each other, we use ONE effect
+  // that tracks all relevant inputs. Position is read with untrack()
+  // so normal playback drift doesn't trigger restarts.
+  //
+  // SolidJS on() with an array of accessors compares each element
+  // individually, so the effect only fires when a value actually changes.
 
-  // Start/stop based on isPlaying and audioUrl
   createEffect(
     on(
-      () => [props.isPlaying, props.audioUrl] as const,
-      ([playing, url]) => {
+      [
+        () => props.isPlaying,
+        () => props.audioUrl,
+        () => props.speed ?? 1,
+        resolution,
+      ],
+      ([playing, url, speed]) => {
         if (playing && url) {
-          startVisualization(url, props.position)
+          const pos = untrack(() => props.position)
+          startVisualization(url, pos, speed)
         } else {
           stopVisualization()
-          // Keep last bar data visible (freeze frame) when paused
         }
       },
     ),
   )
 
-  // Handle seeks: restart the ffmpeg stream at the new position
-  // We track position and restart only on significant jumps (>2s delta)
+  // ── Seek detection: lightweight effect for position jumps ──────────
+  //
+  // Watches position and restarts the reader (not the whole pipeline)
+  // only on significant jumps (>2s), which indicate a user seek.
+  // This is intentionally a separate effect — it should NOT trigger a
+  // full pipeline restart, just restart the ffmpeg stream at the new pos.
+
   let lastSyncPosition = 0
   createEffect(
     on(
       () => props.position,
       (pos) => {
-        if (!props.isPlaying || !reader?.running) return
+        if (!props.isPlaying || !reader?.running) {
+          lastSyncPosition = pos
+          return
+        }
 
         const delta = Math.abs(pos - lastSyncPosition)
-        // Only restart on seeks (>2s jump), not normal playback drift
+        lastSyncPosition = pos
+
         if (delta > 2) {
-          reader.restart(pos)
-          lastSyncPosition = pos
-        } else {
-          lastSyncPosition = pos
+          const speed = props.speed ?? 1
+          reader.restart(pos, speed)
         }
       },
     ),
   )
 
-  // Re-init cavacore if resolution changes
-  createEffect(
-    on(resolution, (bars) => {
-      if (props.isPlaying && props.audioUrl && cava) {
-        // Restart with new bar count
-        startVisualization(props.audioUrl, props.position)
-      }
-    }),
-  )
-
   // Cleanup on unmount
   onCleanup(() => {
     stopVisualization()
+    if (reader) {
+      reader.stop()
+      reader = null
+    }
     // Don't null cava itself — it can be reused. But do destroy its plan.
     if (cava?.isReady) {
       cava.destroy()

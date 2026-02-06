@@ -105,6 +105,7 @@ export function Player(props: PlayerProps) {
             position={audio.position()}
             duration={dur()}
             isPlaying={audio.isPlaying()}
+            speed={audio.speed()}
             onSeek={(next: number) => audio.seek(next)}
             visualizerConfig={(() => {
               const viz = useAppStore().state().settings.visualizer

@@ -1,4 +1,4 @@
-import { createSignal, ErrorBoundary } from "solid-js";
+import { createSignal, createMemo, ErrorBoundary } from "solid-js";
 import { useSelectionHandler } from "@opentui/solid";
 import { Layout } from "./components/Layout";
 import { Navigation } from "./components/Navigation";
@@ -107,7 +107,7 @@ export function App() {
     }).catch(() => {})
   })
 
-  const getPanels = () => {
+  const getPanels = createMemo(() => {
     const tab = activeTab();
 
     switch (tab) {
@@ -305,7 +305,7 @@ export function App() {
           hint: "",
         };
     }
-  };
+  });
 
   return (
     <ErrorBoundary fallback={(err) => (
