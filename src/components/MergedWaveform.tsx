@@ -6,88 +6,92 @@
  * separate progress bar. Click-to-seek is supported.
  */
 
-import { createSignal, createEffect, onCleanup } from "solid-js"
-import { getWaveformData, getWaveformDataSync } from "../utils/audio-waveform"
+import { createSignal, createEffect, onCleanup } from "solid-js";
+import { getWaveformData } from "../utils/audio-waveform";
 
 type MergedWaveformProps = {
   /** Audio URL — used to generate or retrieve waveform data */
-  audioUrl: string
+  audioUrl: string;
   /** Current playback position in seconds */
-  position: number
+  position: number;
   /** Total duration in seconds */
-  duration: number
+  duration: number;
   /** Whether audio is currently playing */
-  isPlaying: boolean
+  isPlaying: boolean;
   /** Number of data points / columns */
-  resolution?: number
+  resolution?: number;
   /** Callback when user clicks to seek */
-  onSeek?: (seconds: number) => void
-}
+  onSeek?: (seconds: number) => void;
+};
 
 /** Block characters for waveform amplitude levels */
-const BARS = [".", "-", "~", "=", "#"]
+const BARS = [".", "-", "~", "=", "#"];
 
 export function MergedWaveform(props: MergedWaveformProps) {
-  const resolution = () => props.resolution ?? 64
+  const resolution = () => props.resolution ?? 64;
 
   // Waveform data — start with sync/cached, kick off async extraction
-  const [data, setData] = createSignal<number[]>(
-    getWaveformDataSync(props.audioUrl, resolution()),
-  )
+  const [data, setData] = createSignal<number[]>();
 
   // When the audioUrl changes, attempt async extraction for real data
   createEffect(() => {
-    const url = props.audioUrl
-    const res = resolution()
-    if (!url) return
+    const url = props.audioUrl;
+    const res = resolution();
+    if (!url) return;
 
-    let cancelled = false
+    let cancelled = false;
     getWaveformData(url, res).then((result) => {
-      if (!cancelled) setData(result)
-    })
-    onCleanup(() => { cancelled = true })
-  })
+      if (!cancelled) setData(result);
+    });
+    onCleanup(() => {
+      cancelled = true;
+    });
+  });
 
   const playedRatio = () =>
-    props.duration <= 0 ? 0 : Math.min(1, props.position / props.duration)
+    props.duration <= 0 ? 0 : Math.min(1, props.position / props.duration);
 
   const renderLine = () => {
-    const d = data()
-    const played = Math.floor(d.length * playedRatio())
-    const playedColor = props.isPlaying ? "#6fa8ff" : "#7d8590"
-    const futureColor = "#3b4252"
+    const d = data();
+    if (!d) {
+      console.error("no data recieved");
+      return;
+    }
+    const played = Math.floor(d.length * playedRatio());
+    const playedColor = props.isPlaying ? "#6fa8ff" : "#7d8590";
+    const futureColor = "#3b4252";
 
     const playedChars = d
       .slice(0, played)
       .map((v) => BARS[Math.min(BARS.length - 1, Math.floor(v * BARS.length))])
-      .join("")
+      .join("");
 
     const futureChars = d
       .slice(played)
       .map((v) => BARS[Math.min(BARS.length - 1, Math.floor(v * BARS.length))])
-      .join("")
+      .join("");
 
     return (
       <box flexDirection="row" gap={0}>
         <text fg={playedColor}>{playedChars || " "}</text>
         <text fg={futureColor}>{futureChars || " "}</text>
       </box>
-    )
-  }
+    );
+  };
 
   const handleClick = (event: { x: number }) => {
-    const d = data()
-    const ratio = d.length === 0 ? 0 : event.x / d.length
+    const d = data();
+    const ratio = !d || d.length === 0 ? 0 : event.x / d.length;
     const next = Math.max(
       0,
       Math.min(props.duration, Math.round(props.duration * ratio)),
-    )
-    props.onSeek?.(next)
-  }
+    );
+    props.onSeek?.(next);
+  };
 
   return (
     <box border padding={1} onMouseDown={handleClick}>
       {renderLine()}
     </box>
-  )
+  );
 }
