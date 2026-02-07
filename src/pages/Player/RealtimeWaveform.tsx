@@ -14,25 +14,11 @@ import {
   type CavaCoreConfig,
 } from "@/utils/cavacore";
 import { AudioStreamReader } from "@/utils/audio-stream-reader";
+import { useAudio } from "@/hooks/useAudio";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export type RealtimeWaveformProps = {
-  /** Audio URL — used to start the ffmpeg decode stream */
-  audioUrl: string;
-  /** Current playback position in seconds */
-  position: number;
-  /** Total duration in seconds */
-  duration: number;
-  /** Whether audio is currently playing */
-  isPlaying: boolean;
-  /** Playback speed multiplier (default: 1) */
-  speed?: number;
-  /** Number of frequency bars / columns */
-  resolution?: number;
-  /** Callback when user clicks to seek */
-  onSeek?: (seconds: number) => void;
-  /** Visualizer configuration overrides */
   visualizerConfig?: Partial<CavaCoreConfig>;
 };
 
@@ -58,7 +44,7 @@ const SAMPLES_PER_FRAME = 512;
 // ── Component ────────────────────────────────────────────────────────
 
 export function RealtimeWaveform(props: RealtimeWaveformProps) {
-  const resolution = () => props.resolution ?? 32;
+  const audio = useAudio();
 
   // Frequency bar values (0.0–1.0 per bar)
   const [barData, setBarData] = createSignal<number[]>([]);
@@ -95,7 +81,7 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 
     // Initialize cavacore with current resolution + any overrides
     const config: CavaCoreConfig = {
-      bars: resolution(),
+      bars: 32,
       sampleRate: 44100,
       channels: 1,
       ...props.visualizerConfig,
@@ -151,27 +137,17 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
     setBarData(Array.from(output));
   };
 
-  // ── Single unified effect: respond to all prop changes ─────────────
-  //
-  // Instead of three competing effects that each independently call
-  // startVisualization() and race against each other, we use ONE effect
-  // that tracks all relevant inputs. Position is read with untrack()
-  // so normal playback drift doesn't trigger restarts.
-  //
-  // SolidJS on() with an array of accessors compares each element
-  // individually, so the effect only fires when a value actually changes.
-
   createEffect(
     on(
       [
-        () => props.isPlaying,
-        () => props.audioUrl,
-        () => props.speed ?? 1,
-        resolution,
+        audio.isPlaying,
+        () => audio.currentEpisode()?.audioUrl ?? "", // may need to fire an error here
+        audio.speed,
+        () => 32,
       ],
       ([playing, url, speed]) => {
         if (playing && url) {
-          const pos = untrack(() => props.position);
+          const pos = untrack(audio.position);
           startVisualization(url, pos, speed);
         } else {
           stopVisualization();
@@ -189,23 +165,19 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 
   let lastSyncPosition = 0;
   createEffect(
-    on(
-      () => props.position,
-      (pos) => {
-        if (!props.isPlaying || !reader?.running) {
-          lastSyncPosition = pos;
-          return;
-        }
-
-        const delta = Math.abs(pos - lastSyncPosition);
+    on(audio.position, (pos) => {
+      if (!audio.isPlaying || !reader?.running) {
         lastSyncPosition = pos;
+        return;
+      }
 
-        if (delta > 2) {
-          const speed = props.speed ?? 1;
-          reader.restart(pos, speed);
-        }
-      },
-    ),
+      const delta = Math.abs(pos - lastSyncPosition);
+      lastSyncPosition = pos;
+
+      if (delta > 2) {
+        reader.restart(pos, audio.speed() ?? 1);
+      }
+    }),
   );
 
   // Cleanup on unmount
@@ -224,11 +196,13 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
   // ── Rendering ──────────────────────────────────────────────────────
 
   const playedRatio = () =>
-    props.duration <= 0 ? 0 : Math.min(1, props.position / props.duration);
+    audio.duration() <= 0
+      ? 0
+      : Math.min(1, audio.position() / audio.duration());
 
   const renderLine = () => {
     const bars = barData();
-    const numBars = resolution();
+    const numBars = 32;
 
     // If no data yet, show empty placeholder
     if (bars.length === 0) {
@@ -241,7 +215,7 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
     }
 
     const played = Math.floor(numBars * playedRatio());
-    const playedColor = props.isPlaying ? "#6fa8ff" : "#7d8590";
+    const playedColor = audio.isPlaying() ? "#6fa8ff" : "#7d8590";
     const futureColor = "#3b4252";
 
     const playedChars = bars
@@ -263,13 +237,13 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
   };
 
   const handleClick = (event: { x: number }) => {
-    const numBars = resolution();
-    const ratio = numBars === 0 ? 0 : event.x / numBars;
+    const numBars = 32;
+    const ratio = event.x / numBars;
     const next = Math.max(
       0,
-      Math.min(props.duration, Math.round(props.duration * ratio)),
+      Math.min(audio.duration(), Math.round(audio.duration() * ratio)),
     );
-    props.onSeek?.(next);
+    audio.seek(next);
   };
 
   return (

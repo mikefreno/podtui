@@ -23,7 +23,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "account", label: "Account" },
 ];
 
-export function SettingsScreen(props: SettingsScreenProps) {
+export function SettingsPage(props: SettingsScreenProps) {
   const { theme } = useTheme();
   const [activeSection, setActiveSection] = createSignal<SectionId>("sync");
 

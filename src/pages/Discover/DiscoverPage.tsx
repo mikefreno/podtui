@@ -7,120 +7,18 @@ import { useKeyboard } from "@opentui/solid";
 import { useDiscoverStore, DISCOVER_CATEGORIES } from "@/stores/discover";
 import { useTheme } from "@/context/ThemeContext";
 import { PodcastCard } from "./PodcastCard";
+import { PageProps } from "@/App";
 
-type DiscoverPageProps = {
-  focused: boolean;
-  onExit?: () => void;
-};
+enum DiscoverPagePaneType {
+  CATEGORIES = 1,
+  SHOWS = 2,
+}
+export const DiscoverPaneCount = 2;
 
-type FocusArea = "categories" | "shows";
-
-export function DiscoverPage(props: DiscoverPageProps) {
+export function DiscoverPage(props: PageProps) {
   const discoverStore = useDiscoverStore();
-  const [focusArea, setFocusArea] = createSignal<FocusArea>("shows");
   const [showIndex, setShowIndex] = createSignal(0);
   const [categoryIndex, setCategoryIndex] = createSignal(0);
-
-  // Keyboard navigation
-  useKeyboard((key) => {
-    if (!props.focused) return;
-
-    const area = focusArea();
-
-    // Tab switches focus between categories and shows
-    if (key.name === "tab") {
-      if (key.shift) {
-        setFocusArea((a) => (a === "categories" ? "shows" : "categories"));
-      } else {
-        setFocusArea((a) => (a === "categories" ? "shows" : "categories"));
-      }
-      return;
-    }
-
-    if (key.name === "return" && area === "categories") {
-      setFocusArea("shows");
-      return;
-    }
-
-    // Category navigation
-    if (area === "categories") {
-      if (key.name === "left" || key.name === "h") {
-        const nextIndex = Math.max(0, categoryIndex() - 1);
-        setCategoryIndex(nextIndex);
-        const cat = DISCOVER_CATEGORIES[nextIndex];
-        if (cat) discoverStore.setSelectedCategory(cat.id);
-        setShowIndex(0);
-        return;
-      }
-      if (key.name === "right" || key.name === "l") {
-        const nextIndex = Math.min(
-          DISCOVER_CATEGORIES.length - 1,
-          categoryIndex() + 1,
-        );
-        setCategoryIndex(nextIndex);
-        const cat = DISCOVER_CATEGORIES[nextIndex];
-        if (cat) discoverStore.setSelectedCategory(cat.id);
-        setShowIndex(0);
-        return;
-      }
-      if (key.name === "return" || key.name === "enter") {
-        // Select category and move to shows
-        setFocusArea("shows");
-        return;
-      }
-      if (key.name === "down" || key.name === "j") {
-        setFocusArea("shows");
-        return;
-      }
-    }
-
-    // Shows navigation
-    if (area === "shows") {
-      const shows = discoverStore.filteredPodcasts();
-      if (key.name === "down" || key.name === "j") {
-        if (shows.length === 0) return;
-        setShowIndex((i) => Math.min(i + 1, shows.length - 1));
-        return;
-      }
-      if (key.name === "up" || key.name === "k") {
-        if (shows.length === 0) {
-          setFocusArea("categories");
-          return;
-        }
-        const newIndex = showIndex() - 1;
-        if (newIndex < 0) {
-          setFocusArea("categories");
-        } else {
-          setShowIndex(newIndex);
-        }
-        return;
-      }
-      if (key.name === "return" || key.name === "enter") {
-        // Subscribe/unsubscribe
-        const podcast = shows[showIndex()];
-        if (podcast) {
-          discoverStore.toggleSubscription(podcast.id);
-        }
-        return;
-      }
-    }
-
-    if (key.name === "escape") {
-      if (area === "shows") {
-        setFocusArea("categories");
-        key.stopPropagation();
-      } else {
-        props.onExit?.();
-      }
-      return;
-    }
-
-    // Refresh with 'r'
-    if (key.name === "r") {
-      discoverStore.refresh();
-      return;
-    }
-  });
 
   const handleCategorySelect = (categoryId: string) => {
     discoverStore.setSelectedCategory(categoryId);
@@ -131,7 +29,6 @@ export function DiscoverPage(props: DiscoverPageProps) {
 
   const handleShowSelect = (index: number) => {
     setShowIndex(index);
-    setFocusArea("shows");
   };
 
   const handleSubscribe = (podcast: { id: string }) => {
@@ -149,7 +46,13 @@ export function DiscoverPage(props: DiscoverPageProps) {
         gap={1}
         width={20}
       >
-        <text fg={focusArea() === "categories" ? theme.accent : theme.text}>
+        <text
+          fg={
+            props.depth() == DiscoverPagePaneType.CATEGORIES
+              ? theme.accent
+              : theme.text
+          }
+        >
           Categories:
         </text>
         <box flexDirection="column" gap={1}>
@@ -180,7 +83,9 @@ export function DiscoverPage(props: DiscoverPageProps) {
         borderColor={theme.border}
       >
         <box padding={1}>
-          <text fg={focusArea() === "shows" ? "cyan" : "gray"}>
+          <text
+            fg={props.depth() == DiscoverPagePaneType.SHOWS ? "cyan" : "gray"}
+          >
             Trending in{" "}
             {DISCOVER_CATEGORIES.find(
               (c) => c.id === discoverStore.selectedCategory(),
@@ -210,7 +115,8 @@ export function DiscoverPage(props: DiscoverPageProps) {
                     <PodcastCard
                       podcast={podcast}
                       selected={
-                        index() === showIndex() && focusArea() === "shows"
+                        index() === showIndex() &&
+                        props.depth() == DiscoverPagePaneType.SHOWS
                       }
                       onSelect={() => handleShowSelect(index())}
                       onSubscribe={() => handleSubscribe(podcast)}

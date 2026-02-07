@@ -1,18 +1,19 @@
 import { useTheme } from "@/context/ThemeContext";
+import { TABS } from "@/utils/navigation";
 import { For } from "solid-js";
 
 interface TabNavigationProps {
-  activeTab: TabId;
-  onTabSelect: (tab: TabId) => void;
+  activeTab: TABS;
+  onTabSelect: (tab: TABS) => void;
 }
 
 export const tabs: TabDefinition[] = [
-  { id: "feed", label: "Feed" },
-  { id: "shows", label: "My Shows" },
-  { id: "discover", label: "Discover" },
-  { id: "search", label: "Search" },
-  { id: "player", label: "Player" },
-  { id: "settings", label: "Settings" },
+  { id: TABS.FEED, label: "Feed" },
+  { id: TABS.MYSHOWS, label: "My Shows" },
+  { id: TABS.DISCOVER, label: "Discover" },
+  { id: TABS.SEARCH, label: "Search" },
+  { id: TABS.PLAYER, label: "Player" },
+  { id: TABS.SETTINGS, label: "Settings" },
 ];
 
 export function TabNavigation(props: TabNavigationProps) {
@@ -52,15 +53,7 @@ export function TabNavigation(props: TabNavigationProps) {
   );
 }
 
-export type TabId =
-  | "feed"
-  | "shows"
-  | "discover"
-  | "search"
-  | "player"
-  | "settings";
-
 export type TabDefinition = {
-  id: TabId;
+  id: TABS;
   label: string;
 };

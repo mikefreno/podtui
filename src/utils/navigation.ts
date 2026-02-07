@@ -1,49 +1,9 @@
-enum FEEDTABTYPE {
-  LATEST,
-}
-export const FeedTab = {
-  [FEEDTABTYPE.LATEST]: {
-    size: 1,
-    title: "Feed - Latest Episodes",
-    scrolling: true,
-  },
-};
-enum MYSHOWSTYPE {
-  SHOWLIST,
-  EPISODELIST,
-}
-export const MyShowsTab = {
-  [MYSHOWSTYPE.SHOWLIST]: { size: 0.3, title: "My Shows", scrolling: true },
-  [MYSHOWSTYPE.EPISODELIST]: {
-    size: 0.7,
-    title: "<SHOW> - Episodes",
-    scrolling: true,
-  },
-};
-
-enum DiscoverTab {
-  CATEGORIES,
-  CATEGORYLIST,
-}
-
-export enum CATEGORIES {
-  ALL,
-  TECHNOLOGY,
-  SCIENCE,
-  COMEDY,
-  NEWS,
-  BUSINESS,
-  HEALTH,
-  EDUCATION,
-  SPORTS,
-  TRUECRIME,
-  ARTS,
-}
-export const SearchTab = [];
-
-export const PlayerTab = [];
-
-export const SettingsTab = [];
+import { DiscoverPage } from "@/pages/Discover/DiscoverPage";
+import { FeedPage, FeedPaneCount } from "@/pages/Feed/FeedPage";
+import { MyShowsPage, MyShowsPaneCount } from "@/pages/MyShows/MyShowsPage";
+import { PlayerPage } from "@/pages/Player/PlayerPage";
+import { SearchPage } from "@/pages/Search/SearchPage";
+import { SettingsPage } from "@/pages/Settings/SettingsPage";
 
 export enum TABS {
   FEED,
@@ -55,10 +15,18 @@ export enum TABS {
 }
 
 export const LayerGraph = {
-  [TABS.FEED]: FeedTab,
-  [TABS.MYSHOWS]: MyShowsTab,
-  [TABS.DISCOVER]: DiscoverTab,
-  [TABS.SEARCH]: SearchTab,
-  [TABS.PLAYER]: PlayerTab,
-  [TABS.SETTINGS]: SettingsTab,
+  [TABS.FEED]: FeedPage,
+  [TABS.MYSHOWS]: MyShowsPage,
+  [TABS.DISCOVER]: DiscoverPage,
+  [TABS.SEARCH]: SearchPage,
+  [TABS.PLAYER]: PlayerPage,
+  [TABS.SETTINGS]: SettingsPage,
+};
+export const LayerDepths = {
+  [TABS.FEED]: FeedPaneCount,
+  [TABS.MYSHOWS]: MyShowsPaneCount,
+  [TABS.DISCOVER]: DiscoverPaneCount,
+  [TABS.SEARCH]: SearchPaneCount,
+  [TABS.PLAYER]: PlayerPaneCount,
+  [TABS.SETTINGS]: SettingPaneCount,
 };

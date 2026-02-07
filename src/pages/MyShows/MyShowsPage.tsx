@@ -12,19 +12,19 @@ import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
+import { PageProps } from "@/App";
 
-type MyShowsPageProps = {
-  focused: boolean;
-  onPlayEpisode?: (episode: Episode, feed: Feed) => void;
-  onExit?: () => void;
-};
+enum MyShowsPaneType {
+  SHOWS,
+  EPISODES,
+}
 
-type FocusPane = "shows" | "episodes";
+export const MyShowsPaneCount = 2
 
-export function MyShowsPage(props: MyShowsPageProps) {
+export function MyShowsPage(props: PageProps) {
   const feedStore = useFeedStore();
   const downloadStore = useDownloadStore();
-  const [focusPane, setFocusPane] = createSignal<FocusPane>("shows");
+  const [focusPane, setFocusPane] = createSignal<>("shows");
   const [showIndex, setShowIndex] = createSignal(0);
   const [episodeIndex, setEpisodeIndex] = createSignal(0);
   const [isRefreshing, setIsRefreshing] = createSignal(false);
@@ -128,95 +128,6 @@ export function MyShowsPage(props: MyShowsPageProps) {
     setEpisodeIndex(0);
   };
 
-  useKeyboard((key) => {
-    if (!props.focused) return;
-
-    const pane = focusPane();
-
-    // Navigate between panes
-    if (key.name === "right" || key.name === "l") {
-      if (pane === "shows" && selectedShow()) {
-        setFocusPane("episodes");
-        setEpisodeIndex(0);
-      }
-      return;
-    }
-    if (key.name === "left" || key.name === "h") {
-      if (pane === "episodes") {
-        setFocusPane("shows");
-      }
-      return;
-    }
-    if (key.name === "tab") {
-      if (pane === "shows" && selectedShow()) {
-        setFocusPane("episodes");
-        setEpisodeIndex(0);
-      } else {
-        setFocusPane("shows");
-      }
-      return;
-    }
-
-    if (pane === "shows") {
-      const s = shows();
-      if (key.name === "down" || key.name === "j") {
-        setShowIndex((i) => Math.min(s.length - 1, i + 1));
-        setEpisodeIndex(0);
-      } else if (key.name === "up" || key.name === "k") {
-        setShowIndex((i) => Math.max(0, i - 1));
-        setEpisodeIndex(0);
-      } else if (key.name === "return" || key.name === "enter") {
-        if (selectedShow()) {
-          setFocusPane("episodes");
-          setEpisodeIndex(0);
-        }
-      } else if (key.name === "d") {
-        handleUnsubscribe();
-      } else if (key.name === "r") {
-        handleRefresh();
-      } else if (key.name === "escape") {
-        props.onExit?.();
-      }
-    } else if (pane === "episodes") {
-      const eps = episodes();
-      if (key.name === "down" || key.name === "j") {
-        setEpisodeIndex((i) => Math.min(eps.length - 1, i + 1));
-      } else if (key.name === "up" || key.name === "k") {
-        setEpisodeIndex((i) => Math.max(0, i - 1));
-      } else if (key.name === "return" || key.name === "enter") {
-        const ep = eps[episodeIndex()];
-        const show = selectedShow();
-        if (ep && show) props.onPlayEpisode?.(ep, show);
-      } else if (key.name === "d") {
-        const ep = eps[episodeIndex()];
-        const show = selectedShow();
-        if (ep && show) {
-          const status = downloadStore.getDownloadStatus(ep.id);
-          if (
-            status === DownloadStatus.NONE ||
-            status === DownloadStatus.FAILED
-          ) {
-            downloadStore.startDownload(ep, show.id);
-          } else if (
-            status === DownloadStatus.DOWNLOADING ||
-            status === DownloadStatus.QUEUED
-          ) {
-            downloadStore.cancelDownload(ep.id);
-          }
-        }
-      } else if (key.name === "pageup") {
-        setEpisodeIndex((i) => Math.max(0, i - 10));
-      } else if (key.name === "pagedown") {
-        setEpisodeIndex((i) => Math.min(eps.length - 1, i + 10));
-      } else if (key.name === "r") {
-        handleRefresh();
-      } else if (key.name === "escape") {
-        setFocusPane("shows");
-        key.stopPropagation();
-      }
-    }
-  });
-
   return {
     showsPanel: () => (
       <box flexDirection="column" height="100%">
@@ -233,10 +144,7 @@ export function MyShowsPage(props: MyShowsPageProps) {
             </box>
           }
         >
-          <scrollbox
-            height="100%"
-            focused={props.focused && focusPane() === "shows"}
-          >
+          <scrollbox height="100%" focused={props.depth}>
             <For each={shows()}>
               {(feed, index) => (
                 <box

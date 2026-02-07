@@ -4,20 +4,16 @@
  */
 
 import { createSignal, For, Show } from "solid-js";
-import { useKeyboard } from "@opentui/solid";
 import { useFeedStore } from "@/stores/feed";
 import { format } from "date-fns";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { useTheme } from "@/context/ThemeContext";
+import { PageProps } from "@/App";
 
-type FeedPageProps = {
-  focused: boolean;
-  onPlayEpisode?: (episode: Episode, feed: Feed) => void;
-  onExit?: () => void;
-};
+export const FeedPaneCount = 1;
 
-export function FeedPage(props: FeedPageProps) {
+export function FeedPage(props: PageProps) {
   const feedStore = useFeedStore();
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [isRefreshing, setIsRefreshing] = createSignal(false);
@@ -41,33 +37,6 @@ export function FeedPage(props: FeedPageProps) {
     setIsRefreshing(false);
   };
 
-  useKeyboard((key) => {
-    if (!props.focused) return;
-
-    const episodes = allEpisodes();
-
-    if (key.name === "down" || key.name === "j") {
-      setSelectedIndex((i) => Math.min(episodes.length - 1, i + 1));
-    } else if (key.name === "up" || key.name === "k") {
-      setSelectedIndex((i) => Math.max(0, i - 1));
-    } else if (key.name === "return") {
-      const item = episodes[selectedIndex()];
-      if (item) props.onPlayEpisode?.(item.episode, item.feed);
-    } else if (key.name === "home" || key.name === "g") {
-      setSelectedIndex(0);
-    } else if (key.name === "end") {
-      setSelectedIndex(episodes.length - 1);
-    } else if (key.name === "pageup") {
-      setSelectedIndex((i) => Math.max(0, i - 10));
-    } else if (key.name === "pagedown") {
-      setSelectedIndex((i) => Math.min(episodes.length - 1, i + 10));
-    } else if (key.name === "r") {
-      handleRefresh();
-    } else if (key.name === "escape") {
-      props.onExit?.();
-    }
-  });
-
   const { theme } = useTheme();
   return (
     <box
@@ -80,7 +49,6 @@ export function FeedPage(props: FeedPageProps) {
         <text fg="yellow">Refreshing feeds...</text>
       </Show>
 
-      {/* Episode list */}
       <Show
         when={allEpisodes().length > 0}
         fallback={
@@ -91,7 +59,8 @@ export function FeedPage(props: FeedPageProps) {
           </box>
         }
       >
-        <scrollbox height="100%" focused={props.focused}>
+        {/**TODO: figure out wtf to do here **/}
+        <scrollbox height="100%" focused={true}>
           <For each={allEpisodes()}>
             {(item, index) => (
               <box
