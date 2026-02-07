@@ -1,6 +1,6 @@
 import { createSignal, createMemo, ErrorBoundary } from "solid-js";
 import { useSelectionHandler } from "@opentui/solid";
-import { Layout } from "./components/Layout";
+import { Layout } from "./Layout";
 import { TabNavigation } from "./components/TabNavigation";
 import { FeedPage } from "@/tabs/Feed/FeedPage";
 import { MyShowsPage } from "@/tabs/MyShows/MyShowsPage";
@@ -14,7 +14,6 @@ import { Player } from "@/tabs/Player/Player";
 import { SettingsScreen } from "@/tabs/Settings/SettingsScreen";
 import { useAuthStore } from "@/stores/auth";
 import { useFeedStore } from "@/stores/feed";
-import { useAppStore } from "@/stores/app";
 import { useAudio } from "@/hooks/useAudio";
 import { useMultimediaKeys } from "@/hooks/useMultimediaKeys";
 import { FeedVisibility } from "@/types/feed";
@@ -34,7 +33,6 @@ export function App() {
   const [layerDepth, setLayerDepth] = createSignal(0);
   const auth = useAuthStore();
   const feedStore = useFeedStore();
-  const appStore = useAppStore();
   const audio = useAudio();
   const toast = useToast();
   const renderer = useRenderer();

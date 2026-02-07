@@ -1,43 +1,57 @@
-import { Tab, type TabId } from "./Tab";
+import { useTheme } from "@/context/ThemeContext";
+import { For } from "solid-js";
 
-type TabNavigationProps = {
+interface TabNavigationProps {
   activeTab: TabId;
   onTabSelect: (tab: TabId) => void;
-};
+}
+
+export const tabs: TabDefinition[] = [
+  { id: "feed", label: "Feed" },
+  { id: "shows", label: "My Shows" },
+  { id: "discover", label: "Discover" },
+  { id: "search", label: "Search" },
+  { id: "player", label: "Player" },
+  { id: "settings", label: "Settings" },
+];
 
 export function TabNavigation(props: TabNavigationProps) {
+  const { theme } = useTheme();
   return (
     <box style={{ flexDirection: "row", gap: 1 }}>
-      <Tab
-        tab={{ id: "feed", label: "Feed" }}
-        active={props.activeTab === "feed"}
-        onSelect={props.onTabSelect}
-      />
-      <Tab
-        tab={{ id: "shows", label: "My Shows" }}
-        active={props.activeTab === "shows"}
-        onSelect={props.onTabSelect}
-      />
-      <Tab
-        tab={{ id: "discover", label: "Discover" }}
-        active={props.activeTab === "discover"}
-        onSelect={props.onTabSelect}
-      />
-      <Tab
-        tab={{ id: "search", label: "Search" }}
-        active={props.activeTab === "search"}
-        onSelect={props.onTabSelect}
-      />
-      <Tab
-        tab={{ id: "player", label: "Player" }}
-        active={props.activeTab === "player"}
-        onSelect={props.onTabSelect}
-      />
-      <Tab
-        tab={{ id: "settings", label: "Settings" }}
-        active={props.activeTab === "settings"}
-        onSelect={props.onTabSelect}
-      />
+      <For each={tabs}>
+        {(tab) => (
+          <box
+            border
+            borderColor={theme.border}
+            onMouseDown={() => props.onTabSelect(tab.id)}
+            style={{
+              padding: 1,
+              backgroundColor:
+                tab.id == props.activeTab ? theme.primary : "transparent",
+            }}
+          >
+            <text style={{ fg: theme.text }}>
+              {tab.id == props.activeTab ? "[" : " "}
+              {tab.label}
+              {tab.id == props.activeTab ? "]" : " "}
+            </text>
+          </box>
+        )}
+      </For>
     </box>
   );
 }
+
+export type TabId =
+  | "feed"
+  | "shows"
+  | "discover"
+  | "search"
+  | "player"
+  | "settings";
+
+export type TabDefinition = {
+  id: TabId;
+  label: string;
+};
