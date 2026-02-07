@@ -2,11 +2,11 @@
  * DiscoverPage component - Main discover/browse interface for PodTUI
  */
 
-import { createSignal } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import { useDiscoverStore, DISCOVER_CATEGORIES } from "@/stores/discover";
-import { CategoryFilter } from "./CategoryFilter";
-import { TrendingShows } from "./TrendingShows";
+import { useTheme } from "@/context/ThemeContext";
+import { PodcastCard } from "./PodcastCard";
 
 type DiscoverPageProps = {
   focused: boolean;
@@ -37,10 +37,7 @@ export function DiscoverPage(props: DiscoverPageProps) {
       return;
     }
 
-    if (
-      key.name === "return" &&
-      area === "categories"
-    ) {
+    if (key.name === "return" && area === "categories") {
       setFocusArea("shows");
       return;
     }
@@ -141,42 +138,47 @@ export function DiscoverPage(props: DiscoverPageProps) {
     discoverStore.toggleSubscription(podcast.id);
   };
 
+  const { theme } = useTheme();
   return (
-    <box flexDirection="column" height="100%" gap={1}>
-      {/* Header */}
+    <box flexDirection="row" flexGrow={1} height="100%" gap={1}>
       <box
-        flexDirection="row"
-        justifyContent="space-between"
-        alignItems="center"
+        border
+        padding={1}
+        borderColor={theme.border}
+        flexDirection="column"
+        gap={1}
+        width={20}
       >
-        <text>
-          <strong>Discover Podcasts</strong>
+        <text fg={focusArea() === "categories" ? theme.accent : theme.text}>
+          Categories:
         </text>
-        <box flexDirection="row" gap={2}>
-          <text fg="gray">{discoverStore.filteredPodcasts().length} shows</text>
-          <box onMouseDown={() => discoverStore.refresh()}>
-            <text fg="cyan">[R] Refresh</text>
-          </box>
-        </box>
-      </box>
-
-      {/* Category Filter */}
-      <box border padding={1}>
         <box flexDirection="column" gap={1}>
-          <text fg={focusArea() === "categories" ? "cyan" : "gray"}>
-            Categories:
-          </text>
-          <CategoryFilter
-            categories={discoverStore.categories}
-            selectedCategory={discoverStore.selectedCategory()}
-            focused={focusArea() === "categories"}
-            onSelect={handleCategorySelect}
-          />
+          <For each={discoverStore.categories}>
+            {(category) => {
+              const isSelected = () =>
+                discoverStore.selectedCategory() === category.id;
+
+              return (
+                <box
+                  border={isSelected()}
+                  backgroundColor={isSelected() ? theme.accent : undefined}
+                  onMouseDown={() => handleCategorySelect(category.id)}
+                >
+                  <text fg={isSelected() ? "cyan" : "gray"}>
+                    {category.icon} {category.name}
+                  </text>
+                </box>
+              );
+            }}
+          </For>
         </box>
       </box>
-
-      {/* Trending Shows */}
-      <box flexDirection="column" flexGrow={1} border>
+      <box
+        flexDirection="column"
+        flexGrow={1}
+        border
+        borderColor={theme.border}
+      >
         <box padding={1}>
           <text fg={focusArea() === "shows" ? "cyan" : "gray"}>
             Trending in{" "}
@@ -185,23 +187,40 @@ export function DiscoverPage(props: DiscoverPageProps) {
             )?.name ?? "All"}
           </text>
         </box>
-        <TrendingShows
-          podcasts={discoverStore.filteredPodcasts()}
-          selectedIndex={showIndex()}
-          focused={focusArea() === "shows"}
-          isLoading={discoverStore.isLoading()}
-          onSelect={handleShowSelect}
-          onSubscribe={handleSubscribe}
-        />
-      </box>
-
-      {/* Footer Hints */}
-      <box flexDirection="row" gap={2}>
-        <text fg="gray">[Tab] Switch focus</text>
-        <text fg="gray">[j/k] Navigate</text>
-        <text fg="gray">[Enter] Subscribe</text>
-        <text fg="gray">[Esc] Up</text>
-        <text fg="gray">[R] Refresh</text>
+        <box flexDirection="column" height="100%">
+          <Show
+            fallback={
+              <box padding={2}>
+                {discoverStore.filteredPodcasts().length !== 0 ? (
+                  <text fg="yellow">Loading trending shows...</text>
+                ) : (
+                  <text fg="gray">No podcasts found in this category.</text>
+                )}
+              </box>
+            }
+            when={
+              !discoverStore.isLoading() &&
+              discoverStore.filteredPodcasts().length === 0
+            }
+          >
+            <scrollbox>
+              <box flexDirection="column">
+                <For each={discoverStore.filteredPodcasts()}>
+                  {(podcast, index) => (
+                    <PodcastCard
+                      podcast={podcast}
+                      selected={
+                        index() === showIndex() && focusArea() === "shows"
+                      }
+                      onSelect={() => handleShowSelect(index())}
+                      onSubscribe={() => handleSubscribe(podcast)}
+                    />
+                  )}
+                </For>
+              </box>
+            </scrollbox>
+          </Show>
+        </box>
       </box>
     </box>
   );

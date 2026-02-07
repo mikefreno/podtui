@@ -23,6 +23,7 @@ import { useToast } from "@/ui/toast";
 import { useRenderer } from "@opentui/solid";
 import type { AuthScreen } from "@/types/auth";
 import type { Episode } from "@/types/episode";
+import { DIRECTION } from "./types/navigation";
 
 export function App() {
   const [activeTab, setActiveTab] = createSignal<TabId>("feed");
@@ -61,26 +62,23 @@ export function App() {
     onExit: () => setLayerDepth(0),
   });
 
-  // Centralized keyboard handler for all tab navigation and shortcuts
   useAppKeyboard({
-    get activeTab() {
-      return activeTab();
-    },
-    onTabChange: (tab: TabId) => {
-      setActiveTab(tab);
-      setInputFocused(false);
-    },
-    get inputFocused() {
-      return inputFocused();
-    },
-    get navigationEnabled() {
-      return layerDepth() === 0;
-    },
     layerDepth,
-    onLayerChange: (newDepth) => {
-      setLayerDepth(newDepth);
-    },
-    onAction: (action) => {
+    onAction: (action, direction) => {
+      if (action == "cycle") {
+        if (direction == DIRECTION.Increment) {
+          //if()
+        }
+        if (direction == DIRECTION.Decrement) {
+        }
+      }
+      if (action == "depth") {
+        if (direction == DIRECTION.Increment) {
+        }
+        if (direction == DIRECTION.Decrement) {
+        }
+      }
+
       if (action === "escape") {
         if (layerDepth() > 0) {
           setLayerDepth(0);
@@ -89,10 +87,6 @@ export function App() {
           setShowAuthPanel(false);
           setInputFocused(false);
         }
-      }
-
-      if (action === "enter" && layerDepth() === 0) {
-        setLayerDepth(1);
       }
     },
   });

@@ -3,145 +3,30 @@
  * Single handler to prevent conflicts
  */
 
-import { useKeyboard, useRenderer } from "@opentui/solid"
-import type { Accessor } from "solid-js"
-
-const TAB_ORDER: TabId[] = ["feed", "shows", "discover", "search", "player", "settings"]
-
-type TabId =
-  | "feed"
-  | "shows"
-  | "discover"
-  | "search"
-  | "player"
-  | "settings"
+import { TabId } from "@/components/TabNavigation";
+import { useKeyboard, useRenderer } from "@opentui/solid";
+import type { Accessor } from "solid-js";
 
 type ShortcutOptions = {
-  activeTab: TabId
-  onTabChange: (tab: TabId) => void
-  onAction?: (action: string) => void
-  inputFocused?: boolean
-  navigationEnabled?: boolean
-  layerDepth?: Accessor<number>
-  onLayerChange?: (newDepth: number) => void
-}
+  onAction?: (action: string, direction: Direction) => void;
+  layerDepth: Accessor<number>;
+};
 
-export function useAppKeyboard(options: ShortcutOptions) {
-  const renderer = useRenderer()
+export function useAppKeyboard(props: ShortcutOptions) {
+  const renderer = useRenderer();
 
-  const getNextTab = (current: TabId): TabId => {
-    const idx = TAB_ORDER.indexOf(current)
-    return TAB_ORDER[(idx + 1) % TAB_ORDER.length]
-  }
-
-  const getPrevTab = (current: TabId): TabId => {
-    const idx = TAB_ORDER.indexOf(current)
-    return TAB_ORDER[(idx - 1 + TAB_ORDER.length) % TAB_ORDER.length]
-  }
-
+  // layer depth 0 is tabs, they are oriented
+  // vertically, all others are vertically
   useKeyboard((key) => {
-    // Always allow quit
-    if (key.ctrl && key.name === "q") {
-      renderer.destroy()
-      return
-    }
-
-    if (key.name === "escape") {
-      options.onAction?.("escape")
-      return
-    }
-
-    // Skip global shortcuts if input is focused (let input handle keys)
-    if (options.inputFocused) {
-      return
-    }
-
-    if (options.navigationEnabled === false) {
-      return
-    }
-
-    // Return key cycles tabs (equivalent to Tab)
-    if (key.name === "return") {
-      options.onTabChange(getNextTab(options.activeTab))
-      return
-    }
-
-    // Layer navigation with left/right arrows
-    if (options.layerDepth !== undefined && options.onLayerChange) {
-      const currentDepth = options.layerDepth()
-      const maxLayers = 3
-
-      if (key.name === "right") {
-        if (currentDepth < maxLayers) {
-          options.onLayerChange(currentDepth + 1)
-        }
-        return
-      }
-
-      if (key.name === "left") {
-        if (currentDepth > 0) {
-          options.onLayerChange(currentDepth - 1)
-        }
-        return
-      }
-    }
-
-    // Tab navigation with left/right arrows OR [ and ]
-    if (key.name === "right" || key.name === "]") {
-      options.onTabChange(getNextTab(options.activeTab))
-      return
-    }
-
-    if (key.name === "left" || key.name === "[") {
-      options.onTabChange(getPrevTab(options.activeTab))
-      return
-    }
-
-    // Number keys for direct tab access (1-6)
-    if (key.name === "1") {
-      options.onTabChange("feed")
-      return
-    }
-    if (key.name === "2") {
-      options.onTabChange("shows")
-      return
-    }
-    if (key.name === "3") {
-      options.onTabChange("discover")
-      return
-    }
-    if (key.name === "4") {
-      options.onTabChange("search")
-      return
-    }
-    if (key.name === "5") {
-      options.onTabChange("player")
-      return
-    }
-    if (key.name === "6") {
-      options.onTabChange("settings")
-      return
-    }
-
-    // Tab key cycles tabs (Shift+Tab goes backwards)
-    if (key.name === "tab") {
+    // handle cycle current layer
+    if (props.layerDepth() == 0) {
+      let reverse = false;
       if (key.shift) {
-        options.onTabChange(getPrevTab(options.activeTab))
-      } else {
-        options.onTabChange(getNextTab(options.activeTab))
+        reverse = true;
       }
-      return
-    }
-
-    // Forward other actions
-    if (options.onAction) {
-      if (key.ctrl && key.name === "s") {
-        options.onAction("save")
-      } else if (key.ctrl && key.name === "f") {
-        options.onAction("find")
-      } else if (key.name === "?" || (key.shift && key.name === "/")) {
-        options.onAction("help")
+      if (key.name == "tab" || key.name == "down" || key.name == "j") {
       }
     }
-  })
+    // handle cycle depth
+  });
 }
