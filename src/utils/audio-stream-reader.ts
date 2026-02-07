@@ -85,6 +85,9 @@ export class AudioStreamReader {
     const args = [
       "ffmpeg",
       "-loglevel", "quiet",
+      "-reconnect", "1",
+      "-reconnect_streamed", "1",
+      "-reconnect_delay_max", "5",
     ]
 
     // Seek before input for network efficiency
@@ -97,8 +100,7 @@ export class AudioStreamReader {
     // Apply speed via atempo filter if not 1x.
     // ffmpeg atempo only supports 0.5–100.0; chain multiple for extremes.
     if (speed !== 1 && speed > 0) {
-      const atempoFilters = buildAtempoChain(speed)
-      args.push("-af", atempoFilters)
+      args.push("-af", buildAtempoChain(speed))
     }
 
     args.push(

@@ -54,7 +54,21 @@ export interface PlayOptions {
 // ── Utilities ────────────────────────────────────────────────────────
 
 function which(cmd: string): string | null {
-  return Bun.which(cmd)
+  const resolved = Bun.which(cmd)
+  if (resolved) return resolved
+
+  if (platform() === "darwin") {
+    const candidates = [
+      `/opt/homebrew/bin/${cmd}`,
+      `/usr/local/bin/${cmd}`,
+      `/usr/bin/${cmd}`,
+    ]
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) return candidate
+    }
+  }
+
+  return null
 }
 
 function mpvSocketPath(): string {
@@ -345,6 +359,7 @@ class FfplayBackend implements AudioBackend {
   readonly name: BackendName = "ffplay"
   private proc: ReturnType<typeof Bun.spawn> | null = null
   private _playing = false
+  private _paused = false
   private _position = 0
   private _duration = 0
   private _volume = 100
@@ -377,6 +392,10 @@ class FfplayBackend implements AudioBackend {
       args.push("-ss", String(this._position))
     }
 
+    if (this._speed !== 1) {
+      args.push("-af", `atempo=${this._speed}`)
+    }
+
     args.push("-i", this._url)
 
     this.proc = Bun.spawn(args, {
@@ -386,6 +405,7 @@ class FfplayBackend implements AudioBackend {
     })
 
     this._playing = true
+    this._paused = false
     this.startTime = Date.now()
     this.startPolling()
 
@@ -413,10 +433,10 @@ class FfplayBackend implements AudioBackend {
   }
 
   async pause(): Promise<void> {
-    // ffplay doesn't support pause via IPC; kill and remember position
     if (this.proc) {
-      try { this.proc.kill() } catch {}
-      this.proc = null
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      try { if (pid) process.kill(pid, "SIGSTOP") } catch {}
+      this._paused = true
     }
     this._playing = false
     this.stopPolling()
@@ -424,6 +444,15 @@ class FfplayBackend implements AudioBackend {
 
   async resume(): Promise<void> {
     if (!this._url) return
+    if (this.proc && this._paused) {
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      try { if (pid) process.kill(pid, "SIGCONT") } catch {}
+      this._paused = false
+      this._playing = true
+      this.startTime = Date.now()
+      this.startPolling()
+      return
+    }
     this.spawnProcess()
   }
 
@@ -434,6 +463,7 @@ class FfplayBackend implements AudioBackend {
       this.proc = null
     }
     this._playing = false
+    this._paused = false
     this._position = 0
     this._url = ""
   }
@@ -447,6 +477,11 @@ class FfplayBackend implements AudioBackend {
         this.proc = null
       }
       this.spawnProcess()
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      if (this._paused && pid) {
+        try { process.kill(pid, "SIGSTOP") } catch {}
+        this._playing = false
+      }
     }
   }
 
@@ -454,20 +489,36 @@ class FfplayBackend implements AudioBackend {
     this._volume = Math.round(volume * 100)
     // ffplay has no runtime IPC; volume will apply on next play/resume.
     // Restart the process to apply immediately if currently playing.
-    if (this._playing && this._url) {
+    if (this._url && (this._playing || this._paused)) {
       this.stopPolling()
       if (this.proc) {
         try { this.proc.kill() } catch {}
         this.proc = null
       }
       this.spawnProcess()
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      if (this._paused && pid) {
+        try { process.kill(pid, "SIGSTOP") } catch {}
+        this._playing = false
+      }
     }
   }
 
   async setSpeed(speed: number): Promise<void> {
     this._speed = speed
-    // ffplay doesn't support runtime speed changes; no restart possible
-    // since ffplay has no speed CLI flag. Speed only affects position tracking.
+    if (this._url && (this._playing || this._paused)) {
+      this.stopPolling()
+      if (this.proc) {
+        try { this.proc.kill() } catch {}
+        this.proc = null
+      }
+      this.spawnProcess()
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      if (this._paused && pid) {
+        try { process.kill(pid, "SIGSTOP") } catch {}
+        this._playing = false
+      }
+    }
   }
 
   async getPosition(): Promise<number> {
@@ -494,6 +545,7 @@ class AfplayBackend implements AudioBackend {
   readonly name: BackendName = "afplay"
   private proc: ReturnType<typeof Bun.spawn> | null = null
   private _playing = false
+  private _paused = false
   private _position = 0
   private _duration = 0
   private _volume = 1
@@ -534,6 +586,7 @@ class AfplayBackend implements AudioBackend {
     })
 
     this._playing = true
+    this._paused = false
     this.startTime = Date.now()
     this.startPolling()
 
@@ -562,8 +615,9 @@ class AfplayBackend implements AudioBackend {
 
   async pause(): Promise<void> {
     if (this.proc) {
-      try { this.proc.kill() } catch {}
-      this.proc = null
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      try { if (pid) process.kill(pid, "SIGSTOP") } catch {}
+      this._paused = true
     }
     this._playing = false
     this.stopPolling()
@@ -571,6 +625,15 @@ class AfplayBackend implements AudioBackend {
 
   async resume(): Promise<void> {
     if (!this._url) return
+    if (this.proc && this._paused) {
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      try { if (pid) process.kill(pid, "SIGCONT") } catch {}
+      this._paused = false
+      this._playing = true
+      this.startTime = Date.now()
+      this.startPolling()
+      return
+    }
     this.spawnProcess()
   }
 
@@ -581,6 +644,7 @@ class AfplayBackend implements AudioBackend {
       this.proc = null
     }
     this._playing = false
+    this._paused = false
     this._position = 0
     this._url = ""
   }
@@ -593,32 +657,47 @@ class AfplayBackend implements AudioBackend {
         this.proc = null
       }
       this.spawnProcess()
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      if (this._paused && pid) {
+        try { process.kill(pid, "SIGSTOP") } catch {}
+        this._playing = false
+      }
     }
   }
 
   async setVolume(volume: number): Promise<void> {
     this._volume = volume
     // Restart the process with new volume to apply immediately
-    if (this._playing && this._url) {
+    if (this._url && (this._playing || this._paused)) {
       this.stopPolling()
       if (this.proc) {
         try { this.proc.kill() } catch {}
         this.proc = null
       }
       this.spawnProcess()
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      if (this._paused && pid) {
+        try { process.kill(pid, "SIGSTOP") } catch {}
+        this._playing = false
+      }
     }
   }
 
   async setSpeed(speed: number): Promise<void> {
     this._speed = speed
     // Restart the process with new rate to apply immediately
-    if (this._playing && this._url) {
+    if (this._url && (this._playing || this._paused)) {
       this.stopPolling()
       if (this.proc) {
         try { this.proc.kill() } catch {}
         this.proc = null
       }
       this.spawnProcess()
+      const pid = (this.proc as unknown as { pid?: number } | null)?.pid
+      if (this._paused && pid) {
+        try { process.kill(pid, "SIGSTOP") } catch {}
+        this._playing = false
+      }
     }
   }
 
