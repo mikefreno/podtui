@@ -18,7 +18,7 @@ export const tabs: TabDefinition[] = [
 export function TabNavigation(props: TabNavigationProps) {
   const { theme } = useTheme();
   return (
-    <box style={{ flexDirection: "row", gap: 1 }}>
+    <box style={{ flexDirection: "column", gap: 1, width: 20 }}>
       <For each={tabs}>
         {(tab) => (
           <box
@@ -27,6 +27,7 @@ export function TabNavigation(props: TabNavigationProps) {
             onMouseDown={() => props.onTabSelect(tab.id)}
             style={{
               padding: 1,
+              paddingLeft: 2,
               backgroundColor:
                 tab.id == props.activeTab ? theme.primary : "transparent",
             }}
