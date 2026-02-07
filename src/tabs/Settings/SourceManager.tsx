@@ -62,7 +62,6 @@ export function SourceManager(props: SourceManagerProps) {
         setSelectedIndex((i) => Math.min(sources().length - 1, i + 1));
       } else if (
         key.name === "return" ||
-        key.name === "enter" ||
         key.name === "space"
       ) {
         const source = sources()[selectedIndex()];
@@ -98,7 +97,6 @@ export function SourceManager(props: SourceManagerProps) {
 
     if (focusArea() === "explicit") {
       if (
-        key.name === "enter" ||
         key.name === "return" ||
         key.name === "space"
       ) {
@@ -113,7 +111,6 @@ export function SourceManager(props: SourceManagerProps) {
 
     if (focusArea() === "language") {
       if (
-        key.name === "enter" ||
         key.name === "return" ||
         key.name === "space"
       ) {

@@ -29,7 +29,7 @@ export function SyncProfile(props: SyncProfileProps) {
         ? (currentIndex - 1 + fields.length) % fields.length
         : (currentIndex + 1) % fields.length;
       setFocusField(fields[nextIndex]);
-    } else if (key.name === "return" || key.name === "enter") {
+    } else if (key.name === "return") {
       if (focusField() === "sync" && props.onManageSync) {
         props.onManageSync();
       } else if (focusField() === "logout" && props.onLogout) {

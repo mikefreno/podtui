@@ -50,7 +50,7 @@ export function FeedPage(props: FeedPageProps) {
       setSelectedIndex((i) => Math.min(episodes.length - 1, i + 1));
     } else if (key.name === "up" || key.name === "k") {
       setSelectedIndex((i) => Math.max(0, i - 1));
-    } else if (key.name === "return" || key.name === "enter") {
+    } else if (key.name === "return") {
       const item = episodes[selectedIndex()];
       if (item) props.onPlayEpisode?.(item.episode, item.feed);
     } else if (key.name === "home" || key.name === "g") {

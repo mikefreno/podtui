@@ -1,7 +1,7 @@
 import { createSignal, createMemo, ErrorBoundary } from "solid-js";
 import { useSelectionHandler } from "@opentui/solid";
 import { Layout } from "./Layout";
-import { TabNavigation } from "./components/TabNavigation";
+import { TabId, TabNavigation } from "./components/TabNavigation";
 import { FeedPage } from "@/tabs/Feed/FeedPage";
 import { MyShowsPage } from "@/tabs/MyShows/MyShowsPage";
 import { LoginScreen } from "@/tabs/Settings/LoginScreen";
@@ -21,7 +21,6 @@ import { useAppKeyboard } from "@/hooks/useAppKeyboard";
 import { Clipboard } from "@/utils/clipboard";
 import { useToast } from "@/ui/toast";
 import { useRenderer } from "@opentui/solid";
-import type { TabId } from "@/components/Tab";
 import type { AuthScreen } from "@/types/auth";
 import type { Episode } from "@/types/episode";
 

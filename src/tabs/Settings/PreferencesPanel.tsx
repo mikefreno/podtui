@@ -46,7 +46,7 @@ export function PreferencesPanel() {
     if (key.name === "right" || key.name === "l") {
       stepValue(1);
     }
-    if (key.name === "space" || key.name === "return" || key.name === "enter") {
+    if (key.name === "space" || key.name === "return") {
       toggleValue();
     }
   };

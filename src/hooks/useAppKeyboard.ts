@@ -4,10 +4,17 @@
  */
 
 import { useKeyboard, useRenderer } from "@opentui/solid"
-import type { TabId } from "../components/Tab"
 import type { Accessor } from "solid-js"
 
 const TAB_ORDER: TabId[] = ["feed", "shows", "discover", "search", "player", "settings"]
+
+type TabId =
+  | "feed"
+  | "shows"
+  | "discover"
+  | "search"
+  | "player"
+  | "settings"
 
 type ShortcutOptions = {
   activeTab: TabId
@@ -53,8 +60,9 @@ export function useAppKeyboard(options: ShortcutOptions) {
       return
     }
 
+    // Return key cycles tabs (equivalent to Tab)
     if (key.name === "return") {
-      options.onAction?.("enter")
+      options.onTabChange(getNextTab(options.activeTab))
       return
     }
 

@@ -37,7 +37,7 @@ export function FeedList(props: FeedListProps) {
       setSelectedIndex((i) => Math.max(0, i - 1));
     } else if (key.name === "down" || key.name === "j") {
       setSelectedIndex((i) => Math.min(feeds.length - 1, i + 1));
-    } else if (key.name === "return" || key.name === "enter") {
+    } else if (key.name === "return") {
       const feed = feeds[selectedIndex()];
       if (feed && props.onOpenFeed) {
         props.onOpenFeed(feed);

@@ -38,7 +38,7 @@ export function DiscoverPage(props: DiscoverPageProps) {
     }
 
     if (
-      (key.name === "return" || key.name === "enter") &&
+      key.name === "return" &&
       area === "categories"
     ) {
       setFocusArea("shows");

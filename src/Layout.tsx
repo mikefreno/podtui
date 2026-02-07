@@ -47,26 +47,13 @@ export function Layout(props: LayoutProps) {
 
   return (
     <box
-      flexDirection="column"
+      flexDirection="row"
       width="100%"
       height="100%"
       backgroundColor={theme.surface}
     >
-      {/* Header - tab bar */}
-      <Show when={props.header}>
-        <box
-          style={{
-            height: 3,
-            backgroundColor: theme.surface ?? theme.backgroundPanel,
-          }}
-        >
-          <box style={{ paddingLeft: 1, paddingTop: 0, paddingBottom: 0 }}>
-            {props.header}
-          </box>
-        </box>
-      </Show>
+      {props.header}
 
-      {/* Main content: side-by-side panels */}
       <box flexDirection="row" style={{ flexGrow: 1 }}>
         <For each={props.panels}>
           {(panel, index) => (

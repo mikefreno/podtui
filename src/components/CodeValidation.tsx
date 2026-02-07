@@ -72,7 +72,7 @@ export function CodeValidation(props: CodeValidationProps) {
         ? (currentIndex - 1 + fields.length) % fields.length
         : (currentIndex + 1) % fields.length;
       setFocusField(fields[nextIndex]);
-    } else if (key.name === "return" || key.name === "enter") {
+    } else if (key.name === "return" || key.name === "tab") {
       if (focusField() === "submit") {
         handleSubmit();
       } else if (focusField() === "back" && props.onBack) {

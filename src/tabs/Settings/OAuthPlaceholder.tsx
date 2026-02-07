@@ -26,7 +26,7 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
         ? (currentIndex - 1 + fields.length) % fields.length
         : (currentIndex + 1) % fields.length;
       setFocusField(fields[nextIndex]);
-    } else if (key.name === "return" || key.name === "enter") {
+    } else if (key.name === "return") {
       if (focusField() === "code" && props.onNavigateToCode) {
         props.onNavigateToCode();
       } else if (focusField() === "back" && props.onBack) {

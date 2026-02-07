@@ -71,7 +71,7 @@ export function LoginScreen(props: LoginScreenProps) {
         ? (currentIndex - 1 + fields.length) % fields.length
         : (currentIndex + 1) % fields.length;
       setFocusField(fields[nextIndex]);
-    } else if (key.name === "return" || key.name === "enter") {
+    } else if (key.name === "return") {
       if (focusField() === "submit") {
         handleSubmit();
       } else if (focusField() === "code" && props.onNavigateToCode) {

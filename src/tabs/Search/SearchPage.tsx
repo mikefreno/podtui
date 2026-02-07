@@ -63,7 +63,7 @@ export function SearchPage(props: SearchPageProps) {
     const area = focusArea();
 
     // Enter to search from input
-    if ((key.name === "return" || key.name === "enter") && area === "input") {
+    if (key.name === "return" && area === "input") {
       handleSearch();
       return;
     }
