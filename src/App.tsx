@@ -1,15 +1,9 @@
 import { createSignal, createMemo, ErrorBoundary, Accessor } from "solid-js";
 import { useSelectionHandler } from "@opentui/solid";
 import { TabNavigation } from "./components/TabNavigation";
-import { FeedPage } from "@/tabs/Feed/FeedPage";
-import { MyShowsPage } from "@/tabs/MyShows/MyShowsPage";
-import { LoginScreen } from "@/tabs/Settings/LoginScreen";
+
 import { CodeValidation } from "@/components/CodeValidation";
-import { OAuthPlaceholder } from "@/tabs/Settings/OAuthPlaceholder";
-import { SyncProfile } from "@/tabs/Settings/SyncProfile";
-import { SearchPage } from "@/tabs/Search/SearchPage";
-import { DiscoverPage } from "@/tabs/Discover/DiscoverPage";
-import { SettingsScreen } from "@/tabs/Settings/SettingsScreen";
+
 import { useAuthStore } from "@/stores/auth";
 import { useFeedStore } from "@/stores/feed";
 import { useAudio } from "@/hooks/useAudio";
@@ -21,8 +15,7 @@ import { useToast } from "@/ui/toast";
 import { useRenderer } from "@opentui/solid";
 import type { AuthScreen } from "@/types/auth";
 import type { Episode } from "@/types/episode";
-import { DIRECTION } from "./types/navigation";
-import { LayerGraph, TABS } from "./utils/navigation";
+import { DIRECTION, LayerGraph, TABS } from "./utils/navigation";
 import { useTheme } from "./context/ThemeContext";
 
 export interface PageProps {
@@ -119,6 +112,7 @@ export function App() {
       >
         <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
         {LayerGraph[activeTab()]({ depth: activeDepth })}
+        {/**TODO: Contextual controls based on tab/depth**/}
       </box>
     </ErrorBoundary>
   );

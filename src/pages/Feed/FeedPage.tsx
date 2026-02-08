@@ -11,6 +11,9 @@ import type { Feed } from "@/types/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { PageProps } from "@/App";
 
+enum FeedPaneType {
+  FEED = 1,
+}
 export const FeedPaneCount = 1;
 
 export function FeedPage(props: PageProps) {
@@ -60,7 +63,7 @@ export function FeedPage(props: PageProps) {
         }
       >
         {/**TODO: figure out wtf to do here **/}
-        <scrollbox height="100%" focused={true}>
+        <scrollbox height="100%" focused={props.depth() == FeedPaneType.FEED}>
           <For each={allEpisodes()}>
             {(item, index) => (
               <box

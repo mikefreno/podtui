@@ -1,9 +1,15 @@
+import { PageProps } from "@/App";
 import { PlaybackControls } from "./PlaybackControls";
 import { RealtimeWaveform } from "./RealtimeWaveform";
 import { useAudio } from "@/hooks/useAudio";
 import { useAppStore } from "@/stores/app";
 
-export function PlayerPage() {
+enum PlayerPaneType {
+  PLAYER = 1,
+}
+export const PlayerPaneCount = 1;
+
+export function PlayerPage(props: PageProps) {
   const audio = useAudio();
 
   const progressPercent = () => {
@@ -63,11 +69,6 @@ export function PlayerPage() {
         onSpeedChange={(s: number) => audio.setSpeed(s)}
         onVolumeChange={(v: number) => audio.setVolume(v)}
       />
-
-      <text fg="gray">
-        Space play/pause | Left/Right seek 10s | Up/Down volume | S speed | Esc
-        back
-      </text>
     </box>
   );
 }

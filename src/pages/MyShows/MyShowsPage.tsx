@@ -15,16 +15,15 @@ import type { Feed } from "@/types/feed";
 import { PageProps } from "@/App";
 
 enum MyShowsPaneType {
-  SHOWS,
-  EPISODES,
+  SHOWS = 1,
+  EPISODES = 2,
 }
 
-export const MyShowsPaneCount = 2
+export const MyShowsPaneCount = 2;
 
 export function MyShowsPage(props: PageProps) {
   const feedStore = useFeedStore();
   const downloadStore = useDownloadStore();
-  const [focusPane, setFocusPane] = createSignal<>("shows");
   const [showIndex, setShowIndex] = createSignal(0);
   const [episodeIndex, setEpisodeIndex] = createSignal(0);
   const [isRefreshing, setIsRefreshing] = createSignal(false);
@@ -128,8 +127,8 @@ export function MyShowsPage(props: PageProps) {
     setEpisodeIndex(0);
   };
 
-  return {
-    showsPanel: () => (
+  return (
+    <box flexDirection="row" flexGrow={1}>
       <box flexDirection="column" height="100%">
         <Show when={isRefreshing()}>
           <text fg="yellow">Refreshing...</text>
@@ -144,7 +143,10 @@ export function MyShowsPage(props: PageProps) {
             </box>
           }
         >
-          <scrollbox height="100%" focused={props.depth}>
+          <scrollbox
+            height="100%"
+            focused={props.depth() == MyShowsPaneType.SHOWS}
+          >
             <For each={shows()}>
               {(feed, index) => (
                 <box
@@ -171,9 +173,6 @@ export function MyShowsPage(props: PageProps) {
           </scrollbox>
         </Show>
       </box>
-    ),
-
-    episodesPanel: () => (
       <box flexDirection="column" height="100%">
         <Show
           when={selectedShow()}
@@ -193,7 +192,7 @@ export function MyShowsPage(props: PageProps) {
           >
             <scrollbox
               height="100%"
-              focused={props.focused && focusPane() === "episodes"}
+              focused={props.depth() == MyShowsPaneType.EPISODES}
             >
               <For each={episodes()}>
                 {(episode, index) => (
@@ -252,9 +251,6 @@ export function MyShowsPage(props: PageProps) {
           </Show>
         </Show>
       </box>
-    ),
-
-    focusPane,
-    selectedShow,
-  };
+    </box>
+  );
 }

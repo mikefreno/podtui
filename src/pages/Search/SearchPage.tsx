@@ -8,35 +8,35 @@ import { useSearchStore } from "@/stores/search";
 import { SearchResults } from "./SearchResults";
 import { SearchHistory } from "./SearchHistory";
 import type { SearchResult } from "@/types/source";
+import { PageProps } from "@/App";
+import { MyShowsPage } from "../MyShows/MyShowsPage";
 
-type SearchPageProps = {
-  focused: boolean;
-  onSubscribe?: (result: SearchResult) => void;
-  onInputFocusChange?: (focused: boolean) => void;
-  onExit?: () => void;
-};
+enum SearchPaneType {
+  INPUT = 1,
+  RESULTS = 2,
+  HISTORY = 3,
+}
+export const SearchPaneCount = 3;
 
-type FocusArea = "input" | "results" | "history";
-
-export function SearchPage(props: SearchPageProps) {
+export function SearchPage(props: PageProps) {
   const searchStore = useSearchStore();
-  const [focusArea, setFocusArea] = createSignal<FocusArea>("input");
   const [inputValue, setInputValue] = createSignal("");
   const [resultIndex, setResultIndex] = createSignal(0);
   const [historyIndex, setHistoryIndex] = createSignal(0);
 
   // Keep parent informed about input focus state
-  createEffect(() => {
-    const isInputFocused = props.focused && focusArea() === "input";
-    props.onInputFocusChange?.(isInputFocused);
-  });
+  // TODO: have a global input focused prop in useKeyboard hook
+  //createEffect(() => {
+  //const isInputFocused = props.focused && focusArea() === "input";
+  //props.onInputFocusChange?.(isInputFocused);
+  //});
 
   const handleSearch = async () => {
     const query = inputValue().trim();
     if (query) {
       await searchStore.search(query);
       if (searchStore.results().length > 0) {
-        setFocusArea("results");
+        //setFocusArea("results"); //TODO: move level
         setResultIndex(0);
       }
     }
@@ -46,119 +46,15 @@ export function SearchPage(props: SearchPageProps) {
     setInputValue(query);
     await searchStore.search(query);
     if (searchStore.results().length > 0) {
-      setFocusArea("results");
+      //setFocusArea("results"); //TODO: move level
       setResultIndex(0);
     }
   };
 
   const handleResultSelect = (result: SearchResult) => {
-    props.onSubscribe?.(result);
+    //props.onSubscribe?.(result);
     searchStore.markSubscribed(result.podcast.id);
   };
-
-  // Keyboard navigation
-  useKeyboard((key) => {
-    if (!props.focused) return;
-
-    const area = focusArea();
-
-    // Enter to search from input
-    if (key.name === "return" && area === "input") {
-      handleSearch();
-      return;
-    }
-
-    // Tab to cycle focus areas
-    if (key.name === "tab" && !key.shift) {
-      if (area === "input") {
-        if (searchStore.results().length > 0) {
-          setFocusArea("results");
-        } else if (searchStore.history().length > 0) {
-          setFocusArea("history");
-        }
-      } else if (area === "results") {
-        if (searchStore.history().length > 0) {
-          setFocusArea("history");
-        } else {
-          setFocusArea("input");
-        }
-      } else {
-        setFocusArea("input");
-      }
-      return;
-    }
-
-    if (key.name === "tab" && key.shift) {
-      if (area === "input") {
-        if (searchStore.history().length > 0) {
-          setFocusArea("history");
-        } else if (searchStore.results().length > 0) {
-          setFocusArea("results");
-        }
-      } else if (area === "history") {
-        if (searchStore.results().length > 0) {
-          setFocusArea("results");
-        } else {
-          setFocusArea("input");
-        }
-      } else {
-        setFocusArea("input");
-      }
-      return;
-    }
-
-    // Up/Down for results and history
-    if (area === "results") {
-      const results = searchStore.results();
-      if (key.name === "down" || key.name === "j") {
-        setResultIndex((i) => Math.min(i + 1, results.length - 1));
-        return;
-      }
-      if (key.name === "up" || key.name === "k") {
-        setResultIndex((i) => Math.max(i - 1, 0));
-        return;
-      }
-      if (key.name === "return" || key.name === "enter") {
-        const result = results[resultIndex()];
-        if (result) handleResultSelect(result);
-        return;
-      }
-    }
-
-    if (area === "history") {
-      const history = searchStore.history();
-      if (key.name === "down" || key.name === "j") {
-        setHistoryIndex((i) => Math.min(i + 1, history.length - 1));
-        return;
-      }
-      if (key.name === "up" || key.name === "k") {
-        setHistoryIndex((i) => Math.max(i - 1, 0));
-        return;
-      }
-      if (key.name === "return" || key.name === "enter") {
-        const query = history[historyIndex()];
-        if (query) handleHistorySelect(query);
-        return;
-      }
-    }
-
-    // Escape goes back to input or up one level
-    if (key.name === "escape") {
-      if (area === "input") {
-        props.onExit?.();
-      } else {
-        setFocusArea("input");
-        key.stopPropagation();
-      }
-      return;
-    }
-
-    // "/" focuses search input
-    if (key.name === "/" && area !== "input") {
-      setFocusArea("input");
-      return;
-    }
-  });
 
   return (
     <box flexDirection="column" height="100%" gap={1}>
@@ -177,7 +73,7 @@ export function SearchPage(props: SearchPageProps) {
               setInputValue(value);
             }}
             placeholder="Enter podcast name, topic, or author..."
-            focused={props.focused && focusArea() === "input"}
+            focused={props.depth() === SearchPaneType.INPUT}
             width={50}
           />
           <box
@@ -205,7 +101,9 @@ export function SearchPage(props: SearchPageProps) {
         {/* Results Panel */}
         <box flexDirection="column" flexGrow={1} border>
           <box padding={1}>
-            <text fg={focusArea() === "results" ? "cyan" : "gray"}>
+            <text
+              fg={props.depth() === SearchPaneType.RESULTS ? "cyan" : "gray"}
+            >
               Results ({searchStore.results().length})
             </text>
           </box>
@@ -224,7 +122,7 @@ export function SearchPage(props: SearchPageProps) {
             <SearchResults
               results={searchStore.results()}
               selectedIndex={resultIndex()}
-              focused={focusArea() === "results"}
+              focused={props.depth() === SearchPaneType.RESULTS}
               onSelect={handleResultSelect}
               onChange={setResultIndex}
               isSearching={searchStore.isSearching()}
@@ -237,14 +135,16 @@ export function SearchPage(props: SearchPageProps) {
         <box width={30} border>
           <box padding={1} flexDirection="column">
             <box paddingBottom={1}>
-              <text fg={focusArea() === "history" ? "cyan" : "gray"}>
+              <text
+                fg={props.depth() === SearchPaneType.HISTORY ? "cyan" : "gray"}
+              >
                 History
               </text>
             </box>
             <SearchHistory
               history={searchStore.history()}
               selectedIndex={historyIndex()}
-              focused={focusArea() === "history"}
+              focused={props.depth() === SearchPaneType.HISTORY}
               onSelect={handleHistorySelect}
               onRemove={searchStore.removeFromHistory}
               onClear={searchStore.clearHistory}
@@ -252,14 +152,6 @@ export function SearchPage(props: SearchPageProps) {
             />
           </box>
         </box>
-      </box>
-
-      {/* Footer Hints */}
-      <box flexDirection="row" gap={2}>
-        <text fg="gray">[Tab] Switch focus</text>
-        <text fg="gray">[/] Focus search</text>
-        <text fg="gray">[Enter] Select</text>
-        <text fg="gray">[Esc] Up</text>
       </box>
     </box>
   );
