@@ -1,15 +1,12 @@
 import { createSignal, createMemo, ErrorBoundary, Accessor } from "solid-js";
-import { useSelectionHandler } from "@opentui/solid";
+import { useKeyboard, useSelectionHandler } from "@opentui/solid";
 import { TabNavigation } from "./components/TabNavigation";
-
 import { CodeValidation } from "@/components/CodeValidation";
-
 import { useAuthStore } from "@/stores/auth";
 import { useFeedStore } from "@/stores/feed";
 import { useAudio } from "@/hooks/useAudio";
 import { useMultimediaKeys } from "@/hooks/useMultimediaKeys";
 import { FeedVisibility } from "@/types/feed";
-import { useAppKeyboard } from "@/hooks/useAppKeyboard";
 import { Clipboard } from "@/utils/clipboard";
 import { useToast } from "@/ui/toast";
 import { useRenderer } from "@opentui/solid";
@@ -34,6 +31,7 @@ export function App() {
   const audio = useAudio();
   const toast = useToast();
   const renderer = useRenderer();
+  const { theme } = useTheme();
 
   useMultimediaKeys({
     playerFocused: () => activeTab() === TABS.PLAYER && layerDepth() > 0,
@@ -46,35 +44,6 @@ export function App() {
     setActiveTab(TABS.PLAYER);
     setLayerDepth(1);
   };
-
-  useAppKeyboard({
-    layerDepth,
-    onAction: (action, direction) => {
-      if (action == "cycle") {
-        if (direction == DIRECTION.Increment) {
-          //if()
-        }
-        if (direction == DIRECTION.Decrement) {
-        }
-      }
-      if (action == "depth") {
-        if (direction == DIRECTION.Increment) {
-        }
-        if (direction == DIRECTION.Decrement) {
-        }
-      }
-
-      if (action === "escape") {
-        if (layerDepth() > 0) {
-          setLayerDepth(0);
-          setInputFocused(false);
-        } else {
-          setShowAuthPanel(false);
-          setInputFocused(false);
-        }
-      }
-    },
-  });
 
   useSelectionHandler((selection: any) => {
     if (!selection) return;
@@ -91,7 +60,14 @@ export function App() {
       });
   });
 
-  const { theme } = useTheme();
+  //useKeyboard(
+  //(keyEvent) => {
+  ////handle intra layer navigation
+  //if(keyEvent.name == "up" || keyEvent.name)
+  //},
+  //{ release: false }, // Not strictly necessary
+  //);
+
   return (
     <ErrorBoundary
       fallback={(err) => (

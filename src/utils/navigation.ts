@@ -11,13 +11,14 @@ export enum DIRECTION {
 }
 
 export enum TABS {
-  FEED,
-  MYSHOWS,
-  DISCOVER,
-  SEARCH,
-  PLAYER,
-  SETTINGS,
+  FEED = 1,
+  MYSHOWS = 2,
+  DISCOVER = 3,
+  SEARCH = 4,
+  PLAYER = 5,
+  SETTINGS = 6,
 }
+export const TabsCount = 6;
 
 export const LayerGraph = {
   [TABS.FEED]: FeedPage,
