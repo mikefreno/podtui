@@ -62,7 +62,7 @@ export function SearchPage(props: PageProps) {
     <box flexDirection="column" height="100%" gap={1} width="100%">
       {/* Search Header */}
       <box flexDirection="column" gap={1}>
-        <text>
+        <text fg={theme.text}>
           <strong>Search Podcasts</strong>
         </text>
 
@@ -101,7 +101,7 @@ export function SearchPage(props: PageProps) {
         {/* Main Content - Results or History */}
         <box flexDirection="row" height="100%" gap={2}>
           {/* Results Panel */}
-          <box flexDirection="column" flexGrow={1} border>
+          <box flexDirection="column" flexGrow={1} border borderColor={theme.border}>
             <box padding={1}>
               <text
                 fg={props.depth() === SearchPaneType.RESULTS ? theme.primary : theme.muted}
@@ -134,7 +134,7 @@ export function SearchPage(props: PageProps) {
         </box>
 
         {/* History Sidebar */}
-        <box width={30} border>
+        <box width={30} border borderColor={theme.border}>
           <box padding={1} flexDirection="column">
             <box paddingBottom={1}>
               <text

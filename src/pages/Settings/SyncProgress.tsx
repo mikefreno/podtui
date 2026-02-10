@@ -1,8 +1,11 @@
+import { useTheme } from "@/context/ThemeContext"
+
 type SyncProgressProps = {
   value: number
 }
 
 export function SyncProgress(props: SyncProgressProps) {
+  const { theme } = useTheme();
   const width = 30
   let filled = (props.value / 100) * width
   filled = filled >= 0 ? filled : 0
@@ -18,8 +21,8 @@ export function SyncProgress(props: SyncProgressProps) {
 
   return (
     <box style={{ flexDirection: "column" }}>
-      <text>{bar}</text>
-      <text>{props.value}%</text>
+      <text fg={theme.text}>{bar}</text>
+      <text fg={theme.text}>{props.value}%</text>
     </box>
   )
 }

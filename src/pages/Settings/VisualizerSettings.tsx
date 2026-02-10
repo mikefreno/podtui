@@ -99,7 +99,7 @@ export function VisualizerSettings() {
           <text fg={focusField() === "bars" ? theme.primary : theme.textMuted}>
             Bars:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text fg={theme.text}>{viz().bars}</text>
           </box>
           <text fg={theme.textMuted}>[Left/Right +/-8]</text>
@@ -113,7 +113,7 @@ export function VisualizerSettings() {
           >
             Auto Sensitivity:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text
               fg={viz().sensitivity === 1 ? theme.success : theme.textMuted}
             >
@@ -127,7 +127,7 @@ export function VisualizerSettings() {
           <text fg={focusField() === "noise" ? theme.primary : theme.textMuted}>
             Noise Reduction:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text fg={theme.text}>{viz().noiseReduction.toFixed(2)}</text>
           </box>
           <text fg={theme.textMuted}>[Left/Right +/-0.05]</text>
@@ -139,7 +139,7 @@ export function VisualizerSettings() {
           >
             Low Cutoff:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text fg={theme.text}>{viz().lowCutOff} Hz</text>
           </box>
           <text fg={theme.textMuted}>[Left/Right +/-10]</text>
@@ -151,7 +151,7 @@ export function VisualizerSettings() {
           >
             High Cutoff:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text fg={theme.text}>{viz().highCutOff} Hz</text>
           </box>
           <text fg={theme.textMuted}>[Left/Right +/-500]</text>

@@ -15,6 +15,7 @@ import {
 } from "@/utils/cavacore";
 import { AudioStreamReader } from "@/utils/audio-stream-reader";
 import { useAudio } from "@/hooks/useAudio";
+import { useTheme } from "@/context/ThemeContext";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ const SAMPLES_PER_FRAME = 512;
 // ── Component ────────────────────────────────────────────────────────
 
 export function RealtimeWaveform(props: RealtimeWaveformProps) {
+  const { theme } = useTheme();
   const audio = useAudio();
 
   // Frequency bar values (0.0–1.0 per bar)
@@ -247,7 +249,7 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
   };
 
   return (
-    <box border padding={1} onMouseDown={handleClick}>
+    <box border borderColor={theme.border} padding={1} onMouseDown={handleClick}>
       {renderLine()}
     </box>
   );

@@ -166,12 +166,12 @@ export function SourceManager(props: SourceManagerProps) {
   const sourceLanguage = () => selectedSource()?.language || "en_us";
 
   return (
-    <box flexDirection="column" border padding={1} gap={1}>
+    <box flexDirection="column" border borderColor={theme.border} padding={1} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
-        <text>
+        <text fg={theme.text}>
           <strong>Podcast Sources</strong>
         </text>
-        <box border padding={0} onMouseDown={props.onClose}>
+        <box border borderColor={theme.border} padding={0} onMouseDown={props.onClose}>
           <text fg={theme.primary}>[Esc] Close</text>
         </box>
       </box>
@@ -179,7 +179,7 @@ export function SourceManager(props: SourceManagerProps) {
       <text fg={theme.textMuted}>Manage where to search for podcasts</text>
 
       {/* Source list */}
-      <box border padding={1} flexDirection="column" gap={1}>
+      <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
         <text fg={focusArea() === "list" ? theme.primary : theme.textMuted}>
           Sources:
         </text>
@@ -243,6 +243,7 @@ export function SourceManager(props: SourceManagerProps) {
           <box flexDirection="row" gap={2}>
             <box
               border
+              borderColor={theme.border}
               padding={0}
               backgroundColor={
                 focusArea() === "country" ? theme.primary : undefined
@@ -256,6 +257,7 @@ export function SourceManager(props: SourceManagerProps) {
             </box>
             <box
               border
+              borderColor={theme.border}
               padding={0}
               backgroundColor={
                 focusArea() === "language" ? theme.primary : undefined
@@ -272,6 +274,7 @@ export function SourceManager(props: SourceManagerProps) {
             </box>
             <box
               border
+              borderColor={theme.border}
               padding={0}
               backgroundColor={
                 focusArea() === "explicit" ? theme.primary : undefined
@@ -293,7 +296,7 @@ export function SourceManager(props: SourceManagerProps) {
       </box>
 
       {/* Add new source form */}
-      <box border padding={1} flexDirection="column" gap={1}>
+      <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
         <text
           fg={
             focusArea() === "add" || focusArea() === "url"
@@ -329,7 +332,7 @@ export function SourceManager(props: SourceManagerProps) {
           />
         </box>
 
-        <box border padding={0} width={15} onMouseDown={handleAddSource}>
+        <box border borderColor={theme.border} padding={0} width={15} onMouseDown={handleAddSource}>
           <text fg={theme.success}>[+] Add Source</text>
         </box>
       </box>

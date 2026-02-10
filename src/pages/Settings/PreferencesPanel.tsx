@@ -94,7 +94,7 @@ export function PreferencesPanel() {
           <text fg={focusField() === "theme" ? theme.primary : theme.textMuted}>
             Theme:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text fg={theme.text}>
               {THEME_LABELS.find((t) => t.value === settings().theme)?.label}
             </text>
@@ -106,7 +106,7 @@ export function PreferencesPanel() {
           <text fg={focusField() === "font" ? theme.primary : theme.textMuted}>
             Font Size:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text fg={theme.text}>{settings().fontSize}px</text>
           </box>
           <text fg={theme.textMuted}>[Left/Right]</text>
@@ -116,7 +116,7 @@ export function PreferencesPanel() {
           <text fg={focusField() === "speed" ? theme.primary : theme.textMuted}>
             Playback:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text fg={theme.text}>{settings().playbackSpeed}x</text>
           </box>
           <text fg={theme.textMuted}>[Left/Right]</text>
@@ -128,7 +128,7 @@ export function PreferencesPanel() {
           >
             Show Explicit:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text
               fg={preferences().showExplicit ? theme.success : theme.textMuted}
             >
@@ -142,7 +142,7 @@ export function PreferencesPanel() {
           <text fg={focusField() === "auto" ? theme.primary : theme.textMuted}>
             Auto Download:
           </text>
-          <box border padding={0}>
+          <box border borderColor={theme.border} padding={0}>
             <text
               fg={preferences().autoDownload ? theme.success : theme.textMuted}
             >

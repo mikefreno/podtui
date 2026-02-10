@@ -8,18 +8,20 @@ const createSignal = <T,>(value: T): [() => T, (next: T) => void] => {
 import { ImportDialog } from "./ImportDialog"
 import { ExportDialog } from "./ExportDialog"
 import { SyncStatus } from "./SyncStatus"
+import { useTheme } from "@/context/ThemeContext"
 
 export function SyncPanel() {
+  const { theme } = useTheme();
   const mode = createSignal<"import" | "export" | null>(null)
 
   return (
     <box style={{ flexDirection: "column", gap: 1 }}>
       <box style={{ flexDirection: "row", gap: 1 }}>
-        <box border onMouseDown={() => mode[1]("import")}>
-          <text>Import</text>
+        <box border borderColor={theme.border} onMouseDown={() => mode[1]("import")}>
+          <text fg={theme.text}>Import</text>
         </box>
-        <box border onMouseDown={() => mode[1]("export")}>
-          <text>Export</text>
+        <box border borderColor={theme.border} onMouseDown={() => mode[1]("export")}>
+          <text fg={theme.text}>Export</text>
         </box>
       </box>
       <SyncStatus />

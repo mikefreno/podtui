@@ -83,8 +83,8 @@ export function LoginScreen(props: LoginScreenProps) {
   };
 
   return (
-    <box flexDirection="column" border padding={2} gap={1}>
-      <text>
+    <box flexDirection="column" border borderColor={theme.border} padding={2} gap={1}>
+      <text fg={theme.text}>
         <strong>Sign In</strong>
       </text>
 
@@ -92,7 +92,7 @@ export function LoginScreen(props: LoginScreenProps) {
 
       {/* Email field */}
       <box flexDirection="column" gap={0}>
-        <text fg={focusField() === "email" ? theme.primary : undefined}>
+        <text fg={focusField() === "email" ? theme.primary : theme.textMuted}>
           Email:
         </text>
         <input
@@ -107,7 +107,7 @@ export function LoginScreen(props: LoginScreenProps) {
 
       {/* Password field */}
       <box flexDirection="column" gap={0}>
-        <text fg={focusField() === "password" ? theme.primary : undefined}>
+        <text fg={focusField() === "password" ? theme.primary : theme.textMuted}>
           Password:
         </text>
         <input
@@ -126,6 +126,7 @@ export function LoginScreen(props: LoginScreenProps) {
       <box flexDirection="row" gap={2}>
         <box
           border
+          borderColor={theme.border}
           padding={1}
           backgroundColor={
             focusField() === "submit" ? theme.primary : undefined
@@ -148,6 +149,7 @@ export function LoginScreen(props: LoginScreenProps) {
       <box flexDirection="row" gap={2}>
         <box
           border
+          borderColor={theme.border}
           padding={1}
           backgroundColor={focusField() === "code" ? theme.primary : undefined}
         >
@@ -158,6 +160,7 @@ export function LoginScreen(props: LoginScreenProps) {
 
         <box
           border
+          borderColor={theme.border}
           padding={1}
           backgroundColor={focusField() === "oauth" ? theme.primary : undefined}
         >

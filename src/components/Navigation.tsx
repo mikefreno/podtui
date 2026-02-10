@@ -1,4 +1,5 @@
 import type { TabId } from "./Tab"
+import { useTheme } from "@/context/ThemeContext"
 
 type NavigationProps = {
   activeTab: TabId
@@ -6,9 +7,10 @@ type NavigationProps = {
 }
 
 export function Navigation(props: NavigationProps) {
+  const { theme } = useTheme();
   return (
     <box style={{ flexDirection: "row", width: "100%", height: 1 }}>
-      <text>
+      <text fg={theme.text}>
         {props.activeTab === "feed" ? "[" : " "}Feed{props.activeTab === "feed" ? "]" : " "}
         <span> </span>
         {props.activeTab === "shows" ? "[" : " "}My Shows{props.activeTab === "shows" ? "]" : " "}

@@ -129,10 +129,10 @@ export function FeedDetail(props: FeedDetailProps) {
 
       {/* Episodes header */}
       <box flexDirection="row" justifyContent="space-between">
-        <text>
+        <text fg={theme.text}>
           <strong>Episodes</strong>
         </text>
-        <text fg="gray">({episodes().length} total)</text>
+        <text fg={theme.textMuted}>({episodes().length} total)</text>
       </box>
 
       {/* Episode list */}

@@ -37,6 +37,7 @@ export function SettingsPage(props: PageProps) {
           {(section, index) => (
             <box
               border
+              borderColor={theme.border}
               padding={0}
               backgroundColor={
                 activeSection() === section.id ? theme.primary : undefined
@@ -55,7 +56,7 @@ export function SettingsPage(props: PageProps) {
         </For>
       </box>
 
-      <box border flexGrow={1} padding={1} flexDirection="column" gap={1}>
+      <box border borderColor={theme.border} flexGrow={1} padding={1} flexDirection="column" gap={1}>
         {activeSection() === SettingsPaneType.SYNC && <SyncPanel />}
         {activeSection() === SettingsPaneType.SOURCES && (
           <SourceManager focused />

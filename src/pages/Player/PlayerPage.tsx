@@ -29,7 +29,7 @@ export function PlayerPage(props: PageProps) {
   return (
     <box flexDirection="column" gap={1} width="100%">
       <box flexDirection="row" justifyContent="space-between">
-        <text>
+        <text fg={theme.text}>
           <strong>Now Playing</strong>
         </text>
         <text fg={theme.muted}>
@@ -40,7 +40,7 @@ export function PlayerPage(props: PageProps) {
 
       {audio.error() && <text fg={theme.error}>{audio.error()}</text>}
 
-      <box border padding={1} flexDirection="column" gap={1}>
+      <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
         <text fg={theme.text}>
           <strong>{audio.currentEpisode()?.title}</strong>
         </text>

@@ -7,10 +7,12 @@ const createSignal = <T,>(value: T): [() => T, (next: T) => void] => {
 
 import { SyncProgress } from "./SyncProgress"
 import { SyncError } from "./SyncError"
+import { useTheme } from "@/context/ThemeContext"
 
 type SyncState = "idle" | "syncing" | "complete" | "error"
 
 export function SyncStatus() {
+  const { theme } = useTheme();
   const state = createSignal<SyncState>("idle")
   const message = createSignal("Idle")
   const progress = createSignal(0)
@@ -35,15 +37,15 @@ export function SyncStatus() {
   }
 
   return (
-    <box border title="Sync Status" style={{ padding: 1, flexDirection: "column", gap: 1 }}>
+    <box border title="Sync Status" borderColor={theme.border} style={{ padding: 1, flexDirection: "column", gap: 1 }}>
       <box style={{ flexDirection: "row", gap: 1 }}>
-        <text>Status:</text>
-        <text>{message[0]()}</text>
+        <text fg={theme.text}>Status:</text>
+        <text fg={theme.text}>{message[0]()}</text>
       </box>
       <SyncProgress value={progress[0]()} />
       {state[0]() === "error" ? <SyncError message={message[0]()} onRetry={() => toggle()} /> : null}
-      <box border onMouseDown={toggle}>
-        <text>Cycle Status</text>
+      <box border borderColor={theme.border} onMouseDown={toggle}>
+        <text fg={theme.text}>Cycle Status</text>
       </box>
     </box>
   )
