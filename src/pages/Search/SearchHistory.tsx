@@ -3,6 +3,7 @@
  */
 
 import { For, Show } from "solid-js"
+import { useTheme } from "@/context/ThemeContext"
 
 type SearchHistoryProps = {
   history: string[]
@@ -15,6 +16,7 @@ type SearchHistoryProps = {
 }
 
 export function SearchHistory(props: SearchHistoryProps) {
+  const { theme } = useTheme();
   const handleSearchClick = (index: number, query: string) => {
     props.onChange?.(index)
     props.onSelect?.(query)
@@ -27,19 +29,19 @@ export function SearchHistory(props: SearchHistoryProps) {
   return (
     <box flexDirection="column" gap={1}>
       <box flexDirection="row" justifyContent="space-between">
-        <text fg="gray">Recent Searches</text>
-        <Show when={props.history.length > 0}>
-          <box onMouseDown={() => props.onClear?.()} padding={0}>
-            <text fg="red">[Clear All]</text>
-          </box>
-        </Show>
+            <text fg={theme.textMuted}>Recent Searches</text>
+            <Show when={props.history.length > 0}>
+              <box onMouseDown={() => props.onClear?.()} padding={0}>
+                <text fg={theme.error}>[Clear All]</text>
+              </box>
+            </Show>
       </box>
 
       <Show
         when={props.history.length > 0}
         fallback={
           <box padding={1}>
-            <text fg="gray">No recent searches</text>
+            <text fg={theme.textMuted}>No recent searches</text>
           </box>
         }
       >
@@ -56,15 +58,15 @@ export function SearchHistory(props: SearchHistoryProps) {
                     padding={0}
                     paddingLeft={1}
                     paddingRight={1}
-                    backgroundColor={isSelected() ? "#333" : undefined}
+                    backgroundColor={isSelected() ? theme.backgroundElement : undefined}
                     onMouseDown={() => handleSearchClick(index(), query)}
                   >
                     <box flexDirection="row" gap={1}>
-                      <text fg="gray">{">"}</text>
-                      <text fg={isSelected() ? "cyan" : "white"}>{query}</text>
+                      <text fg={theme.textMuted}>{">"}</text>
+                      <text fg={isSelected() ? theme.primary : theme.text}>{query}</text>
                     </box>
                     <box onMouseDown={() => handleRemoveClick(query)} padding={0}>
-                      <text fg="red">[x]</text>
+                      <text fg={theme.error}>[x]</text>
                     </box>
                   </box>
                 )

@@ -270,7 +270,7 @@ function CommandDialog(props: {
   const maxHeight = Math.floor(dimensions().height * 0.6);
 
   return (
-    <box flexDirection="column" padding={1}>
+    <box flexDirection="column" padding={1} borderColor={theme.border}>
       {/* Search input */}
       <box marginBottom={1}>
         <text fg={theme.textMuted}>{"> "}</text>
@@ -278,7 +278,7 @@ function CommandDialog(props: {
       </box>
 
       {/* Command list */}
-      <box flexDirection="column" maxHeight={maxHeight}>
+      <box flexDirection="column" maxHeight={maxHeight} borderColor={theme.border}>
         <For each={filteredOptions().slice(0, 10)}>
           {(option, index) => (
             <box

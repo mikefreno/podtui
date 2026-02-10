@@ -6,6 +6,7 @@
 import { createSignal } from "solid-js";
 import { FeedVisibility, FeedSortField } from "@/types/feed";
 import type { FeedFilter } from "@/types/feed";
+import { useTheme } from "@/context/ThemeContext";
 
 interface FeedFilterProps {
   filter: FeedFilter;
@@ -16,6 +17,7 @@ interface FeedFilterProps {
 type FilterField = "visibility" | "sort" | "pinned" | "search";
 
 export function FeedFilterComponent(props: FeedFilterProps) {
+  const { theme } = useTheme();
   const [focusField, setFocusField] = createSignal<FilterField>("visibility");
   const [searchValue, setSearchValue] = createSignal(
     props.filter.searchQuery || "",
@@ -89,9 +91,9 @@ export function FeedFilterComponent(props: FeedFilterProps) {
 
   const visibilityColor = () => {
     const vis = props.filter.visibility;
-    if (vis === "public") return "green";
-    if (vis === "private") return "yellow";
-    return "white";
+    if (vis === "public") return theme.success;
+    if (vis === "private") return theme.warning;
+    return theme.text;
   };
 
   const sortLabel = () => {
@@ -110,8 +112,8 @@ export function FeedFilterComponent(props: FeedFilterProps) {
   };
 
   return (
-    <box flexDirection="column" border padding={1} gap={1}>
-      <text>
+    <box flexDirection="column" border padding={1} gap={1} borderColor={theme.border}>
+      <text fg={theme.text}>
         <strong>Filter Feeds</strong>
       </text>
 
@@ -120,10 +122,11 @@ export function FeedFilterComponent(props: FeedFilterProps) {
         <box
           border
           padding={0}
-          backgroundColor={focusField() === "visibility" ? "#333" : undefined}
+            backgroundColor={focusField() === "visibility" ? theme.backgroundElement : undefined}
+            borderColor={theme.border}
         >
           <box flexDirection="row" gap={1}>
-            <text fg={focusField() === "visibility" ? "cyan" : "gray"}>
+            <text fg={focusField() === "visibility" ? theme.primary : theme.textMuted}>
               Show:
             </text>
             <text fg={visibilityColor()}>{visibilityLabel()}</text>
@@ -134,11 +137,11 @@ export function FeedFilterComponent(props: FeedFilterProps) {
         <box
           border
           padding={0}
-          backgroundColor={focusField() === "sort" ? "#333" : undefined}
+            backgroundColor={focusField() === "sort" ? theme.backgroundElement : undefined}
         >
           <box flexDirection="row" gap={1}>
-            <text fg={focusField() === "sort" ? "cyan" : "gray"}>Sort:</text>
-            <text fg="white">{sortLabel()}</text>
+            <text fg={focusField() === "sort" ? theme.primary : theme.textMuted}>Sort:</text>
+            <text fg={theme.text}>{sortLabel()}</text>
           </box>
         </box>
 
@@ -146,13 +149,13 @@ export function FeedFilterComponent(props: FeedFilterProps) {
         <box
           border
           padding={0}
-          backgroundColor={focusField() === "pinned" ? "#333" : undefined}
+            backgroundColor={focusField() === "pinned" ? theme.backgroundElement : undefined}
         >
           <box flexDirection="row" gap={1}>
-            <text fg={focusField() === "pinned" ? "cyan" : "gray"}>
+            <text fg={focusField() === "pinned" ? theme.primary : theme.textMuted}>
               Pinned:
             </text>
-            <text fg={props.filter.pinnedOnly ? "yellow" : "gray"}>
+            <text fg={props.filter.pinnedOnly ? theme.warning : theme.textMuted}>
               {props.filter.pinnedOnly ? "Yes" : "No"}
             </text>
           </box>
@@ -161,7 +164,7 @@ export function FeedFilterComponent(props: FeedFilterProps) {
 
       {/* Search box */}
       <box flexDirection="row" gap={1}>
-        <text fg={focusField() === "search" ? "cyan" : "gray"}>Search:</text>
+            <text fg={focusField() === "search" ? theme.primary : theme.textMuted}>Search:</text>
         <input
           value={searchValue()}
           onInput={handleSearchInput}
@@ -171,7 +174,7 @@ export function FeedFilterComponent(props: FeedFilterProps) {
         />
       </box>
 
-      <text fg="gray">Tab to navigate, Enter/Space to toggle</text>
+      <text fg={theme.textMuted}>Tab to navigate, Enter/Space to toggle</text>
     </box>
   );
 }

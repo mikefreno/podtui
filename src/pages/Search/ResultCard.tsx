@@ -1,6 +1,7 @@
 import { Show } from "solid-js";
 import type { SearchResult } from "@/types/source";
 import { SourceBadge } from "./SourceBadge";
+import { useTheme } from "@/context/ThemeContext";
 
 type ResultCardProps = {
   result: SearchResult;
@@ -10,6 +11,7 @@ type ResultCardProps = {
 };
 
 export function ResultCard(props: ResultCardProps) {
+  const { theme } = useTheme();
   const podcast = () => props.result.podcast;
 
   return (
@@ -17,8 +19,8 @@ export function ResultCard(props: ResultCardProps) {
       flexDirection="column"
       padding={1}
       border={props.selected}
-      borderColor={props.selected ? "cyan" : undefined}
-      backgroundColor={props.selected ? "#222" : undefined}
+      borderColor={props.selected ? theme.primary : undefined}
+      backgroundColor={props.selected ? theme.backgroundElement : undefined}
       onMouseDown={props.onSelect}
     >
       <box
@@ -27,9 +29,9 @@ export function ResultCard(props: ResultCardProps) {
         alignItems="center"
       >
         <box flexDirection="row" gap={2} alignItems="center">
-          <text fg={props.selected ? "cyan" : "white"}>
-            <strong>{podcast().title}</strong>
-          </text>
+            <text fg={props.selected ? theme.primary : theme.text}>
+              <strong>{podcast().title}</strong>
+            </text>
           <SourceBadge
             sourceId={props.result.sourceId}
             sourceName={props.result.sourceName}
@@ -37,17 +39,17 @@ export function ResultCard(props: ResultCardProps) {
           />
         </box>
         <Show when={podcast().isSubscribed}>
-          <text fg="green">[Subscribed]</text>
+            <text fg={theme.success}>[Subscribed]</text>
         </Show>
       </box>
 
       <Show when={podcast().author}>
-        <text fg="gray">by {podcast().author}</text>
+            <text fg={theme.textMuted}>by {podcast().author}</text>
       </Show>
 
       <Show when={podcast().description}>
         {(description) => (
-          <text fg={props.selected ? "white" : "gray"}>
+            <text fg={props.selected ? theme.text : theme.textMuted}>
             {description().length > 120
               ? description().slice(0, 120) + "..."
               : description()}
@@ -58,7 +60,7 @@ export function ResultCard(props: ResultCardProps) {
       <Show when={(podcast().categories ?? []).length > 0}>
         <box flexDirection="row" gap={1}>
           {(podcast().categories ?? []).slice(0, 3).map((category) => (
-            <text fg="yellow">[{category}]</text>
+            <text fg={theme.warning}>[{category}]</text>
           ))}
         </box>
       </Show>
@@ -75,7 +77,7 @@ export function ResultCard(props: ResultCardProps) {
             props.onSubscribe?.();
           }}
         >
-          <text fg="cyan">[+] Add to Feeds</text>
+            <text fg={theme.primary}>[+] Add to Feeds</text>
         </box>
       </Show>
     </box>

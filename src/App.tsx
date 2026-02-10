@@ -72,8 +72,8 @@ export function App() {
   return (
     <ErrorBoundary
       fallback={(err) => (
-        <box border padding={2}>
-          <text fg="red">
+        <box border padding={2} borderColor={theme.error}>
+          <text fg={theme.error}>
             Error: {err?.message ?? String(err)}
             {"\n"}
             Press a number key (1-6) to switch tabs.

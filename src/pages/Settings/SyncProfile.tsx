@@ -6,6 +6,7 @@
 import { createSignal } from "solid-js";
 import { useAuthStore } from "@/stores/auth";
 import { format } from "date-fns";
+import { useTheme } from "@/context/ThemeContext";
 
 interface SyncProfileProps {
   focused?: boolean;
@@ -17,6 +18,7 @@ type FocusField = "sync" | "export" | "logout";
 
 export function SyncProfile(props: SyncProfileProps) {
   const auth = useAuthStore();
+  const { theme } = useTheme();
   const [focusField, setFocusField] = createSignal<FocusField>("sync");
   const [lastSyncTime] = createSignal<Date | null>(new Date());
 
@@ -59,8 +61,8 @@ export function SyncProfile(props: SyncProfileProps) {
   };
 
   return (
-    <box flexDirection="column" border padding={2} gap={1}>
-      <text>
+    <box flexDirection="column" border padding={2} gap={1} borderColor={theme.border}>
+      <text fg={theme.text}>
         <strong>User Profile</strong>
       </text>
 
@@ -77,38 +79,38 @@ export function SyncProfile(props: SyncProfileProps) {
           justifyContent="center"
           alignItems="center"
         >
-          <text fg="cyan">{userInitials()}</text>
+          <text fg={theme.primary}>{userInitials()}</text>
         </box>
 
         {/* User details */}
         <box flexDirection="column" gap={0}>
-          <text fg="white">{user()?.name || "Guest User"}</text>
-          <text fg="gray">{user()?.email || "No email"}</text>
-          <text fg="gray">Joined: {formatDate(user()?.createdAt)}</text>
+            <text fg={theme.text}>{user()?.name || "Guest User"}</text>
+            <text fg={theme.textMuted}>{user()?.email || "No email"}</text>
+            <text fg={theme.textMuted}>Joined: {formatDate(user()?.createdAt)}</text>
         </box>
       </box>
 
       <box height={1} />
 
       {/* Sync status section */}
-      <box border padding={1} flexDirection="column" gap={0}>
-        <text fg="cyan">Sync Status</text>
+      <box border padding={1} flexDirection="column" gap={0} borderColor={theme.border}>
+        <text fg={theme.primary}>Sync Status</text>
 
         <box flexDirection="row" gap={1}>
-          <text fg="gray">Status:</text>
-          <text fg={user()?.syncEnabled ? "green" : "yellow"}>
-            {user()?.syncEnabled ? "Enabled" : "Disabled"}
-          </text>
+            <text fg={theme.textMuted}>Status:</text>
+            <text fg={user()?.syncEnabled ? theme.success : theme.warning}>
+              {user()?.syncEnabled ? "Enabled" : "Disabled"}
+            </text>
         </box>
 
         <box flexDirection="row" gap={1}>
-          <text fg="gray">Last Sync:</text>
-          <text fg="white">{formatDate(lastSyncTime())}</text>
+            <text fg={theme.textMuted}>Last Sync:</text>
+            <text fg={theme.text}>{formatDate(lastSyncTime())}</text>
         </box>
 
         <box flexDirection="row" gap={1}>
-          <text fg="gray">Method:</text>
-          <text fg="white">File-based (JSON/XML)</text>
+            <text fg={theme.textMuted}>Method:</text>
+            <text fg={theme.text}>File-based (JSON/XML)</text>
         </box>
       </box>
 
@@ -119,9 +121,9 @@ export function SyncProfile(props: SyncProfileProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "sync" ? "#333" : undefined}
+            backgroundColor={focusField() === "sync" ? theme.backgroundElement : undefined}
         >
-          <text fg={focusField() === "sync" ? "cyan" : undefined}>
+            <text fg={focusField() === "sync" ? theme.primary : undefined}>
             [S] Manage Sync
           </text>
         </box>
@@ -129,9 +131,9 @@ export function SyncProfile(props: SyncProfileProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "export" ? "#333" : undefined}
+            backgroundColor={focusField() === "export" ? theme.backgroundElement : undefined}
         >
-          <text fg={focusField() === "export" ? "cyan" : undefined}>
+            <text fg={focusField() === "export" ? theme.primary : undefined}>
             [E] Export Data
           </text>
         </box>
@@ -139,9 +141,9 @@ export function SyncProfile(props: SyncProfileProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "logout" ? "#333" : undefined}
+            backgroundColor={focusField() === "logout" ? theme.backgroundElement : undefined}
         >
-          <text fg={focusField() === "logout" ? "red" : "gray"}>
+            <text fg={focusField() === "logout" ? theme.error : theme.textMuted}>
             [L] Logout
           </text>
         </box>
@@ -149,7 +151,7 @@ export function SyncProfile(props: SyncProfileProps) {
 
       <box height={1} />
 
-      <text fg="gray">Tab to navigate, Enter to select</text>
+      <text fg={theme.textMuted}>Tab to navigate, Enter to select</text>
     </box>
   );
 }

@@ -50,14 +50,14 @@ export function FeedPage(props: PageProps) {
     >
       {/* Status line */}
       <Show when={isRefreshing()}>
-        <text fg="yellow">Refreshing feeds...</text>
+        <text fg={theme.warning}>Refreshing feeds...</text>
       </Show>
 
       <Show
         when={allEpisodes().length > 0}
         fallback={
           <box padding={2}>
-            <text fg="gray">
+            <text fg={theme.textMuted}>
               No episodes yet. Subscribe to shows from Discover or Search.
             </text>
           </box>
@@ -75,22 +75,22 @@ export function FeedPage(props: PageProps) {
                 paddingTop={0}
                 paddingBottom={0}
                 backgroundColor={
-                  index() === selectedIndex() ? "#333" : undefined
+                  index() === selectedIndex() ? theme.backgroundElement : undefined
                 }
                 onMouseDown={() => setSelectedIndex(index())}
               >
                 <box flexDirection="row" gap={1}>
-                  <text fg={index() === selectedIndex() ? "cyan" : "gray"}>
+                  <text fg={index() === selectedIndex() ? theme.primary : theme.textMuted}>
                     {index() === selectedIndex() ? ">" : " "}
                   </text>
-                  <text fg={index() === selectedIndex() ? "white" : theme.text}>
+                  <text fg={index() === selectedIndex() ? theme.text : theme.text}>
                     {item.episode.title}
                   </text>
                 </box>
                 <box flexDirection="row" gap={2} paddingLeft={2}>
-                  <text fg="cyan">{item.feed.podcast.title}</text>
-                  <text fg="gray">{formatDate(item.episode.pubDate)}</text>
-                  <text fg="gray">{formatDuration(item.episode.duration)}</text>
+                  <text fg={theme.primary}>{item.feed.podcast.title}</text>
+                  <text fg={theme.textMuted}>{formatDate(item.episode.pubDate)}</text>
+                  <text fg={theme.textMuted}>{formatDuration(item.episode.duration)}</text>
                 </box>
               </box>
             )}

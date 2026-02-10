@@ -1,4 +1,5 @@
 import { SourceType } from "@/types/source";
+import { useTheme } from "@/context/ThemeContext";
 
 type SourceBadgeProps = {
   sourceId: string;
@@ -14,21 +15,29 @@ const typeLabel = (sourceType?: SourceType) => {
 };
 
 const typeColor = (sourceType?: SourceType) => {
-  if (sourceType === SourceType.API) return "cyan";
-  if (sourceType === SourceType.RSS) return "green";
-  if (sourceType === SourceType.CUSTOM) return "yellow";
-  return "gray";
+  if (sourceType === SourceType.API) return theme.primary;
+  if (sourceType === SourceType.RSS) return theme.success;
+  if (sourceType === SourceType.CUSTOM) return theme.warning;
+  return theme.textMuted;
 };
 
 export function SourceBadge(props: SourceBadgeProps) {
+  const { theme } = useTheme();
   const label = () => props.sourceName || props.sourceId;
+
+  const typeColor = (sourceType?: SourceType) => {
+    if (sourceType === SourceType.API) return theme.primary;
+    if (sourceType === SourceType.RSS) return theme.success;
+    if (sourceType === SourceType.CUSTOM) return theme.warning;
+    return theme.textMuted;
+  };
 
   return (
     <box flexDirection="row" gap={1} padding={0}>
       <text fg={typeColor(props.sourceType)}>
         [{typeLabel(props.sourceType)}]
       </text>
-      <text fg="gray">{label()}</text>
+      <text fg={theme.textMuted}>{label()}</text>
     </box>
   );
 }

@@ -5,6 +5,7 @@
 
 import { createSignal } from "solid-js";
 import { OAUTH_PROVIDERS, OAUTH_LIMITATION_MESSAGE } from "@/config/auth";
+import { useTheme } from "@/context/ThemeContext";
 
 interface OAuthPlaceholderProps {
   focused?: boolean;
@@ -15,6 +16,7 @@ interface OAuthPlaceholderProps {
 type FocusField = "code" | "back";
 
 export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
+  const { theme } = useTheme();
   const [focusField, setFocusField] = createSignal<FocusField>("code");
 
   const fields: FocusField[] = ["code", "back"];
@@ -38,23 +40,23 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
   };
 
   return (
-    <box flexDirection="column" border padding={2} gap={1}>
-      <text>
+    <box flexDirection="column" border padding={2} gap={1} borderColor={theme.border}>
+      <text fg={theme.text}>
         <strong>OAuth Authentication</strong>
       </text>
 
       <box height={1} />
 
       {/* OAuth providers list */}
-      <text fg="cyan">Available OAuth Providers:</text>
+      <text fg={theme.primary}>Available OAuth Providers:</text>
 
       <box flexDirection="column" gap={0} paddingLeft={2}>
         {OAUTH_PROVIDERS.map((provider) => (
           <box flexDirection="row" gap={1}>
-            <text fg={provider.enabled ? "green" : "gray"}>
+            <text fg={provider.enabled ? theme.success : theme.textMuted}>
               {provider.enabled ? "[+]" : "[-]"} {provider.name}
             </text>
-            <text fg="gray">- {provider.description}</text>
+            <text fg={theme.textMuted}>- {provider.description}</text>
           </box>
         ))}
       </box>
@@ -62,33 +64,29 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
       <box height={1} />
 
       {/* Limitation message */}
-      <box border padding={1} borderColor="yellow">
-        <text fg="yellow">Terminal Limitations</text>
+      <box border padding={1} borderColor={theme.warning}>
+        <text fg={theme.warning}>Terminal Limitations</text>
       </box>
 
       <box paddingLeft={1}>
         {OAUTH_LIMITATION_MESSAGE.split("\n").map((line) => (
-          <text fg="gray">{line}</text>
+          <text fg={theme.textMuted}>{line}</text>
         ))}
       </box>
 
       <box height={1} />
 
       {/* Alternative options */}
-      <text fg="cyan">Recommended Alternatives:</text>
+      <text fg={theme.primary}>Recommended Alternatives:</text>
 
       <box flexDirection="column" gap={0} paddingLeft={2}>
         <box flexDirection="row" gap={1}>
-          <text fg="green">[1]</text>
-          <text fg="white">Use a sync code from the web portal</text>
-        </box>
-        <box flexDirection="row" gap={1}>
-          <text fg="green">[2]</text>
-          <text fg="white">Use email/password authentication</text>
-        </box>
-        <box flexDirection="row" gap={1}>
-          <text fg="green">[3]</text>
-          <text fg="white">Use file-based sync (no account needed)</text>
+            <text fg={theme.success}>[1]</text>
+            <text fg={theme.text}>Use a sync code from the web portal</text>
+            <text fg={theme.success}>[2]</text>
+            <text fg={theme.text}>Use email/password authentication</text>
+            <text fg={theme.success}>[3]</text>
+            <text fg={theme.text}>Use file-based sync (no account needed)</text>
         </box>
       </box>
 
@@ -99,9 +97,9 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "code" ? "#333" : undefined}
+            backgroundColor={focusField() === "code" ? theme.backgroundElement : undefined}
         >
-          <text fg={focusField() === "code" ? "cyan" : undefined}>
+            <text fg={focusField() === "code" ? theme.primary : undefined}>
             [C] Enter Sync Code
           </text>
         </box>
@@ -109,9 +107,9 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "back" ? "#333" : undefined}
+            backgroundColor={focusField() === "back" ? theme.backgroundElement : undefined}
         >
-          <text fg={focusField() === "back" ? "yellow" : "gray"}>
+            <text fg={focusField() === "back" ? theme.warning : theme.textMuted}>
             [Esc] Back to Login
           </text>
         </box>
@@ -119,7 +117,7 @@ export function OAuthPlaceholder(props: OAuthPlaceholderProps) {
 
       <box height={1} />
 
-      <text fg="gray">Tab to navigate, Enter to select, Esc to go back</text>
+      <text fg={theme.textMuted}>Tab to navigate, Enter to select, Esc to go back</text>
     </box>
   );
 }

@@ -66,7 +66,7 @@ export function DiscoverPage(props: PageProps) {
                   backgroundColor={isSelected() ? theme.accent : undefined}
                   onMouseDown={() => handleCategorySelect(category.id)}
                 >
-                  <text fg={isSelected() ? "cyan" : "gray"}>
+                  <text fg={isSelected() ? theme.primary : theme.textMuted}>
                     {category.icon} {category.name}
                   </text>
                 </box>
@@ -83,7 +83,7 @@ export function DiscoverPage(props: PageProps) {
       >
         <box padding={1}>
           <text
-            fg={props.depth() == DiscoverPagePaneType.SHOWS ? "cyan" : "gray"}
+            fg={props.depth() == DiscoverPagePaneType.SHOWS ? theme.primary : theme.textMuted}
           >
             Trending in{" "}
             {DISCOVER_CATEGORIES.find(
@@ -96,9 +96,9 @@ export function DiscoverPage(props: PageProps) {
             fallback={
               <box padding={2}>
                 {discoverStore.filteredPodcasts().length !== 0 ? (
-                  <text fg="yellow">Loading trending shows...</text>
+                  <text fg={theme.warning}>Loading trending shows...</text>
                 ) : (
-                  <text fg="gray">No podcasts found in this category.</text>
+                  <text fg={theme.textMuted}>No podcasts found in this category.</text>
                 )}
               </box>
             }

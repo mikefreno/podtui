@@ -9,6 +9,7 @@ import { FeedItem } from "./FeedItem";
 import { useFeedStore } from "@/stores/feed";
 import { FeedVisibility, FeedSortField } from "@/types/feed";
 import type { Feed } from "@/types/feed";
+import { useTheme } from "@/context/ThemeContext";
 
 interface FeedListProps {
   focused?: boolean;
@@ -21,6 +22,7 @@ interface FeedListProps {
 }
 
 export function FeedList(props: FeedListProps) {
+  const { theme } = useTheme();
   const feedStore = useFeedStore();
   const [selectedIndex, setSelectedIndex] = createSignal(0);
 
@@ -136,26 +138,26 @@ export function FeedList(props: FeedListProps) {
     <box flexDirection="column" gap={1}>
       {/* Header with filter controls */}
       <box flexDirection="row" justifyContent="space-between" paddingBottom={0}>
-        <text>
+        <text fg={theme.text}>
           <strong>My Feeds</strong>
         </text>
-        <text fg="gray">({filteredFeeds().length} feeds)</text>
-        <box flexDirection="row" gap={1}>
-          <box border padding={0} onMouseDown={cycleVisibilityFilter}>
-            <text fg="cyan">[f] {visibilityLabel()}</text>
-          </box>
-          <box border padding={0} onMouseDown={cycleSortField}>
-            <text fg="cyan">[s] {sortLabel()}</text>
-          </box>
-        </box>
+            <text fg={theme.textMuted}>({filteredFeeds().length} feeds)</text>
+            <box flexDirection="row" gap={1}>
+              <box border padding={0} onMouseDown={cycleVisibilityFilter} borderColor={theme.border}>
+                <text fg={theme.primary}>[f] {visibilityLabel()}</text>
+              </box>
+              <box border padding={0} onMouseDown={cycleSortField} borderColor={theme.border}>
+                <text fg={theme.primary}>[s] {sortLabel()}</text>
+              </box>
+            </box>
       </box>
 
       {/* Feed list in scrollbox */}
       <Show
         when={filteredFeeds().length > 0}
         fallback={
-          <box border padding={2}>
-            <text fg="gray">
+          <box border padding={2} borderColor={theme.border}>
+            <text fg={theme.textMuted}>
               No feeds found. Add podcasts from the Discover or Search tabs.
             </text>
           </box>
@@ -180,9 +182,9 @@ export function FeedList(props: FeedListProps) {
 
       {/* Navigation help */}
       <box paddingTop={0}>
-        <text fg="gray">
-          Enter open | Esc up | j/k navigate | p pin | f filter | s sort
-        </text>
+          <text fg={theme.textMuted}>
+            Enter open | Esc up | j/k navigate | p pin | f filter | s sort
+          </text>
       </box>
     </box>
   );

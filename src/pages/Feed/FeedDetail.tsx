@@ -8,6 +8,7 @@ import { useKeyboard } from "@opentui/solid";
 import type { Feed } from "@/types/feed";
 import type { Episode } from "@/types/episode";
 import { format } from "date-fns";
+import { useTheme } from "@/context/ThemeContext";
 
 interface FeedDetailProps {
   feed: Feed;
@@ -17,6 +18,7 @@ interface FeedDetailProps {
 }
 
 export function FeedDetail(props: FeedDetailProps) {
+  const { theme } = useTheme();
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [showInfo, setShowInfo] = createSignal(true);
 
@@ -82,45 +84,45 @@ export function FeedDetail(props: FeedDetailProps) {
     <box flexDirection="column" gap={1}>
       {/* Header with back button */}
       <box flexDirection="row" justifyContent="space-between">
-        <box border padding={0} onMouseDown={props.onBack}>
-          <text fg="cyan">[Esc] Back</text>
+        <box border padding={0} onMouseDown={props.onBack} borderColor={theme.border}>
+            <text fg={theme.primary}>[Esc] Back</text>
         </box>
-        <box border padding={0} onMouseDown={() => setShowInfo((v) => !v)}>
-          <text fg="cyan">[i] {showInfo() ? "Hide" : "Show"} Info</text>
+        <box border padding={0} onMouseDown={() => setShowInfo((v) => !v)} borderColor={theme.border}>
+            <text fg={theme.primary}>[i] {showInfo() ? "Hide" : "Show"} Info</text>
         </box>
       </box>
 
       {/* Podcast info section */}
       <Show when={showInfo()}>
-        <box border padding={1} flexDirection="column" gap={0}>
-          <text>
+        <box border padding={1} flexDirection="column" gap={0} borderColor={theme.border}>
+          <text fg={theme.text}>
             <strong>{props.feed.customName || props.feed.podcast.title}</strong>
           </text>
           {props.feed.podcast.author && (
             <box flexDirection="row" gap={1}>
-              <text fg="gray">by</text>
-              <text fg="cyan">{props.feed.podcast.author}</text>
+                <text fg={theme.textMuted}>by</text>
+                <text fg={theme.primary}>{props.feed.podcast.author}</text>
             </box>
           )}
           <box height={1} />
-          <text fg="gray">
+          <text fg={theme.textMuted}>
             {props.feed.podcast.description?.slice(0, 200)}
             {(props.feed.podcast.description?.length || 0) > 200 ? "..." : ""}
           </text>
           <box height={1} />
           <box flexDirection="row" gap={2}>
             <box flexDirection="row" gap={1}>
-              <text fg="gray">Episodes:</text>
-              <text fg="white">{props.feed.episodes.length}</text>
+              <text fg={theme.textMuted}>Episodes:</text>
+              <text fg={theme.text}>{props.feed.episodes.length}</text>
             </box>
             <box flexDirection="row" gap={1}>
-              <text fg="gray">Updated:</text>
-              <text fg="white">{formatDate(props.feed.lastUpdated)}</text>
+              <text fg={theme.textMuted}>Updated:</text>
+              <text fg={theme.text}>{formatDate(props.feed.lastUpdated)}</text>
             </box>
-            <text fg={props.feed.visibility === "public" ? "green" : "yellow"}>
+            <text fg={props.feed.visibility === "public" ? theme.success : theme.warning}>
               {props.feed.visibility === "public" ? "[Public]" : "[Private]"}
             </text>
-            {props.feed.isPinned && <text fg="yellow">[Pinned]</text>}
+            {props.feed.isPinned && <text fg={theme.warning}>[Pinned]</text>}
           </box>
         </box>
       </Show>
@@ -141,7 +143,7 @@ export function FeedDetail(props: FeedDetailProps) {
               flexDirection="column"
               gap={0}
               padding={1}
-              backgroundColor={index() === selectedIndex() ? "#333" : undefined}
+                    backgroundColor={index() === selectedIndex() ? theme.backgroundElement : undefined}
               onMouseDown={() => {
                 setSelectedIndex(index());
                 if (props.onPlayEpisode) {
@@ -150,17 +152,17 @@ export function FeedDetail(props: FeedDetailProps) {
               }}
             >
               <box flexDirection="row" gap={1}>
-                <text fg={index() === selectedIndex() ? "cyan" : "gray"}>
-                  {index() === selectedIndex() ? ">" : " "}
-                </text>
-                <text fg={index() === selectedIndex() ? "white" : undefined}>
-                  {episode.episodeNumber ? `#${episode.episodeNumber} - ` : ""}
-                  {episode.title}
-                </text>
+                  <text fg={index() === selectedIndex() ? theme.primary : theme.textMuted}>
+                    {index() === selectedIndex() ? ">" : " "}
+                  </text>
+                  <text fg={index() === selectedIndex() ? theme.text : undefined}>
+                    {episode.episodeNumber ? `#${episode.episodeNumber} - ` : ""}
+                    {episode.title}
+                  </text>
               </box>
               <box flexDirection="row" gap={2} paddingLeft={2}>
-                <text fg="gray">{formatDate(episode.pubDate)}</text>
-                <text fg="gray">{formatDuration(episode.duration)}</text>
+                  <text fg={theme.textMuted}>{formatDate(episode.pubDate)}</text>
+                  <text fg={theme.textMuted}>{formatDuration(episode.duration)}</text>
               </box>
             </box>
           )}
@@ -168,7 +170,7 @@ export function FeedDetail(props: FeedDetailProps) {
       </scrollbox>
 
       {/* Help text */}
-      <text fg="gray">
+      <text fg={theme.textMuted}>
         j/k to navigate, Enter to play, i to toggle info, Esc to go back
       </text>
     </box>

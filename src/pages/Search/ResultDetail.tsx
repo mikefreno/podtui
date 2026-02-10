@@ -2,6 +2,7 @@ import { Show } from "solid-js";
 import { format } from "date-fns";
 import type { SearchResult } from "@/types/source";
 import { SourceBadge } from "./SourceBadge";
+import { useTheme } from "@/context/ThemeContext";
 
 type ResultDetailProps = {
   result?: SearchResult;
@@ -9,15 +10,16 @@ type ResultDetailProps = {
 };
 
 export function ResultDetail(props: ResultDetailProps) {
+  const { theme } = useTheme();
   return (
-    <box flexDirection="column" border padding={1} gap={1} height="100%">
+    <box flexDirection="column" border padding={1} gap={1} height="100%" borderColor={theme.border}>
       <Show
         when={props.result}
-        fallback={<text fg="gray">Select a result to see details.</text>}
+        fallback={          <text fg={theme.textMuted}>Select a result to see details.</text>}
       >
         {(result) => (
           <>
-            <text fg="white">
+            <text fg={theme.text}>
               <strong>{result().podcast.title}</strong>
             </text>
 
@@ -28,24 +30,24 @@ export function ResultDetail(props: ResultDetailProps) {
             />
 
             <Show when={result().podcast.author}>
-              <text fg="gray">by {result().podcast.author}</text>
+              <text fg={theme.textMuted}>by {result().podcast.author}</text>
             </Show>
 
             <Show when={result().podcast.description}>
-              <text fg="gray">{result().podcast.description}</text>
+              <text fg={theme.textMuted}>{result().podcast.description}</text>
             </Show>
 
             <Show when={(result().podcast.categories ?? []).length > 0}>
               <box flexDirection="row" gap={1}>
                 {(result().podcast.categories ?? []).map((category) => (
-                  <text fg="yellow">[{category}]</text>
+                  <text fg={theme.warning}>[{category}]</text>
                 ))}
               </box>
             </Show>
 
-            <text fg="gray">Feed: {result().podcast.feedUrl}</text>
+            <text fg={theme.textMuted}>Feed: {result().podcast.feedUrl}</text>
 
-            <text fg="gray">
+            <text fg={theme.textMuted}>
               Updated: {format(result().podcast.lastUpdated, "MMM d, yyyy")}
             </text>
 
@@ -58,12 +60,12 @@ export function ResultDetail(props: ResultDetailProps) {
                 width={18}
                 onMouseDown={() => props.onSubscribe?.(result())}
               >
-                <text fg="cyan">[+] Add to Feeds</text>
+                  <text fg={theme.primary}>[+] Add to Feeds</text>
               </box>
             </Show>
 
             <Show when={result().podcast.isSubscribed}>
-              <text fg="green">Already subscribed</text>
+              <text fg={theme.success}>Already subscribed</text>
             </Show>
           </>
         )}

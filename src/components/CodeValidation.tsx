@@ -6,6 +6,7 @@
 import { createSignal } from "solid-js";
 import { useAuthStore } from "@/stores/auth";
 import { AUTH_CONFIG } from "@/config/auth";
+import { useTheme } from "@/context/ThemeContext";
 
 interface CodeValidationProps {
   focused?: boolean;
@@ -16,6 +17,7 @@ type FocusField = "code" | "submit" | "back";
 
 export function CodeValidation(props: CodeValidationProps) {
   const auth = useAuthStore();
+  const { theme } = useTheme();
   const [code, setCode] = createSignal("");
   const [focusField, setFocusField] = createSignal<FocusField>("code");
   const [codeError, setCodeError] = createSignal<string | null>(null);
@@ -98,32 +100,32 @@ export function CodeValidation(props: CodeValidationProps) {
   };
 
   return (
-    <box flexDirection="column" border padding={2} gap={1}>
-      <text>
+    <box flexDirection="column" border padding={2} gap={1} borderColor={theme.border}>
+      <text fg={theme.text}>
         <strong>Enter Sync Code</strong>
       </text>
 
       <box height={1} />
 
-      <text fg="gray">
+      <text fg={theme.textMuted}>
         Enter your 8-character sync code to link your account.
       </text>
-      <text fg="gray">You can get this code from the web portal.</text>
+      <text fg={theme.textMuted}>You can get this code from the web portal.</text>
 
       <box height={1} />
 
       {/* Code display */}
       <box flexDirection="column" gap={0}>
-        <text fg={focusField() === "code" ? "cyan" : undefined}>
-          Code ({codeProgress()}):
-        </text>
+      <text fg={focusField() === "code" ? theme.primary : undefined}>
+            Code ({codeProgress()}):
+          </text>
 
-        <box border padding={1}>
+        <box border padding={1} borderColor={theme.border}>
           <text
             fg={
               code().length === AUTH_CONFIG.codeValidation.codeLength
-                ? "green"
-                : "yellow"
+                ? theme.success
+                : theme.warning
             }
           >
             {codeDisplay()}
@@ -139,7 +141,7 @@ export function CodeValidation(props: CodeValidationProps) {
           width={30}
         />
 
-        {codeError() && <text fg="red">{codeError()}</text>}
+        {codeError() && <text fg={theme.error}>{codeError()}</text>}
       </box>
 
       <box height={1} />
@@ -149,9 +151,9 @@ export function CodeValidation(props: CodeValidationProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "submit" ? "#333" : undefined}
+          backgroundColor={focusField() === "submit" ? theme.backgroundElement : undefined}
         >
-          <text fg={focusField() === "submit" ? "cyan" : undefined}>
+          <text fg={focusField() === "submit" ? theme.primary : undefined}>
             {auth.isLoading ? "Validating..." : "[Enter] Validate Code"}
           </text>
         </box>
@@ -159,20 +161,20 @@ export function CodeValidation(props: CodeValidationProps) {
         <box
           border
           padding={1}
-          backgroundColor={focusField() === "back" ? "#333" : undefined}
+          backgroundColor={focusField() === "back" ? theme.backgroundElement : undefined}
         >
-          <text fg={focusField() === "back" ? "yellow" : "gray"}>
+          <text fg={focusField() === "back" ? theme.warning : theme.textMuted}>
             [Esc] Back to Login
           </text>
         </box>
       </box>
 
       {/* Auth error message */}
-      {auth.error && <text fg="red">{auth.error.message}</text>}
+      {auth.error && <text fg={theme.error}>{auth.error.message}</text>}
 
       <box height={1} />
 
-      <text fg="gray">Tab to navigate, Enter to select, Esc to go back</text>
+      <text fg={theme.textMuted}>Tab to navigate, Enter to select, Esc to go back</text>
     </box>
   );
 }

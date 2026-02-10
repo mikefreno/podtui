@@ -1,4 +1,5 @@
 import type { BackendName } from "../utils/audio-player"
+import { useTheme } from "@/context/ThemeContext"
 
 type PlaybackControlsProps = {
   isPlaying: boolean
@@ -22,39 +23,40 @@ const BACKEND_LABELS: Record<BackendName, string> = {
 }
 
 export function PlaybackControls(props: PlaybackControlsProps) {
+  const { theme } = useTheme();
   return (
-    <box flexDirection="row" gap={1} alignItems="center" border padding={1}>
-      <box border padding={0} onMouseDown={props.onPrev}>
-        <text fg="cyan">[Prev]</text>
+    <box flexDirection="row" gap={1} alignItems="center" border padding={1} borderColor={theme.border}>
+      <box border padding={0} onMouseDown={props.onPrev} borderColor={theme.border}>
+        <text fg={theme.primary}>[Prev]</text>
       </box>
-      <box border padding={0} onMouseDown={props.onToggle}>
-        <text fg="cyan">{props.isPlaying ? "[Pause]" : "[Play]"}</text>
+      <box border padding={0} onMouseDown={props.onToggle} borderColor={theme.border}>
+        <text fg={theme.primary}>{props.isPlaying ? "[Pause]" : "[Play]"}</text>
       </box>
-      <box border padding={0} onMouseDown={props.onNext}>
-        <text fg="cyan">[Next]</text>
-      </box>
-      <box flexDirection="row" gap={1} marginLeft={2}>
-        <text fg="gray">Vol</text>
-        <text fg="white">{Math.round(props.volume * 100)}%</text>
+      <box border padding={0} onMouseDown={props.onNext} borderColor={theme.border}>
+        <text fg={theme.primary}>[Next]</text>
       </box>
       <box flexDirection="row" gap={1} marginLeft={2}>
-        <text fg="gray">Speed</text>
-        <text fg="white">{props.speed}x</text>
+        <text fg={theme.textMuted}>Vol</text>
+        <text fg={theme.text}>{Math.round(props.volume * 100)}%</text>
+      </box>
+      <box flexDirection="row" gap={1} marginLeft={2}>
+        <text fg={theme.textMuted}>Speed</text>
+        <text fg={theme.text}>{props.speed}x</text>
       </box>
       {props.backendName && props.backendName !== "none" && (
         <box flexDirection="row" gap={1} marginLeft={2}>
-          <text fg="gray">via</text>
-          <text fg="cyan">{BACKEND_LABELS[props.backendName]}</text>
+          <text fg={theme.textMuted}>via</text>
+          <text fg={theme.primary}>{BACKEND_LABELS[props.backendName]}</text>
         </box>
       )}
       {props.backendName === "none" && (
         <box marginLeft={2}>
-          <text fg="yellow">No audio player found</text>
+          <text fg={theme.warning}>No audio player found</text>
         </box>
       )}
       {props.hasAudioUrl === false && (
         <box marginLeft={2}>
-          <text fg="yellow">No audio URL</text>
+          <text fg={theme.warning}>No audio URL</text>
         </box>
       )}
     </box>

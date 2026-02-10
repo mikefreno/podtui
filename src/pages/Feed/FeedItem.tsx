@@ -31,12 +31,13 @@ export function FeedItem(props: FeedItemProps) {
   };
 
   const visibilityColor = () => {
-    return props.feed.visibility === "public" ? "green" : "yellow";
+    return props.feed.visibility === "public" ? theme.success : theme.warning;
   };
 
   const pinnedIndicator = () => {
     return props.feed.isPinned ? "*" : " ";
   };
+
   const { theme } = useTheme();
 
   if (props.compact) {
@@ -45,18 +46,18 @@ export function FeedItem(props: FeedItemProps) {
       <box
         flexDirection="row"
         gap={1}
-        backgroundColor={props.isSelected ? "#333" : undefined}
-        paddingLeft={1}
-        paddingRight={1}
-      >
-        <text fg={props.isSelected ? "cyan" : "gray"}>
-          {props.isSelected ? ">" : " "}
-        </text>
-        <text fg={visibilityColor()}>{visibilityIcon()}</text>
-        <text fg={props.isSelected ? "white" : theme.accent}>
-          {props.feed.customName || props.feed.podcast.title}
-        </text>
-        {props.showEpisodeCount && <text fg="gray">({episodeCount()})</text>}
+      backgroundColor={props.isSelected ? theme.backgroundElement : undefined}
+      paddingLeft={1}
+      paddingRight={1}
+    >
+      <text fg={props.isSelected ? theme.primary : theme.textMuted}>
+        {props.isSelected ? ">" : " "}
+      </text>
+      <text fg={visibilityColor()}>{visibilityIcon()}</text>
+      <text fg={props.isSelected ? theme.text : theme.accent}>
+        {props.feed.customName || props.feed.podcast.title}
+      </text>
+      {props.showEpisodeCount && <text fg={theme.textMuted}>({episodeCount()})</text>}
       </box>
     );
   }
@@ -67,18 +68,18 @@ export function FeedItem(props: FeedItemProps) {
       flexDirection="column"
       gap={0}
       border={props.isSelected}
-      borderColor={props.isSelected ? "cyan" : undefined}
-      backgroundColor={props.isSelected ? "#222" : undefined}
+      borderColor={props.isSelected ? theme.primary : undefined}
+      backgroundColor={props.isSelected ? theme.backgroundElement : undefined}
       padding={1}
     >
       {/* Title row */}
       <box flexDirection="row" gap={1}>
-        <text fg={props.isSelected ? "cyan" : "gray"}>
+        <text fg={props.isSelected ? theme.primary : theme.textMuted}>
           {props.isSelected ? ">" : " "}
         </text>
         <text fg={visibilityColor()}>{visibilityIcon()}</text>
-        <text fg="yellow">{pinnedIndicator()}</text>
-        <text fg={props.isSelected ? "white" : theme.text}>
+        <text fg={theme.warning}>{pinnedIndicator()}</text>
+        <text fg={props.isSelected ? theme.text : theme.text}>
           <strong>
             {props.feed.customName || props.feed.podcast.title}
           </strong>
@@ -87,18 +88,18 @@ export function FeedItem(props: FeedItemProps) {
 
       <box flexDirection="row" gap={2} paddingLeft={4}>
         {props.showEpisodeCount && (
-          <text fg="gray">
+          <text fg={theme.textMuted}>
             {episodeCount()} episodes ({unplayedCount()} new)
           </text>
         )}
         {props.showLastUpdated && (
-          <text fg="gray">Updated: {formatDate(props.feed.lastUpdated)}</text>
+          <text fg={theme.textMuted}>Updated: {formatDate(props.feed.lastUpdated)}</text>
         )}
       </box>
 
       {props.feed.podcast.description && (
         <box paddingLeft={4} paddingTop={0}>
-          <text fg="gray">
+          <text fg={theme.textMuted}>
             {props.feed.podcast.description.slice(0, 60)}
             {props.feed.podcast.description.length > 60 ? "..." : ""}
           </text>
