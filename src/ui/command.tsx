@@ -8,67 +8,71 @@ import {
   type ParentProps,
   For,
   Show,
-} from "solid-js"
-import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
-import { useKeybind } from "../context/KeybindContext"
-import { useDialog } from "./dialog"
-import { useTheme } from "../context/ThemeContext"
-import type { KeybindsConfig } from "../utils/keybind"
-import { TextAttributes } from "@opentui/core"
-import { emit } from "../utils/event-bus"
+} from "solid-js";
+import { useKeyboard, useTerminalDimensions } from "@opentui/solid";
+import { KeybindsResolved, useKeybinds } from "../context/KeybindContext";
+import { useDialog } from "./dialog";
+import { useTheme } from "../context/ThemeContext";
+import { TextAttributes } from "@opentui/core";
+import { emit } from "../utils/event-bus";
 
 /**
  * Command option for the command palette.
  */
 export type CommandOption = {
   /** Display title */
-  title: string
+  title: string;
   /** Unique identifier */
-  value: string
+  value: string;
   /** Description shown below title */
-  description?: string
+  description?: string;
   /** Category for grouping */
-  category?: string
+  category?: string;
   /** Keybind reference */
-  keybind?: keyof KeybindsConfig
+  keybind?: keyof KeybindsResolved;
   /** Whether this command is suggested */
-  suggested?: boolean
+  suggested?: boolean;
   /** Slash command configuration */
   slash?: {
-    name: string
-    aliases?: string[]
-  }
+    name: string;
+    aliases?: string[];
+  };
   /** Whether to hide from command list */
-  hidden?: boolean
+  hidden?: boolean;
   /** Whether command is enabled */
-  enabled?: boolean
+  enabled?: boolean;
   /** Footer text (usually keybind display) */
-  footer?: string
+  footer?: string;
   /** Handler when command is selected */
-  onSelect?: (dialog: ReturnType<typeof useDialog>) => void
-}
+  onSelect?: (dialog: ReturnType<typeof useDialog>) => void;
+};
 
-type CommandContext = ReturnType<typeof init>
-const ctx = createContext<CommandContext>()
+type CommandContext = ReturnType<typeof init>;
+const ctx = createContext<CommandContext>();
 
 function init() {
-  const [registrations, setRegistrations] = createSignal<Accessor<CommandOption[]>[]>([])
-  const [suspendCount, setSuspendCount] = createSignal(0)
-  const dialog = useDialog()
-  const keybind = useKeybind()
+  const [registrations, setRegistrations] = createSignal<
+    Accessor<CommandOption[]>[]
+  >([]);
+  const [suspendCount, setSuspendCount] = createSignal(0);
+  const dialog = useDialog();
+  const keybind = useKeybinds();
 
   const entries = createMemo(() => {
-    const all = registrations().flatMap((x) => x())
+    const all = registrations().flatMap((x) => x());
     return all.map((x) => ({
       ...x,
       footer: x.keybind ? keybind.print(x.keybind) : undefined,
-    }))
-  })
+    }));
+  });
 
-  const isEnabled = (option: CommandOption) => option.enabled !== false
-  const isVisible = (option: CommandOption) => isEnabled(option) && !option.hidden
+  const isEnabled = (option: CommandOption) => option.enabled !== false;
+  const isVisible = (option: CommandOption) =>
+    isEnabled(option) && !option.hidden;
 
-  const visibleOptions = createMemo(() => entries().filter((option) => isVisible(option)))
+  const visibleOptions = createMemo(() =>
+    entries().filter((option) => isVisible(option)),
+  );
   const suggestedOptions = createMemo(() =>
     visibleOptions()
       .filter((option) => option.suggested)
@@ -77,23 +81,23 @@ function init() {
         value: `suggested:${option.value}`,
         category: "Suggested",
       })),
-  )
-  const suspended = () => suspendCount() > 0
+  );
+  const suspended = () => suspendCount() > 0;
 
   // Handle keybind shortcuts
   useKeyboard((evt) => {
-    if (suspended()) return
-    if (dialog.isOpen) return
+    if (suspended()) return;
+    if (dialog.isOpen) return;
     for (const option of entries()) {
-      if (!isEnabled(option)) continue
+      if (!isEnabled(option)) continue;
       if (option.keybind && keybind.match(option.keybind, evt)) {
-        evt.preventDefault()
-        option.onSelect?.(dialog)
-        emit("command.execute", { command: option.value })
-        return
+        evt.preventDefault();
+        option.onSelect?.(dialog);
+        emit("command.execute", { command: option.value });
+        return;
       }
     }
-  })
+  });
 
   const result = {
     /**
@@ -102,10 +106,10 @@ function init() {
     trigger(name: string) {
       for (const option of entries()) {
         if (option.value === name) {
-          if (!isEnabled(option)) return
-          option.onSelect?.(dialog)
-          emit("command.execute", { command: name })
-          return
+          if (!isEnabled(option)) return;
+          option.onSelect?.(dialog);
+          emit("command.execute", { command: name });
+          return;
         }
       }
     },
@@ -114,159 +118,163 @@ function init() {
      */
     slashes() {
       return visibleOptions().flatMap((option) => {
-        const slash = option.slash
-        if (!slash) return []
+        const slash = option.slash;
+        if (!slash) return [];
         return {
           display: "/" + slash.name,
           description: option.description ?? option.title,
           aliases: slash.aliases?.map((alias) => "/" + alias),
           onSelect: () => result.trigger(option.value),
-        }
-      })
+        };
+      });
     },
     /**
      * Enable/disable keybinds temporarily.
      */
     keybinds(enabled: boolean) {
-      setSuspendCount((count) => count + (enabled ? -1 : 1))
+      setSuspendCount((count) => count + (enabled ? -1 : 1));
     },
     suspended,
     /**
      * Show the command palette dialog.
      */
     show() {
-      dialog.replace(() => <CommandDialog options={visibleOptions()} suggestedOptions={suggestedOptions()} />)
+      dialog.replace(() => (
+        <CommandDialog
+          options={visibleOptions()}
+          suggestedOptions={suggestedOptions()}
+        />
+      ));
     },
     /**
      * Register commands. Returns cleanup function.
      */
     register(cb: () => CommandOption[]) {
-      const results = createMemo(cb)
-      setRegistrations((arr) => [results, ...arr])
+      const results = createMemo(cb);
+      setRegistrations((arr) => [results, ...arr]);
       onCleanup(() => {
-        setRegistrations((arr) => arr.filter((x) => x !== results))
-      })
+        setRegistrations((arr) => arr.filter((x) => x !== results));
+      });
     },
     /**
      * Get all visible options.
      */
     get options() {
-      return visibleOptions()
+      return visibleOptions();
     },
-  }
-  return result
+  };
+  return result;
 }
 
 export function useCommandDialog() {
-  const value = useContext(ctx)
+  const value = useContext(ctx);
   if (!value) {
-    throw new Error("useCommandDialog must be used within a CommandProvider")
+    throw new Error("useCommandDialog must be used within a CommandProvider");
   }
-  return value
+  return value;
 }
 
 export function CommandProvider(props: ParentProps) {
-  const value = init()
-  const dialog = useDialog()
-  const keybind = useKeybind()
+  const value = init();
+  const dialog = useDialog();
+  const keybind = useKeybinds();
 
   // Open command palette on ctrl+p or command_list keybind
   useKeyboard((evt) => {
-    if (value.suspended()) return
-    if (dialog.isOpen) return
-    if (evt.defaultPrevented) return
+    if (value.suspended()) return;
+    if (dialog.isOpen) return;
+    if (evt.defaultPrevented) return;
     if (keybind.match("command_list", evt)) {
-      evt.preventDefault()
-      value.show()
-      return
+      evt.preventDefault();
+      value.show();
+      return;
     }
-  })
+  });
 
-  return <ctx.Provider value={value}>{props.children}</ctx.Provider>
+  return <ctx.Provider value={value}>{props.children}</ctx.Provider>;
 }
 
 /**
  * Command palette dialog component.
  */
-function CommandDialog(props: { options: CommandOption[]; suggestedOptions: CommandOption[] }) {
-  const { theme } = useTheme()
-  const dialog = useDialog()
-  const dimensions = useTerminalDimensions()
-  const [filter, setFilter] = createSignal("")
-  const [selectedIndex, setSelectedIndex] = createSignal(0)
+function CommandDialog(props: {
+  options: CommandOption[];
+  suggestedOptions: CommandOption[];
+}) {
+  const { theme } = useTheme();
+  const dialog = useDialog();
+  const dimensions = useTerminalDimensions();
+  const [filter, setFilter] = createSignal("");
+  const [selectedIndex, setSelectedIndex] = createSignal(0);
 
   const filteredOptions = createMemo(() => {
-    const query = filter().toLowerCase()
+    const query = filter().toLowerCase();
     if (!query) {
-      return [...props.suggestedOptions, ...props.options]
+      return [...props.suggestedOptions, ...props.options];
     }
     return props.options.filter(
       (option) =>
         option.title.toLowerCase().includes(query) ||
         option.description?.toLowerCase().includes(query) ||
-        option.category?.toLowerCase().includes(query)
-    )
-  })
+        option.category?.toLowerCase().includes(query),
+    );
+  });
 
   // Reset selection when filter changes
   createMemo(() => {
-    filter()
-    setSelectedIndex(0)
-  })
+    filter();
+    setSelectedIndex(0);
+  });
 
   useKeyboard((evt) => {
     if (evt.name === "escape") {
-      dialog.clear()
-      evt.preventDefault()
-      return
+      dialog.clear();
+      evt.preventDefault();
+      return;
     }
 
     if (evt.name === "return" || evt.name === "enter") {
-      const option = filteredOptions()[selectedIndex()]
+      const option = filteredOptions()[selectedIndex()];
       if (option) {
-        option.onSelect?.(dialog)
-        dialog.clear()
+        option.onSelect?.(dialog);
+        dialog.clear();
       }
-      evt.preventDefault()
-      return
+      evt.preventDefault();
+      return;
     }
 
     if (evt.name === "up" || (evt.ctrl && evt.name === "p")) {
-      setSelectedIndex((i) => Math.max(0, i - 1))
-      evt.preventDefault()
-      return
+      setSelectedIndex((i) => Math.max(0, i - 1));
+      evt.preventDefault();
+      return;
     }
 
     if (evt.name === "down" || (evt.ctrl && evt.name === "n")) {
-      setSelectedIndex((i) => Math.min(filteredOptions().length - 1, i + 1))
-      evt.preventDefault()
-      return
+      setSelectedIndex((i) => Math.min(filteredOptions().length - 1, i + 1));
+      evt.preventDefault();
+      return;
     }
 
     // Handle text input
     if (evt.name && evt.name.length === 1 && !evt.ctrl && !evt.meta) {
-      setFilter((f) => f + evt.name)
-      return
+      setFilter((f) => f + evt.name);
+      return;
     }
 
     if (evt.name === "backspace") {
-      setFilter((f) => f.slice(0, -1))
-      return
+      setFilter((f) => f.slice(0, -1));
+      return;
     }
-  })
+  });
 
-  const maxHeight = Math.floor(dimensions().height * 0.6)
+  const maxHeight = Math.floor(dimensions().height * 0.6);
 
   return (
     <box flexDirection="column" padding={1}>
       {/* Search input */}
       <box marginBottom={1}>
-        <text fg={theme.textMuted}>
-          {"> "}
-        </text>
-        <text fg={theme.text}>
-          {filter() || "Type to search commands..."}
-        </text>
+        <text fg={theme.textMuted}>{"> "}</text>
+        <text fg={theme.text}>{filter() || "Type to search commands..."}</text>
       </box>
 
       {/* Command list */}
@@ -274,14 +282,24 @@ function CommandDialog(props: { options: CommandOption[]; suggestedOptions: Comm
         <For each={filteredOptions().slice(0, 10)}>
           {(option, index) => (
             <box
-              backgroundColor={index() === selectedIndex() ? theme.primary : undefined}
+              backgroundColor={
+                index() === selectedIndex() ? theme.primary : undefined
+              }
               padding={1}
             >
               <box flexDirection="column" flexGrow={1}>
                 <box flexDirection="row" justifyContent="space-between">
                   <text
-                    fg={index() === selectedIndex() ? theme.selectedListItemText : theme.text}
-                    attributes={index() === selectedIndex() ? TextAttributes.BOLD : undefined}
+                    fg={
+                      index() === selectedIndex()
+                        ? theme.selectedListItemText
+                        : theme.text
+                    }
+                    attributes={
+                      index() === selectedIndex()
+                        ? TextAttributes.BOLD
+                        : undefined
+                    }
                   >
                     {option.title}
                   </text>
@@ -303,5 +321,5 @@ function CommandDialog(props: { options: CommandOption[]; suggestedOptions: Comm
         </Show>
       </box>
     </box>
-  )
+  );
 }

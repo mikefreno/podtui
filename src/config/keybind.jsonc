@@ -1,0 +1,17 @@
+{
+  "up": ["up", "k"],
+  "down": ["down", "j"],
+  "left": ["left", "h"],
+  "right": ["right", "l"],
+  "cycle": ["tab"], // this will cycle no matter the depth/orientation
+  "dive": ["return"],
+  "out": ["esc"],
+  "inverse": ["shift"],
+  "leader": ":", // will not trigger while focused on input
+  "quit": ["<leader>q"],
+  "audio-toggle": ["<leader>p"],
+  "audio-pause": [],
+  "audio-play": [],
+  "audio-next": ["<leader>n"],
+  "audio-prev": ["<leader>l"],
+}

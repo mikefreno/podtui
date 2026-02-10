@@ -60,13 +60,14 @@ export function App() {
       });
   });
 
-  //useKeyboard(
-  //(keyEvent) => {
-  ////handle intra layer navigation
-  //if(keyEvent.name == "up" || keyEvent.name)
-  //},
-  //{ release: false }, // Not strictly necessary
-  //);
+  useKeyboard(
+    (keyEvent) => {
+      //handle intra layer navigation
+      if (keyEvent.name == "up" || keyEvent.name) {
+      }
+    },
+    { release: false }, // Not strictly necessary
+  );
 
   return (
     <ErrorBoundary
