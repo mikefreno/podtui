@@ -128,7 +128,7 @@ export function MyShowsPage(props: PageProps) {
   };
 
   return (
-    <box flexDirection="row" flexGrow={1}>
+    <box flexDirection="row" flexGrow={1} width="100%">
       <box flexDirection="column" height="100%">
         <Show when={isRefreshing()}>
           <text fg="yellow">Refreshing...</text>

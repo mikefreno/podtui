@@ -46,6 +46,7 @@ export function FeedPage(props: PageProps) {
       backgroundColor={theme.background}
       flexDirection="column"
       height="100%"
+      width="100%"
     >
       {/* Status line */}
       <Show when={isRefreshing()}>

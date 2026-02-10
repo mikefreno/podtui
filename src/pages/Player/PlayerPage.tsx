@@ -25,7 +25,7 @@ export function PlayerPage(props: PageProps) {
   };
 
   return (
-    <box flexDirection="column" gap={1}>
+    <box flexDirection="column" gap={1} width="100%">
       <box flexDirection="row" justifyContent="space-between">
         <text>
           <strong>Now Playing</strong>

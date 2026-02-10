@@ -37,14 +37,13 @@ export function DiscoverPage(props: PageProps) {
 
   const { theme } = useTheme();
   return (
-    <box flexDirection="row" flexGrow={1} height="100%" gap={1}>
+    <box flexDirection="row" flexGrow={1} height="100%" width="100%" gap={1}>
       <box
         border
         padding={1}
         borderColor={theme.border}
         flexDirection="column"
         gap={1}
-        width={20}
       >
         <text
           fg={

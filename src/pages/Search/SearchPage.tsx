@@ -57,7 +57,7 @@ export function SearchPage(props: PageProps) {
   };
 
   return (
-    <box flexDirection="column" height="100%" gap={1}>
+    <box flexDirection="column" height="100%" gap={1} width="100%">
       {/* Search Header */}
       <box flexDirection="column" gap={1}>
         <text>

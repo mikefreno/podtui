@@ -31,7 +31,7 @@ export function SettingsPage(props: PageProps) {
   );
 
   return (
-    <box flexDirection="column" gap={1} height="100%">
+    <box flexDirection="column" gap={1} height="100%" width="100%">
       <box flexDirection="row" gap={1}>
         <For each={SECTIONS}>
           {(section, index) => (
