@@ -10,6 +10,7 @@ import { SearchHistory } from "./SearchHistory";
 import type { SearchResult } from "@/types/source";
 import { PageProps } from "@/App";
 import { MyShowsPage } from "../MyShows/MyShowsPage";
+import { useTheme } from "@/context/ThemeContext";
 
 enum SearchPaneType {
   INPUT = 1,
@@ -23,6 +24,7 @@ export function SearchPage(props: PageProps) {
   const [inputValue, setInputValue] = createSignal("");
   const [resultIndex, setResultIndex] = createSignal(0);
   const [historyIndex, setHistoryIndex] = createSignal(0);
+  const { theme } = useTheme();
 
   // Keep parent informed about input focus state
   // TODO: have a global input focused prop in useKeyboard hook
@@ -83,42 +85,42 @@ export function SearchPage(props: PageProps) {
             paddingRight={1}
             onMouseDown={handleSearch}
           >
-            <text fg="cyan">[Enter] Search</text>
+            <text fg={theme.primary}>[Enter] Search</text>
           </box>
         </box>
 
         {/* Status */}
         <Show when={searchStore.isSearching()}>
-          <text fg="yellow">Searching...</text>
+          <text fg={theme.warning}>Searching...</text>
         </Show>
         <Show when={searchStore.error()}>
-          <text fg="red">{searchStore.error()}</text>
+          <text fg={theme.error}>{searchStore.error()}</text>
         </Show>
       </box>
 
-      {/* Main Content - Results or History */}
-      <box flexDirection="row" height="100%" gap={2}>
-        {/* Results Panel */}
-        <box flexDirection="column" flexGrow={1} border>
-          <box padding={1}>
-            <text
-              fg={props.depth() === SearchPaneType.RESULTS ? "cyan" : "gray"}
+        {/* Main Content - Results or History */}
+        <box flexDirection="row" height="100%" gap={2}>
+          {/* Results Panel */}
+          <box flexDirection="column" flexGrow={1} border>
+            <box padding={1}>
+              <text
+                fg={props.depth() === SearchPaneType.RESULTS ? theme.primary : theme.muted}
+              >
+                Results ({searchStore.results().length})
+              </text>
+            </box>
+            <Show
+              when={searchStore.results().length > 0}
+              fallback={
+                <box padding={2}>
+                  <text fg={theme.muted}>
+                    {searchStore.query()
+                      ? "No results found"
+                      : "Enter a search term to find podcasts"}
+                  </text>
+                </box>
+              }
             >
-              Results ({searchStore.results().length})
-            </text>
-          </box>
-          <Show
-            when={searchStore.results().length > 0}
-            fallback={
-              <box padding={2}>
-                <text fg="gray">
-                  {searchStore.query()
-                    ? "No results found"
-                    : "Enter a search term to find podcasts"}
-                </text>
-              </box>
-            }
-          >
             <SearchResults
               results={searchStore.results()}
               selectedIndex={resultIndex()}
@@ -136,7 +138,7 @@ export function SearchPage(props: PageProps) {
           <box padding={1} flexDirection="column">
             <box paddingBottom={1}>
               <text
-                fg={props.depth() === SearchPaneType.HISTORY ? "cyan" : "gray"}
+                fg={props.depth() === SearchPaneType.HISTORY ? theme.primary : theme.muted}
               >
                 History
               </text>

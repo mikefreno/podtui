@@ -3,6 +3,7 @@ import { PlaybackControls } from "./PlaybackControls";
 import { RealtimeWaveform } from "./RealtimeWaveform";
 import { useAudio } from "@/hooks/useAudio";
 import { useAppStore } from "@/stores/app";
+import { useTheme } from "@/context/ThemeContext";
 
 enum PlayerPaneType {
   PLAYER = 1,
@@ -11,6 +12,7 @@ export const PlayerPaneCount = 1;
 
 export function PlayerPage(props: PageProps) {
   const audio = useAudio();
+  const { theme } = useTheme();
 
   const progressPercent = () => {
     const d = audio.duration();
@@ -30,19 +32,19 @@ export function PlayerPage(props: PageProps) {
         <text>
           <strong>Now Playing</strong>
         </text>
-        <text fg="gray">
+        <text fg={theme.muted}>
           {formatTime(audio.position())} / {formatTime(audio.duration())} (
           {progressPercent()}%)
         </text>
       </box>
 
-      {audio.error() && <text fg="red">{audio.error()}</text>}
+      {audio.error() && <text fg={theme.error}>{audio.error()}</text>}
 
       <box border padding={1} flexDirection="column" gap={1}>
-        <text fg="white">
+        <text fg={theme.text}>
           <strong>{audio.currentEpisode()?.title}</strong>
         </text>
-        <text fg="gray">{audio.currentEpisode()?.description}</text>
+        <text fg={theme.muted}>{audio.currentEpisode()?.description}</text>
 
         <RealtimeWaveform
           visualizerConfig={(() => {

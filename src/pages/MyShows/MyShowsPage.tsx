@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { PageProps } from "@/App";
+import { useTheme } from "@/context/ThemeContext";
 
 enum MyShowsPaneType {
   SHOWS = 1,
@@ -27,6 +28,8 @@ export function MyShowsPage(props: PageProps) {
   const [showIndex, setShowIndex] = createSignal(0);
   const [episodeIndex, setEpisodeIndex] = createSignal(0);
   const [isRefreshing, setIsRefreshing] = createSignal(false);
+  const { theme } = useTheme();
+  const mutedColor = () => theme.muted || theme.text;
 
   /** Threshold: load more when within this many items of the end */
   const LOAD_MORE_THRESHOLD = 5;
@@ -94,23 +97,6 @@ export function MyShowsPage(props: PageProps) {
     }
   };
 
-  /** Get download status color */
-  const downloadColor = (episodeId: string): string => {
-    const status = downloadStore.getDownloadStatus(episodeId);
-    switch (status) {
-      case DownloadStatus.QUEUED:
-        return "yellow";
-      case DownloadStatus.DOWNLOADING:
-        return "cyan";
-      case DownloadStatus.COMPLETED:
-        return "green";
-      case DownloadStatus.FAILED:
-        return "red";
-      default:
-        return "gray";
-    }
-  };
-
   const handleRefresh = async () => {
     const show = selectedShow();
     if (!show) return;
@@ -127,17 +113,34 @@ export function MyShowsPage(props: PageProps) {
     setEpisodeIndex(0);
   };
 
+  /** Get download status color */
+  const downloadColor = (episodeId: string): string => {
+    const status = downloadStore.getDownloadStatus(episodeId);
+    switch (status) {
+      case DownloadStatus.QUEUED:
+        return theme.warning.toString();
+      case DownloadStatus.DOWNLOADING:
+        return theme.primary.toString();
+      case DownloadStatus.COMPLETED:
+        return theme.success.toString();
+      case DownloadStatus.FAILED:
+        return theme.error.toString();
+      default:
+        return mutedColor().toString();
+    }
+  };
+
   return (
     <box flexDirection="row" flexGrow={1} width="100%">
       <box flexDirection="column" height="100%">
         <Show when={isRefreshing()}>
-          <text fg="yellow">Refreshing...</text>
+          <text fg={theme.warning}>Refreshing...</text>
         </Show>
         <Show
           when={shows().length > 0}
           fallback={
             <box padding={1}>
-              <text fg="gray">
+              <text fg={theme.muted}>
                 No shows yet. Subscribe from Discover or Search.
               </text>
             </box>
@@ -154,19 +157,19 @@ export function MyShowsPage(props: PageProps) {
                   gap={1}
                   paddingLeft={1}
                   paddingRight={1}
-                  backgroundColor={index() === showIndex() ? "#333" : undefined}
+                  backgroundColor={index() === showIndex() ? theme.primary : undefined}
                   onMouseDown={() => {
                     setShowIndex(index());
                     setEpisodeIndex(0);
                   }}
                 >
-                  <text fg={index() === showIndex() ? "cyan" : "gray"}>
+                  <text fg={index() === showIndex() ? theme.primary : theme.muted}>
                     {index() === showIndex() ? ">" : " "}
                   </text>
-                  <text fg={index() === showIndex() ? "white" : undefined}>
+                  <text fg={index() === showIndex() ? theme.text : undefined}>
                     {feed.customName || feed.podcast.title}
                   </text>
-                  <text fg="gray">({feed.episodes.length})</text>
+                  <text fg={theme.muted}>({feed.episodes.length})</text>
                 </box>
               )}
             </For>
@@ -174,82 +177,82 @@ export function MyShowsPage(props: PageProps) {
         </Show>
       </box>
       <box flexDirection="column" height="100%">
-        <Show
-          when={selectedShow()}
-          fallback={
-            <box padding={1}>
-              <text fg="gray">Select a show</text>
-            </box>
-          }
-        >
-          <Show
-            when={episodes().length > 0}
-            fallback={
-              <box padding={1}>
-                <text fg="gray">No episodes. Press [r] to refresh.</text>
-              </box>
-            }
-          >
-            <scrollbox
-              height="100%"
-              focused={props.depth() == MyShowsPaneType.EPISODES}
-            >
-              <For each={episodes()}>
-                {(episode, index) => (
-                  <box
-                    flexDirection="column"
-                    gap={0}
-                    paddingLeft={1}
-                    paddingRight={1}
-                    backgroundColor={
-                      index() === episodeIndex() ? "#333" : undefined
-                    }
-                    onMouseDown={() => setEpisodeIndex(index())}
-                  >
-                    <box flexDirection="row" gap={1}>
-                      <text fg={index() === episodeIndex() ? "cyan" : "gray"}>
-                        {index() === episodeIndex() ? ">" : " "}
-                      </text>
-                      <text
-                        fg={index() === episodeIndex() ? "white" : undefined}
-                      >
-                        {episode.episodeNumber
-                          ? `#${episode.episodeNumber} `
-                          : ""}
-                        {episode.title}
-                      </text>
-                    </box>
-                    <box flexDirection="row" gap={2} paddingLeft={2}>
-                      <text fg="gray">{formatDate(episode.pubDate)}</text>
-                      <text fg="gray">{formatDuration(episode.duration)}</text>
-                      <Show when={downloadLabel(episode.id)}>
-                        <text fg={downloadColor(episode.id)}>
-                          {downloadLabel(episode.id)}
-                        </text>
-                      </Show>
-                    </box>
-                  </box>
-                )}
-              </For>
-              <Show when={feedStore.isLoadingMore()}>
-                <box paddingLeft={2} paddingTop={1}>
-                  <text fg="yellow">Loading more episodes...</text>
+            <Show
+              when={selectedShow()}
+              fallback={
+                <box padding={1}>
+                  <text fg={theme.muted}>Select a show</text>
                 </box>
-              </Show>
+              }
+            >
               <Show
-                when={
-                  !feedStore.isLoadingMore() &&
-                  selectedShow() &&
-                  feedStore.hasMoreEpisodes(selectedShow()!.id)
+                when={episodes().length > 0}
+                fallback={
+                  <box padding={1}>
+                    <text fg={theme.muted}>No episodes. Press [r] to refresh.</text>
+                  </box>
                 }
               >
-                <box paddingLeft={2} paddingTop={1}>
-                  <text fg="gray">Scroll down for more episodes</text>
-                </box>
+                <scrollbox
+                  height="100%"
+                  focused={props.depth() == MyShowsPaneType.EPISODES}
+                >
+                  <For each={episodes()}>
+                    {(episode, index) => (
+                      <box
+                        flexDirection="column"
+                        gap={0}
+                        paddingLeft={1}
+                        paddingRight={1}
+                        backgroundColor={
+                          index() === episodeIndex() ? theme.primary : undefined
+                        }
+                        onMouseDown={() => setEpisodeIndex(index())}
+                      >
+                        <box flexDirection="row" gap={1}>
+                          <text fg={index() === episodeIndex() ? theme.primary : theme.muted}>
+                            {index() === episodeIndex() ? ">" : " "}
+                          </text>
+                          <text
+                            fg={index() === episodeIndex() ? theme.text : undefined}
+                          >
+                            {episode.episodeNumber
+                              ? `#${episode.episodeNumber} `
+                              : ""}
+                            {episode.title}
+                          </text>
+                        </box>
+                        <box flexDirection="row" gap={2} paddingLeft={2}>
+                          <text fg={theme.muted}>{formatDate(episode.pubDate)}</text>
+                          <text fg={theme.muted}>{formatDuration(episode.duration)}</text>
+                          <Show when={downloadLabel(episode.id)}>
+                            <text fg={downloadColor(episode.id)}>
+                              {downloadLabel(episode.id)}
+                            </text>
+                          </Show>
+                        </box>
+                      </box>
+                    )}
+                  </For>
+                  <Show when={feedStore.isLoadingMore()}>
+                    <box paddingLeft={2} paddingTop={1}>
+                      <text fg={theme.warning}>Loading more episodes...</text>
+                    </box>
+                  </Show>
+                  <Show
+                    when={
+                      !feedStore.isLoadingMore() &&
+                      selectedShow() &&
+                      feedStore.hasMoreEpisodes(selectedShow()!.id)
+                    }
+                  >
+                    <box paddingLeft={2} paddingTop={1}>
+                      <text fg={theme.muted}>Scroll down for more episodes</text>
+                    </box>
+                  </Show>
+                </scrollbox>
               </Show>
-            </scrollbox>
-          </Show>
-        </Show>
+            </Show>
       </box>
     </box>
   );
