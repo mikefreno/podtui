@@ -5,13 +5,10 @@
  */
 
 import { createSignal, For, Show, createMemo, createEffect } from "solid-js";
-import { useKeyboard } from "@opentui/solid";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
 import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
-import type { Episode } from "@/types/episode";
-import type { Feed } from "@/types/feed";
 import { PageProps } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -157,19 +154,27 @@ export function MyShowsPage(props: PageProps) {
                   gap={1}
                   paddingLeft={1}
                   paddingRight={1}
-                  backgroundColor={index() === showIndex() ? theme.primary : undefined}
+                  backgroundColor={
+                    index() === showIndex() ? theme.primary : undefined
+                  }
                   onMouseDown={() => {
                     setShowIndex(index());
                     setEpisodeIndex(0);
                   }}
                 >
-                  <text fg={index() === showIndex() ? theme.primary : theme.muted}>
+                  <text
+                    fg={index() === showIndex() ? theme.surface : theme.text}
+                  >
                     {index() === showIndex() ? ">" : " "}
                   </text>
-                  <text fg={index() === showIndex() ? theme.text : undefined}>
+                  <text
+                    fg={index() === showIndex() ? theme.surface : theme.text}
+                  >
                     {feed.customName || feed.podcast.title}
                   </text>
-                  <text fg={theme.muted}>({feed.episodes.length})</text>
+                  <text fg={index() === showIndex() ? undefined : theme.text}>
+                    ({feed.episodes.length})
+                  </text>
                 </box>
               )}
             </For>
@@ -177,82 +182,98 @@ export function MyShowsPage(props: PageProps) {
         </Show>
       </box>
       <box flexDirection="column" height="100%">
-            <Show
-              when={selectedShow()}
-              fallback={
-                <box padding={1}>
-                  <text fg={theme.muted}>Select a show</text>
-                </box>
-              }
+        <Show
+          when={selectedShow()}
+          fallback={
+            <box padding={1}>
+              <text fg={theme.muted}>Select a show</text>
+            </box>
+          }
+        >
+          <Show
+            when={episodes().length > 0}
+            fallback={
+              <box padding={1}>
+                <text fg={theme.muted}>No episodes. Press [r] to refresh.</text>
+              </box>
+            }
+          >
+            <scrollbox
+              height="100%"
+              focused={props.depth() == MyShowsPaneType.EPISODES}
             >
-              <Show
-                when={episodes().length > 0}
-                fallback={
-                  <box padding={1}>
-                    <text fg={theme.muted}>No episodes. Press [r] to refresh.</text>
+              <For each={episodes()}>
+                {(episode, index) => (
+                  <box
+                    flexDirection="column"
+                    gap={0}
+                    paddingLeft={1}
+                    paddingRight={1}
+                    backgroundColor={
+                      index() === episodeIndex() ? theme.primary : undefined
+                    }
+                    onMouseDown={() => setEpisodeIndex(index())}
+                  >
+                    <box flexDirection="row" gap={1}>
+                      <text
+                        fg={
+                          index() === episodeIndex()
+                            ? theme.surface
+                            : theme.text
+                        }
+                      >
+                        {index() === episodeIndex() ? ">" : " "}
+                      </text>
+                      <text
+                        fg={
+                          index() === episodeIndex()
+                            ? theme.surface
+                            : theme.text
+                        }
+                      >
+                        {episode.episodeNumber
+                          ? `#${episode.episodeNumber} `
+                          : ""}
+                        {episode.title}
+                      </text>
+                    </box>
+                    <box flexDirection="row" gap={2} paddingLeft={2}>
+                      <text
+                        fg={index() === episodeIndex() ? undefined : theme.info}
+                      >
+                        {formatDate(episode.pubDate)}
+                      </text>
+                      <text fg={theme.muted}>
+                        {formatDuration(episode.duration)}
+                      </text>
+                      <Show when={downloadLabel(episode.id)}>
+                        <text fg={downloadColor(episode.id)}>
+                          {downloadLabel(episode.id)}
+                        </text>
+                      </Show>
+                    </box>
                   </box>
+                )}
+              </For>
+              <Show when={feedStore.isLoadingMore()}>
+                <box paddingLeft={2} paddingTop={1}>
+                  <text fg={theme.warning}>Loading more episodes...</text>
+                </box>
+              </Show>
+              <Show
+                when={
+                  !feedStore.isLoadingMore() &&
+                  selectedShow() &&
+                  feedStore.hasMoreEpisodes(selectedShow()!.id)
                 }
               >
-                <scrollbox
-                  height="100%"
-                  focused={props.depth() == MyShowsPaneType.EPISODES}
-                >
-                  <For each={episodes()}>
-                    {(episode, index) => (
-                      <box
-                        flexDirection="column"
-                        gap={0}
-                        paddingLeft={1}
-                        paddingRight={1}
-                        backgroundColor={
-                          index() === episodeIndex() ? theme.primary : undefined
-                        }
-                        onMouseDown={() => setEpisodeIndex(index())}
-                      >
-                        <box flexDirection="row" gap={1}>
-                          <text fg={index() === episodeIndex() ? theme.primary : theme.muted}>
-                            {index() === episodeIndex() ? ">" : " "}
-                          </text>
-                          <text
-                            fg={index() === episodeIndex() ? theme.text : undefined}
-                          >
-                            {episode.episodeNumber
-                              ? `#${episode.episodeNumber} `
-                              : ""}
-                            {episode.title}
-                          </text>
-                        </box>
-                        <box flexDirection="row" gap={2} paddingLeft={2}>
-                          <text fg={theme.muted}>{formatDate(episode.pubDate)}</text>
-                          <text fg={theme.muted}>{formatDuration(episode.duration)}</text>
-                          <Show when={downloadLabel(episode.id)}>
-                            <text fg={downloadColor(episode.id)}>
-                              {downloadLabel(episode.id)}
-                            </text>
-                          </Show>
-                        </box>
-                      </box>
-                    )}
-                  </For>
-                  <Show when={feedStore.isLoadingMore()}>
-                    <box paddingLeft={2} paddingTop={1}>
-                      <text fg={theme.warning}>Loading more episodes...</text>
-                    </box>
-                  </Show>
-                  <Show
-                    when={
-                      !feedStore.isLoadingMore() &&
-                      selectedShow() &&
-                      feedStore.hasMoreEpisodes(selectedShow()!.id)
-                    }
-                  >
-                    <box paddingLeft={2} paddingTop={1}>
-                      <text fg={theme.muted}>Scroll down for more episodes</text>
-                    </box>
-                  </Show>
-                </scrollbox>
+                <box paddingLeft={2} paddingTop={1}>
+                  <text fg={theme.muted}>Scroll down for more episodes</text>
+                </box>
               </Show>
-            </Show>
+            </scrollbox>
+          </Show>
+        </Show>
       </box>
     </box>
   );

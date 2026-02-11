@@ -46,18 +46,20 @@ export function FeedItem(props: FeedItemProps) {
       <box
         flexDirection="row"
         gap={1}
-      backgroundColor={props.isSelected ? theme.backgroundElement : undefined}
-      paddingLeft={1}
-      paddingRight={1}
-    >
-      <text fg={props.isSelected ? theme.primary : theme.textMuted}>
-        {props.isSelected ? ">" : " "}
-      </text>
-      <text fg={visibilityColor()}>{visibilityIcon()}</text>
-      <text fg={props.isSelected ? theme.text : theme.accent}>
-        {props.feed.customName || props.feed.podcast.title}
-      </text>
-      {props.showEpisodeCount && <text fg={theme.textMuted}>({episodeCount()})</text>}
+        backgroundColor={props.isSelected ? theme.backgroundElement : undefined}
+        paddingLeft={1}
+        paddingRight={1}
+      >
+        <text fg={props.isSelected ? theme.primary : theme.textMuted}>
+          {props.isSelected ? ">" : " "}
+        </text>
+        <text fg={visibilityColor()}>{visibilityIcon()}</text>
+        <text fg={props.isSelected ? theme.text : theme.accent}>
+          {props.feed.customName || props.feed.podcast.title}
+        </text>
+        {props.showEpisodeCount && (
+          <text fg={theme.textMuted}>({episodeCount()})</text>
+        )}
       </box>
     );
   }
@@ -69,7 +71,7 @@ export function FeedItem(props: FeedItemProps) {
       gap={0}
       border={props.isSelected}
       borderColor={props.isSelected ? theme.primary : undefined}
-      backgroundColor={props.isSelected ? theme.backgroundElement : undefined}
+      backgroundColor={props.isSelected ? theme.primary : undefined}
       padding={1}
     >
       {/* Title row */}
@@ -80,9 +82,7 @@ export function FeedItem(props: FeedItemProps) {
         <text fg={visibilityColor()}>{visibilityIcon()}</text>
         <text fg={theme.warning}>{pinnedIndicator()}</text>
         <text fg={props.isSelected ? theme.text : theme.text}>
-          <strong>
-            {props.feed.customName || props.feed.podcast.title}
-          </strong>
+          <strong>{props.feed.customName || props.feed.podcast.title}</strong>
         </text>
       </box>
 
@@ -93,7 +93,9 @@ export function FeedItem(props: FeedItemProps) {
           </text>
         )}
         {props.showLastUpdated && (
-          <text fg={theme.textMuted}>Updated: {formatDate(props.feed.lastUpdated)}</text>
+          <text fg={theme.textMuted}>
+            Updated: {formatDate(props.feed.lastUpdated)}
+          </text>
         )}
       </box>
 
