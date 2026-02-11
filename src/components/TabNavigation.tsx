@@ -1,6 +1,7 @@
 import { useTheme } from "@/context/ThemeContext";
 import { TABS } from "@/utils/navigation";
 import { For } from "solid-js";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 interface TabNavigationProps {
   activeTab: TABS;
@@ -29,24 +30,18 @@ export function TabNavigation(props: TabNavigationProps) {
     >
       <For each={tabs}>
         {(tab) => (
-          <box
+          <SelectableBox
             border
-            borderColor={theme.border}
+            selected={() => tab.id == props.activeTab}
             onMouseDown={() => props.onTabSelect(tab.id)}
-            style={{
-              backgroundColor:
-                tab.id == props.activeTab ? theme.primary : "transparent",
-            }}
           >
-            <text
-              style={{
-                fg: tab.id == props.activeTab ? "white" : theme.text,
-                alignSelf: "center",
-              }}
+            <SelectableText
+              selected={() => tab.id == props.activeTab}
+              alignSelf="center"
             >
               {tab.label}
-            </text>
-          </box>
+            </SelectableText>
+          </SelectableBox>
         )}
       </For>
     </box>
