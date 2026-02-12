@@ -23,11 +23,20 @@ export type ThemeColors = {
   secondary: ColorValue;
   accent: ColorValue;
   text: ColorValue;
+  textPrimary?: ColorValue;
+  textSecondary?: ColorValue;
+  textTertiary?: ColorValue;
+  textSelectedPrimary?: ColorValue;
+  textSelectedSecondary?: ColorValue;
+  textSelectedTertiary?: ColorValue;
   muted: ColorValue;
   warning: ColorValue;
   error: ColorValue;
   success: ColorValue;
   layerBackgrounds?: LayerBackgrounds;
+  _hasSelectedListItemText?: boolean;
+  thinkingOpacity?: number;
+  selectedListItemText?: ColorValue;
 };
 
 export type ThemeVariant = {

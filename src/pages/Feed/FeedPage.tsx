@@ -80,9 +80,9 @@ export function FeedPage(props: PageProps) {
           <For each={Object.entries(episodesByDate()).sort(([a], [b]) => b.localeCompare(a))}>
             {([date, episode], groupIndex) => (
               <>
-                <box flexDirection="column" gap={0} paddingLeft={1} paddingRight={1} paddingTop={1} paddingBottom={1}>
-                  <text fg={theme.primary}>{date}</text>
-                </box>
+                 <box flexDirection="column" gap={0} paddingLeft={1} paddingRight={1} paddingTop={1} paddingBottom={1}>
+                   <SelectableText selected={() => false} primary>{date}</SelectableText>
+                 </box>
                 <SelectableBox
                   selected={() => groupIndex() === selectedIndex()}
                   flexDirection="column"
@@ -93,23 +93,25 @@ export function FeedPage(props: PageProps) {
                   paddingBottom={0}
                   onMouseDown={() => setSelectedIndex(groupIndex())}
                 >
-                  <SelectableText selected={() => groupIndex() === selectedIndex()}>
+                   <SelectableText selected={() => groupIndex() === selectedIndex()} primary>
                     {groupIndex() === selectedIndex() ? ">" : " "}
                   </SelectableText>
                   <SelectableText
                     selected={() => groupIndex() === selectedIndex()}
-                    fg={theme.text}
+                    primary
                   >
                     {episode.episode.title}
                   </SelectableText>
                   <box flexDirection="row" gap={2} paddingLeft={2}>
-                    <text fg={theme.primary}>{episode.feed.podcast.title}</text>
-                    <text fg={theme.textMuted}>
+                    <SelectableText selected={() => groupIndex() === selectedIndex()} primary>
+                      {episode.feed.podcast.title}
+                    </SelectableText>
+                    <SelectableText selected={() => groupIndex() === selectedIndex()} tertiary>
                       {formatDate(episode.episode.pubDate)}
-                    </text>
-                    <text fg={theme.textMuted}>
+                    </SelectableText>
+                    <SelectableText selected={() => groupIndex() === selectedIndex()} tertiary>
                       {formatDuration(episode.episode.duration)}
-                    </text>
+                    </SelectableText>
                   </box>
                 </SelectableBox>
               </>

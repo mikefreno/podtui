@@ -6,7 +6,11 @@ export function SelectableBox({
   selected,
   children,
   ...props
-}: { selected: () => boolean; children: JSXElement } & BoxOptions) {
+}: {
+  selected: () => boolean;
+
+  children: JSXElement;
+} & BoxOptions) {
   const { theme } = useTheme();
 
   return (
@@ -21,18 +25,54 @@ export function SelectableBox({
   );
 }
 
+enum ColorSet {
+  PRIMARY,
+  SECONDARY,
+  TERTIARY,
+  DEFAULT,
+}
+function getTextColor(set: ColorSet, selected: () => boolean) {
+  const { theme } = useTheme();
+  switch (set) {
+    case ColorSet.PRIMARY:
+      return selected() ? theme.textSelectedPrimary : theme.textPrimary;
+    case ColorSet.SECONDARY:
+      return selected() ? theme.textSelectedSecondary : theme.textSecondary;
+    case ColorSet.TERTIARY:
+      return selected() ? theme.textSelectedTertiary : theme.textTertiary;
+    default:
+      return theme.textPrimary;
+  }
+}
+
 export function SelectableText({
   selected,
   children,
+  primary,
+  secondary,
+  tertiary,
   ...props
 }: {
   selected: () => boolean;
+  primary?: boolean;
+  secondary?: boolean;
+  tertiary?: boolean;
   children: JSXElement;
 } & TextOptions) {
-  const { theme } = useTheme();
-
   return (
-    <text fg={selected() ? theme.surface : theme.text} {...props}>
+    <text
+      fg={getTextColor(
+        primary
+          ? ColorSet.PRIMARY
+          : secondary
+            ? ColorSet.SECONDARY
+            : tertiary
+              ? ColorSet.TERTIARY
+              : ColorSet.DEFAULT,
+        selected,
+      )}
+      {...props}
+    >
       {children}
     </text>
   );

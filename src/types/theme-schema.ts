@@ -23,4 +23,10 @@ export type ThemeJson = {
 export type ThemeColors = Record<string, RGBA> & {
   _hasSelectedListItemText: boolean
   thinkingOpacity: number
+  textPrimary?: ColorValue
+  textSecondary?: ColorValue
+  textTertiary?: ColorValue
+  textSelectedPrimary?: ColorValue
+  textSelectedSecondary?: ColorValue
+  textSelectedTertiary?: ColorValue
 }

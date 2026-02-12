@@ -27,19 +27,19 @@ export function ResultCard(props: ResultCardProps) {
         justifyContent="space-between"
         alignItems="center"
       >
-        <box flexDirection="row" gap={2} alignItems="center">
-            <SelectableText
-              selected={() => props.selected}
-              fg={theme.primary}
-            >
-              <strong>{podcast().title}</strong>
-            </SelectableText>
-          <SourceBadge
-            sourceId={props.result.sourceId}
-            sourceName={props.result.sourceName}
-            sourceType={props.result.sourceType}
-          />
-        </box>
+         <box flexDirection="row" gap={2} alignItems="center">
+             <SelectableText
+               selected={() => props.selected}
+               primary
+             >
+               <strong>{podcast().title}</strong>
+             </SelectableText>
+           <SourceBadge
+             sourceId={props.result.sourceId}
+             sourceName={props.result.sourceName}
+             sourceType={props.result.sourceType}
+           />
+         </box>
         <Show when={podcast().isSubscribed}>
             <text fg={theme.success}>[Subscribed]</text>
         </Show>

@@ -22,7 +22,7 @@ import {
   type TerminalColors,
 } from "@opentui/core";
 
-type ThemeResolved = {
+export type ThemeResolved = {
   primary: RGBA;
   secondary: RGBA;
   accent: RGBA;
@@ -32,7 +32,13 @@ type ThemeResolved = {
   info: RGBA;
   text: RGBA;
   textMuted: RGBA;
-  selectedListItemText: RGBA;
+  textPrimary: RGBA;
+  textSecondary: RGBA;
+  textTertiary: RGBA;
+  textSelectedPrimary: RGBA;
+  textSelectedSecondary: RGBA;
+  textSelectedTertiary: RGBA;
+
   background: RGBA;
   backgroundPanel: RGBA;
   backgroundElement: RGBA;
@@ -77,6 +83,7 @@ type ThemeResolved = {
   syntaxPunctuation: RGBA;
   muted?: RGBA;
   surface?: RGBA;
+  selectedListItemText?: RGBA;
   layerBackgrounds?: {
     layer0: RGBA;
     layer1: RGBA;

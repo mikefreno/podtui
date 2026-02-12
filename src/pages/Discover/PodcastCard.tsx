@@ -29,7 +29,7 @@ export function PodcastCard(props: PodcastCardProps) {
       onMouseDown={props.onSelect}
     >
       <box flexDirection="row" gap={2} alignItems="center">
-        <SelectableText selected={() => props.selected}>
+        <SelectableText selected={() => props.selected} primary>
           <strong>{props.podcast.title}</strong>
         </SelectableText>
 
@@ -42,7 +42,7 @@ export function PodcastCard(props: PodcastCardProps) {
       <Show when={props.podcast.author && !props.compact}>
         <SelectableText
           selected={() => props.selected}
-          fg={theme.textMuted}
+          tertiary
         >
           by {props.podcast.author}
         </SelectableText>
@@ -52,7 +52,7 @@ export function PodcastCard(props: PodcastCardProps) {
       <Show when={props.podcast.description && !props.compact}>
         <SelectableText
           selected={() => props.selected}
-          fg={theme.text}
+          tertiary
         >
           {props.podcast.description!.length > 80
             ? props.podcast.description!.slice(0, 80) + "..."

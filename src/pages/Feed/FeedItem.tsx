@@ -54,26 +54,26 @@ export function FeedItem(props: FeedItemProps) {
       >
         <SelectableText
           selected={() => props.isSelected}
-          fg={theme.primary}
+          primary
         >
           {props.isSelected ? ">" : " "}
         </SelectableText>
         <SelectableText
           selected={() => props.isSelected}
-          fg={visibilityColor()}
+          tertiary
         >
           {visibilityIcon()}
         </SelectableText>
         <SelectableText
           selected={() => props.isSelected}
-          fg={theme.text}
+          primary
         >
           {props.feed.customName || props.feed.podcast.title}
         </SelectableText>
         {props.showEpisodeCount && (
           <SelectableText
             selected={() => props.isSelected}
-            fg={theme.textMuted}
+            tertiary
           >
             ({episodeCount()})
           </SelectableText>
@@ -95,25 +95,25 @@ export function FeedItem(props: FeedItemProps) {
       <box flexDirection="row" gap={1}>
         <SelectableText
           selected={() => props.isSelected}
-          fg={theme.primary}
+          primary
         >
           {props.isSelected ? ">" : " "}
         </SelectableText>
         <SelectableText
           selected={() => props.isSelected}
-          fg={visibilityColor()}
+          tertiary
         >
           {visibilityIcon()}
         </SelectableText>
         <SelectableText
           selected={() => props.isSelected}
-          fg={theme.warning}
+          secondary
         >
           {pinnedIndicator()}
         </SelectableText>
         <SelectableText
           selected={() => props.isSelected}
-          fg={theme.text}
+          primary
         >
           <strong>{props.feed.customName || props.feed.podcast.title}</strong>
         </SelectableText>
@@ -123,7 +123,7 @@ export function FeedItem(props: FeedItemProps) {
         {props.showEpisodeCount && (
           <SelectableText
             selected={() => props.isSelected}
-            fg={theme.textMuted}
+            tertiary
           >
             {episodeCount()} episodes ({unplayedCount()} new)
           </SelectableText>
@@ -131,7 +131,7 @@ export function FeedItem(props: FeedItemProps) {
         {props.showLastUpdated && (
           <SelectableText
             selected={() => props.isSelected}
-            fg={theme.textMuted}
+            tertiary
           >
             Updated: {formatDate(props.feed.lastUpdated)}
           </SelectableText>
@@ -143,7 +143,7 @@ export function FeedItem(props: FeedItemProps) {
           selected={() => props.isSelected}
           paddingLeft={4}
           paddingTop={0}
-          fg={theme.textMuted}
+          tertiary
         >
           {props.feed.podcast.description.slice(0, 60)}
           {props.feed.podcast.description.length > 60 ? "..." : ""}
