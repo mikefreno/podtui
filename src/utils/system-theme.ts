@@ -64,6 +64,19 @@ export function generateSystemTheme(
   const diffAddedLineNumberBg = tint(grays[3], ansi.green, diffAlpha);
   const diffRemovedLineNumberBg = tint(grays[3], ansi.red, diffAlpha);
 
+  // Create darker shades for selected text colors to ensure contrast
+  const darken = (color: RGBA, factor: number = 0.6) => {
+    return RGBA.fromInts(
+      Math.round(color.r * 255 * factor),
+      Math.round(color.g * 255 * factor),
+      Math.round(color.b * 255 * factor)
+    );
+  };
+
+  const selectedPrimary = darken(ansi.cyan, isDark ? 0.4 : 0.6);
+  const selectedSecondary = darken(ansi.magenta, isDark ? 0.4 : 0.6);
+  const selectedTertiary = darken(textMuted, isDark ? 0.5 : 0.5);
+
   return {
     theme: {
       primary: ansi.cyan,
@@ -75,6 +88,12 @@ export function generateSystemTheme(
       info: ansi.cyan,
       text: fg,
       textMuted,
+      textPrimary: fg,
+      textSecondary: textMuted,
+      textTertiary: textMuted,
+      textSelectedPrimary: selectedPrimary,
+      textSelectedSecondary: selectedSecondary,
+      textSelectedTertiary: selectedTertiary,
       selectedListItemText: bg,
       background: transparent,
       backgroundPanel: grays[2],

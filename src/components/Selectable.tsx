@@ -1,29 +1,28 @@
 import { useTheme } from "@/context/ThemeContext";
-import type { JSXElement } from "solid-js";
+import { children as solidChildren } from "solid-js";
+import type { ParentComponent } from "solid-js";
 import type { BoxOptions, TextOptions } from "@opentui/core";
 
-export function SelectableBox({
-  selected,
-  children,
-  ...props
-}: {
-  selected: () => boolean;
-
-  children: JSXElement;
-} & BoxOptions) {
+export const SelectableBox: ParentComponent<
+  {
+    selected: () => boolean;
+  } & BoxOptions
+> = (props) => {
   const { theme } = useTheme();
+
+  const child = solidChildren(() => props.children);
 
   return (
     <box
       border={!!props.border}
-      borderColor={selected() ? theme.surface : theme.border}
-      backgroundColor={selected() ? theme.primary : theme.surface}
+      borderColor={props.selected() ? theme.surface : theme.border}
+      backgroundColor={props.selected() ? theme.primary : theme.surface}
       {...props}
     >
-      {children}
+      {child()}
     </box>
   );
-}
+};
 
 enum ColorSet {
   PRIMARY,
@@ -45,35 +44,31 @@ function getTextColor(set: ColorSet, selected: () => boolean) {
   }
 }
 
-export function SelectableText({
-  selected,
-  children,
-  primary,
-  secondary,
-  tertiary,
-  ...props
-}: {
-  selected: () => boolean;
-  primary?: boolean;
-  secondary?: boolean;
-  tertiary?: boolean;
-  children: JSXElement;
-} & TextOptions) {
+export const SelectableText: ParentComponent<
+  {
+    selected: () => boolean;
+    primary?: boolean;
+    secondary?: boolean;
+    tertiary?: boolean;
+  } & TextOptions
+> = (props) => {
+  const child = solidChildren(() => props.children);
+
   return (
     <text
       fg={getTextColor(
-        primary
+        props.primary
           ? ColorSet.PRIMARY
-          : secondary
+          : props.secondary
             ? ColorSet.SECONDARY
-            : tertiary
+            : props.tertiary
               ? ColorSet.TERTIARY
               : ColorSet.DEFAULT,
-        selected,
+        props.selected,
       )}
       {...props}
     >
-      {children}
+      {child()}
     </text>
   );
-}
+};
