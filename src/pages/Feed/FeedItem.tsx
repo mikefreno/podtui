@@ -6,6 +6,7 @@
 import type { Feed, FeedVisibility } from "@/types/feed";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 interface FeedItemProps {
   feed: Feed;
@@ -43,70 +44,111 @@ export function FeedItem(props: FeedItemProps) {
   if (props.compact) {
     // Compact single-line view
     return (
-      <box
+      <SelectableBox
+        selected={() => props.isSelected}
         flexDirection="row"
         gap={1}
-        backgroundColor={props.isSelected ? theme.backgroundElement : undefined}
         paddingLeft={1}
         paddingRight={1}
+        onMouseDown={() => {}}
       >
-        <text fg={props.isSelected ? theme.primary : theme.textMuted}>
+        <SelectableText
+          selected={() => props.isSelected}
+          fg={theme.primary}
+        >
           {props.isSelected ? ">" : " "}
-        </text>
-        <text fg={visibilityColor()}>{visibilityIcon()}</text>
-        <text fg={props.isSelected ? theme.text : theme.accent}>
+        </SelectableText>
+        <SelectableText
+          selected={() => props.isSelected}
+          fg={visibilityColor()}
+        >
+          {visibilityIcon()}
+        </SelectableText>
+        <SelectableText
+          selected={() => props.isSelected}
+          fg={theme.text}
+        >
           {props.feed.customName || props.feed.podcast.title}
-        </text>
+        </SelectableText>
         {props.showEpisodeCount && (
-          <text fg={theme.textMuted}>({episodeCount()})</text>
+          <SelectableText
+            selected={() => props.isSelected}
+            fg={theme.textMuted}
+          >
+            ({episodeCount()})
+          </SelectableText>
         )}
-      </box>
+      </SelectableBox>
     );
   }
 
   // Full view with details
   return (
-    <box
+    <SelectableBox
+      selected={() => props.isSelected}
       flexDirection="column"
       gap={0}
-      border={props.isSelected}
-      borderColor={props.isSelected ? theme.primary : undefined}
-      backgroundColor={props.isSelected ? theme.primary : undefined}
       padding={1}
+      onMouseDown={() => {}}
     >
       {/* Title row */}
       <box flexDirection="row" gap={1}>
-        <text fg={props.isSelected ? theme.primary : theme.textMuted}>
+        <SelectableText
+          selected={() => props.isSelected}
+          fg={theme.primary}
+        >
           {props.isSelected ? ">" : " "}
-        </text>
-        <text fg={visibilityColor()}>{visibilityIcon()}</text>
-        <text fg={theme.warning}>{pinnedIndicator()}</text>
-        <text fg={props.isSelected ? theme.text : theme.text}>
+        </SelectableText>
+        <SelectableText
+          selected={() => props.isSelected}
+          fg={visibilityColor()}
+        >
+          {visibilityIcon()}
+        </SelectableText>
+        <SelectableText
+          selected={() => props.isSelected}
+          fg={theme.warning}
+        >
+          {pinnedIndicator()}
+        </SelectableText>
+        <SelectableText
+          selected={() => props.isSelected}
+          fg={theme.text}
+        >
           <strong>{props.feed.customName || props.feed.podcast.title}</strong>
-        </text>
+        </SelectableText>
       </box>
 
       <box flexDirection="row" gap={2} paddingLeft={4}>
         {props.showEpisodeCount && (
-          <text fg={theme.textMuted}>
+          <SelectableText
+            selected={() => props.isSelected}
+            fg={theme.textMuted}
+          >
             {episodeCount()} episodes ({unplayedCount()} new)
-          </text>
+          </SelectableText>
         )}
         {props.showLastUpdated && (
-          <text fg={theme.textMuted}>
+          <SelectableText
+            selected={() => props.isSelected}
+            fg={theme.textMuted}
+          >
             Updated: {formatDate(props.feed.lastUpdated)}
-          </text>
+          </SelectableText>
         )}
       </box>
 
       {props.feed.podcast.description && (
-        <box paddingLeft={4} paddingTop={0}>
-          <text fg={theme.textMuted}>
-            {props.feed.podcast.description.slice(0, 60)}
-            {props.feed.podcast.description.length > 60 ? "..." : ""}
-          </text>
-        </box>
+        <SelectableText
+          selected={() => props.isSelected}
+          paddingLeft={4}
+          paddingTop={0}
+          fg={theme.textMuted}
+        >
+          {props.feed.podcast.description.slice(0, 60)}
+          {props.feed.podcast.description.length > 60 ? "..." : ""}
+        </SelectableText>
       )}
-    </box>
+    </SelectableBox>
   );
 }

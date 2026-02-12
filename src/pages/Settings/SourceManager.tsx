@@ -8,6 +8,7 @@ import { useFeedStore } from "@/stores/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { SourceType } from "@/types/source";
 import type { PodcastSource } from "@/types/source";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 interface SourceManagerProps {
   focused?: boolean;
@@ -183,24 +184,20 @@ export function SourceManager(props: SourceManagerProps) {
         <text fg={focusArea() === "list" ? theme.primary : theme.textMuted}>
           Sources:
         </text>
-        <scrollbox height={6}>
-          <For each={sources()}>
-            {(source, index) => (
-              <box
-                flexDirection="row"
-                gap={1}
-                padding={0}
-                backgroundColor={
-                  focusArea() === "list" && index() === selectedIndex()
-                    ? theme.primary
-                    : undefined
-                }
-                onMouseDown={() => {
-                  setSelectedIndex(index());
-                  setFocusArea("list");
-                  feedStore.toggleSource(source.id);
-                }}
-              >
+          <scrollbox height={6}>
+            <For each={sources()}>
+              {(source, index) => (
+                <SelectableBox
+                  selected={() => focusArea() === "list" && index() === selectedIndex()}
+                  flexDirection="row"
+                  gap={1}
+                  padding={0}
+                  onMouseDown={() => {
+                    setSelectedIndex(index());
+                    setFocusArea("list");
+                    feedStore.toggleSource(source.id);
+                  }}
+                >
                 <text
                   fg={
                     focusArea() === "list" && index() === selectedIndex()
@@ -212,20 +209,13 @@ export function SourceManager(props: SourceManagerProps) {
                     ? ">"
                     : " "}
                 </text>
-                <text fg={source.enabled ? theme.success : theme.error}>
-                  {source.enabled ? "[x]" : "[ ]"}
-                </text>
-                <text fg={theme.accent}>{getSourceIcon(source)}</text>
-                <text
-                  fg={
-                    focusArea() === "list" && index() === selectedIndex()
-                      ? theme.text
-                      : undefined
-                  }
+                <SelectableText
+                  selected={() => focusArea() === "list" && index() === selectedIndex()}
+                  fg={theme.text}
                 >
                   {source.name}
-                </text>
-              </box>
+                </SelectableText>
+              </SelectableBox>
             )}
           </For>
         </scrollbox>

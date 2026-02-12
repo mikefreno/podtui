@@ -10,6 +10,7 @@ import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { PageProps } from "@/App";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 enum FeedPaneType {
   FEED = 1,
@@ -25,6 +26,18 @@ export function FeedPage(props: PageProps) {
 
   const formatDate = (date: Date): string => {
     return format(date, "MMM d, yyyy");
+  };
+
+  const episodesByDate = () => {
+    const groups: Record<string, { episode: Episode; feed: Feed }> = {};
+    const sortedEpisodes = allEpisodes();
+
+    for (const episode of sortedEpisodes) {
+      const dateKey = formatDate(new Date(episode.episode.pubDate));
+      groups[dateKey] = episode;
+    }
+
+    return groups;
   };
 
   const formatDuration = (seconds: number): string => {
@@ -63,36 +76,43 @@ export function FeedPage(props: PageProps) {
           </box>
         }
       >
-        {/**TODO: figure out wtf to do here **/}
-        <scrollbox height="100%" focused={props.depth() == FeedPaneType.FEED}>
-          <For each={allEpisodes()}>
-            {(item, index) => (
-              <box
-                flexDirection="column"
-                gap={0}
-                paddingLeft={1}
-                paddingRight={1}
-                paddingTop={0}
-                paddingBottom={0}
-                backgroundColor={
-                  index() === selectedIndex() ? theme.backgroundElement : undefined
-                }
-                onMouseDown={() => setSelectedIndex(index())}
-              >
-                <box flexDirection="row" gap={1}>
-                  <text fg={index() === selectedIndex() ? theme.primary : theme.textMuted}>
-                    {index() === selectedIndex() ? ">" : " "}
-                  </text>
-                  <text fg={index() === selectedIndex() ? theme.text : theme.text}>
-                    {item.episode.title}
-                  </text>
+         <scrollbox height="100%" focused={props.depth() == FeedPaneType.FEED}>
+          <For each={Object.entries(episodesByDate()).sort(([a], [b]) => b.localeCompare(a))}>
+            {([date, episode], groupIndex) => (
+              <>
+                <box flexDirection="column" gap={0} paddingLeft={1} paddingRight={1} paddingTop={1} paddingBottom={1}>
+                  <text fg={theme.primary}>{date}</text>
                 </box>
-                <box flexDirection="row" gap={2} paddingLeft={2}>
-                  <text fg={theme.primary}>{item.feed.podcast.title}</text>
-                  <text fg={theme.textMuted}>{formatDate(item.episode.pubDate)}</text>
-                  <text fg={theme.textMuted}>{formatDuration(item.episode.duration)}</text>
-                </box>
-              </box>
+                <SelectableBox
+                  selected={() => groupIndex() === selectedIndex()}
+                  flexDirection="column"
+                  gap={0}
+                  paddingLeft={1}
+                  paddingRight={1}
+                  paddingTop={0}
+                  paddingBottom={0}
+                  onMouseDown={() => setSelectedIndex(groupIndex())}
+                >
+                  <SelectableText selected={() => groupIndex() === selectedIndex()}>
+                    {groupIndex() === selectedIndex() ? ">" : " "}
+                  </SelectableText>
+                  <SelectableText
+                    selected={() => groupIndex() === selectedIndex()}
+                    fg={theme.text}
+                  >
+                    {episode.episode.title}
+                  </SelectableText>
+                  <box flexDirection="row" gap={2} paddingLeft={2}>
+                    <text fg={theme.primary}>{episode.feed.podcast.title}</text>
+                    <text fg={theme.textMuted}>
+                      {formatDate(episode.episode.pubDate)}
+                    </text>
+                    <text fg={theme.textMuted}>
+                      {formatDuration(episode.episode.duration)}
+                    </text>
+                  </box>
+                </SelectableBox>
+              </>
             )}
           </For>
         </scrollbox>

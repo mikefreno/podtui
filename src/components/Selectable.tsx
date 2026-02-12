@@ -6,14 +6,12 @@ export function SelectableBox({
   selected,
   children,
   ...props
-}: {
-  selected: () => boolean;
-  children: JSXElement;
-} & BoxOptions) {
+}: { selected: () => boolean; children: JSXElement } & BoxOptions) {
   const { theme } = useTheme();
 
   return (
     <box
+      border={!!props.border}
       borderColor={selected() ? theme.surface : theme.border}
       backgroundColor={selected() ? theme.primary : theme.surface}
       {...props}

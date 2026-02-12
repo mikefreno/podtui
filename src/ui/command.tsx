@@ -15,6 +15,7 @@ import { useDialog } from "./dialog";
 import { useTheme } from "../context/ThemeContext";
 import { TextAttributes } from "@opentui/core";
 import { emit } from "../utils/event-bus";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 /**
  * Command option for the command palette.
@@ -281,37 +282,53 @@ function CommandDialog(props: {
       <box flexDirection="column" maxHeight={maxHeight} borderColor={theme.border}>
         <For each={filteredOptions().slice(0, 10)}>
           {(option, index) => (
-            <box
-              backgroundColor={
-                index() === selectedIndex() ? theme.primary : undefined
-              }
+            <SelectableBox
+              selected={() => index() === selectedIndex()}
+              flexDirection="column"
               padding={1}
+              onMouseDown={() => {
+                setSelectedIndex(index());
+                const selectedOption = filteredOptions()[index()];
+                if (selectedOption) {
+                  selectedOption.onSelect?.(dialog);
+                  dialog.clear();
+                }
+              }}
             >
               <box flexDirection="column" flexGrow={1}>
-                <box flexDirection="row" justifyContent="space-between">
-                  <text
-                    fg={
-                      index() === selectedIndex()
-                        ? theme.selectedListItemText
-                        : theme.text
-                    }
-                    attributes={
-                      index() === selectedIndex()
-                        ? TextAttributes.BOLD
-                        : undefined
-                    }
+                <SelectableText
+                  selected={() => index() === selectedIndex()}
+                  fg={
+                    index() === selectedIndex()
+                      ? theme.selectedListItemText
+                      : theme.text
+                  }
+                  attributes={
+                    index() === selectedIndex()
+                      ? TextAttributes.BOLD
+                      : undefined
+                  }
+                >
+                  {option.title}
+                </SelectableText>
+                <Show when={option.footer}>
+                  <SelectableText
+                    selected={() => index() === selectedIndex()}
+                    fg={theme.textMuted}
                   >
-                    {option.title}
-                  </text>
-                  <Show when={option.footer}>
-                    <text fg={theme.textMuted}>{option.footer}</text>
-                  </Show>
-                </box>
+                    {option.footer}
+                  </SelectableText>
+                </Show>
                 <Show when={option.description}>
-                  <text fg={theme.textMuted}>{option.description}</text>
+                  <SelectableText
+                    selected={() => index() === selectedIndex()}
+                    fg={theme.textMuted}
+                  >
+                    {option.description}
+                  </SelectableText>
                 </Show>
               </box>
-            </box>
+            </SelectableBox>
           )}
         </For>
         <Show when={filteredOptions().length === 0}>

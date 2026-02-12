@@ -8,6 +8,7 @@ import { useDiscoverStore, DISCOVER_CATEGORIES } from "@/stores/discover";
 import { useTheme } from "@/context/ThemeContext";
 import { PodcastCard } from "./PodcastCard";
 import { PageProps } from "@/App";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 enum DiscoverPagePaneType {
   CATEGORIES = 1,
@@ -54,26 +55,28 @@ export function DiscoverPage(props: PageProps) {
         >
           Categories:
         </text>
-        <box flexDirection="column" gap={1}>
-          <For each={discoverStore.categories}>
-            {(category) => {
-              const isSelected = () =>
-                discoverStore.selectedCategory() === category.id;
+         <box flexDirection="column" gap={1}>
+           <For each={discoverStore.categories}>
+             {(category) => {
+               const isSelected = () =>
+                 discoverStore.selectedCategory() === category.id;
 
-              return (
-                <box
-                  border={isSelected()}
-                  backgroundColor={isSelected() ? theme.accent : undefined}
-                  onMouseDown={() => handleCategorySelect(category.id)}
-                >
-                  <text fg={isSelected() ? theme.primary : theme.textMuted}>
-                    {category.icon} {category.name}
-                  </text>
-                </box>
-              );
-            }}
-          </For>
-        </box>
+               return (
+                 <SelectableBox
+                   selected={isSelected}
+                   onMouseDown={() => handleCategorySelect(category.id)}
+                 >
+                   <SelectableText
+                     selected={isSelected}
+                     fg={theme.primary}
+                   >
+                     {category.icon} {category.name}
+                   </SelectableText>
+                 </SelectableBox>
+               );
+             }}
+           </For>
+         </box>
       </box>
       <box
         flexDirection="column"

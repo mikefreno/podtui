@@ -4,6 +4,7 @@
 
 import { For, Show } from "solid-js"
 import { useTheme } from "@/context/ThemeContext"
+import { SelectableBox, SelectableText } from "@/components/Selectable"
 
 type SearchHistoryProps = {
   history: string[]
@@ -52,23 +53,31 @@ export function SearchHistory(props: SearchHistoryProps) {
                 const isSelected = () => index() === props.selectedIndex && props.focused
 
                 return (
-                  <box
+                  <SelectableBox
+                    selected={isSelected}
                     flexDirection="row"
                     justifyContent="space-between"
                     padding={0}
                     paddingLeft={1}
                     paddingRight={1}
-                    backgroundColor={isSelected() ? theme.backgroundElement : undefined}
                     onMouseDown={() => handleSearchClick(index(), query)}
                   >
-                    <box flexDirection="row" gap={1}>
-                      <text fg={theme.textMuted}>{">"}</text>
-                      <text fg={isSelected() ? theme.primary : theme.text}>{query}</text>
-                    </box>
+                    <SelectableText
+                      selected={isSelected}
+                      fg={theme.textMuted}
+                    >
+                      {">"}
+                    </SelectableText>
+                    <SelectableText
+                      selected={isSelected}
+                      fg={theme.primary}
+                    >
+                      {query}
+                    </SelectableText>
                     <box onMouseDown={() => handleRemoveClick(query)} padding={0}>
                       <text fg={theme.error}>[x]</text>
                     </box>
-                  </box>
+                  </SelectableBox>
                 )
               }}
             </For>

@@ -5,6 +5,7 @@
 import { Show, For } from "solid-js";
 import type { Podcast } from "@/types/podcast";
 import { useTheme } from "@/context/ThemeContext";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 type PodcastCardProps = {
   podcast: Podcast;
@@ -21,59 +22,64 @@ export function PodcastCard(props: PodcastCardProps) {
   };
 
   return (
-    <box
+    <SelectableBox
+      selected={() => props.selected}
       flexDirection="column"
       padding={1}
-      backgroundColor={props.selected ? theme.backgroundElement : undefined}
       onMouseDown={props.onSelect}
     >
-      {/* Title Row */}
       <box flexDirection="row" gap={2} alignItems="center">
-            <text fg={props.selected ? theme.primary : theme.text}>
-              <strong>{props.podcast.title}</strong>
-            </text>
+        <SelectableText selected={() => props.selected}>
+          <strong>{props.podcast.title}</strong>
+        </SelectableText>
 
         <Show when={props.podcast.isSubscribed}>
-            <text fg={theme.success}>[+]</text>
+          <text fg={theme.success}>[+]</text>
         </Show>
       </box>
 
       {/* Author */}
       <Show when={props.podcast.author && !props.compact}>
-            <text fg={theme.textMuted}>by {props.podcast.author}</text>
+        <SelectableText
+          selected={() => props.selected}
+          fg={theme.textMuted}
+        >
+          by {props.podcast.author}
+        </SelectableText>
       </Show>
 
       {/* Description */}
       <Show when={props.podcast.description && !props.compact}>
-            <text fg={props.selected ? theme.text : theme.textMuted}>
+        <SelectableText
+          selected={() => props.selected}
+          fg={theme.text}
+        >
           {props.podcast.description!.length > 80
             ? props.podcast.description!.slice(0, 80) + "..."
             : props.podcast.description}
-        </text>
+        </SelectableText>
       </Show>
 
-      {/* Categories and Subscribe Button */}
-      <box
+      {/**<box
         flexDirection="row"
         justifyContent="space-between"
         marginTop={props.compact ? 0 : 1}
-      >
-        <box flexDirection="row" gap={1}>
-          <Show when={(props.podcast.categories ?? []).length > 0}>
-            <For each={(props.podcast.categories ?? []).slice(0, 2)}>
-                {(cat) => <text fg={theme.warning}>[{cat}]</text>}
-            </For>
-          </Show>
-        </box>
-
-        <Show when={props.selected}>
-          <box onMouseDown={handleSubscribeClick}>
-            <text fg={props.podcast.isSubscribed ? theme.error : theme.success}>
-              {props.podcast.isSubscribed ? "[Unsubscribe]" : "[Subscribe]"}
-            </text>
-          </box>
+      />**/}
+      <box flexDirection="row" gap={1}>
+        <Show when={(props.podcast.categories ?? []).length > 0}>
+          <For each={(props.podcast.categories ?? []).slice(0, 2)}>
+            {(cat) => <text fg={theme.warning}>[{cat}]</text>}
+          </For>
         </Show>
       </box>
-    </box>
+
+      <Show when={props.selected}>
+        <box onMouseDown={handleSubscribeClick}>
+          <text fg={props.podcast.isSubscribed ? theme.error : theme.success}>
+            {props.podcast.isSubscribed ? "[Unsubscribe]" : "[Subscribe]"}
+          </text>
+        </box>
+      </Show>
+    </SelectableBox>
   );
 }

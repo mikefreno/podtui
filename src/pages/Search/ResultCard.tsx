@@ -2,6 +2,7 @@ import { Show } from "solid-js";
 import type { SearchResult } from "@/types/source";
 import { SourceBadge } from "./SourceBadge";
 import { useTheme } from "@/context/ThemeContext";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 type ResultCardProps = {
   result: SearchResult;
@@ -15,12 +16,10 @@ export function ResultCard(props: ResultCardProps) {
   const podcast = () => props.result.podcast;
 
   return (
-    <box
+    <SelectableBox
+      selected={() => props.selected}
       flexDirection="column"
       padding={1}
-      border={props.selected}
-      borderColor={props.selected ? theme.primary : undefined}
-      backgroundColor={props.selected ? theme.backgroundElement : undefined}
       onMouseDown={props.onSelect}
     >
       <box
@@ -29,9 +28,12 @@ export function ResultCard(props: ResultCardProps) {
         alignItems="center"
       >
         <box flexDirection="row" gap={2} alignItems="center">
-            <text fg={props.selected ? theme.primary : theme.text}>
+            <SelectableText
+              selected={() => props.selected}
+              fg={theme.primary}
+            >
               <strong>{podcast().title}</strong>
-            </text>
+            </SelectableText>
           <SourceBadge
             sourceId={props.result.sourceId}
             sourceName={props.result.sourceName}
@@ -44,16 +46,24 @@ export function ResultCard(props: ResultCardProps) {
       </box>
 
       <Show when={podcast().author}>
-            <text fg={theme.textMuted}>by {podcast().author}</text>
+            <SelectableText
+              selected={() => props.selected}
+              fg={theme.textMuted}
+            >
+              by {podcast().author}
+            </SelectableText>
       </Show>
 
       <Show when={podcast().description}>
         {(description) => (
-            <text fg={props.selected ? theme.text : theme.textMuted}>
+            <SelectableText
+              selected={() => props.selected}
+              fg={theme.text}
+            >
             {description().length > 120
               ? description().slice(0, 120) + "..."
               : description()}
-          </text>
+          </SelectableText>
         )}
       </Show>
 
@@ -80,6 +90,6 @@ export function ResultCard(props: ResultCardProps) {
             <text fg={theme.primary}>[+] Add to Feeds</text>
         </box>
       </Show>
-    </box>
+    </SelectableBox>
   );
 }

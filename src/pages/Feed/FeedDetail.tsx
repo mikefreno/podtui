@@ -9,6 +9,7 @@ import type { Feed } from "@/types/feed";
 import type { Episode } from "@/types/episode";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
+import { SelectableBox, SelectableText } from "@/components/Selectable";
 
 interface FeedDetailProps {
   feed: Feed;
@@ -139,11 +140,11 @@ export function FeedDetail(props: FeedDetailProps) {
       <scrollbox height={showInfo() ? 10 : 15} focused={props.focused}>
         <For each={episodes()}>
           {(episode, index) => (
-            <box
+            <SelectableBox
+              selected={() => index() === selectedIndex()}
               flexDirection="column"
               gap={0}
               padding={1}
-                    backgroundColor={index() === selectedIndex() ? theme.backgroundElement : undefined}
               onMouseDown={() => {
                 setSelectedIndex(index());
                 if (props.onPlayEpisode) {
@@ -151,20 +152,24 @@ export function FeedDetail(props: FeedDetailProps) {
                 }
               }}
             >
-              <box flexDirection="row" gap={1}>
-                  <text fg={index() === selectedIndex() ? theme.primary : theme.textMuted}>
-                    {index() === selectedIndex() ? ">" : " "}
-                  </text>
-                  <text fg={index() === selectedIndex() ? theme.text : undefined}>
-                    {episode.episodeNumber ? `#${episode.episodeNumber} - ` : ""}
-                    {episode.title}
-                  </text>
-              </box>
+              <SelectableText
+                selected={() => index() === selectedIndex()}
+                fg={theme.primary}
+              >
+                {index() === selectedIndex() ? ">" : " "}
+              </SelectableText>
+              <SelectableText
+                selected={() => index() === selectedIndex()}
+                fg={theme.text}
+              >
+                {episode.episodeNumber ? `#${episode.episodeNumber} - ` : ""}
+                {episode.title}
+              </SelectableText>
               <box flexDirection="row" gap={2} paddingLeft={2}>
                   <text fg={theme.textMuted}>{formatDate(episode.pubDate)}</text>
                   <text fg={theme.textMuted}>{formatDuration(episode.duration)}</text>
               </box>
-            </box>
+            </SelectableBox>
           )}
         </For>
       </scrollbox>
