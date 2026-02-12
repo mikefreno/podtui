@@ -11,6 +11,7 @@ import type { Feed } from "@/types/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { PageProps } from "@/App";
 import { SelectableBox, SelectableText } from "@/components/Selectable";
+import { se } from "date-fns/locale";
 
 enum FeedPaneType {
   FEED = 1,
@@ -76,46 +77,59 @@ export function FeedPage(props: PageProps) {
           </box>
         }
       >
-         <scrollbox height="100%" focused={props.depth() == FeedPaneType.FEED}>
-          <For each={Object.entries(episodesByDate()).sort(([a], [b]) => b.localeCompare(a))}>
-            {([date, episode], groupIndex) => (
-              <>
-                 <box flexDirection="column" gap={0} paddingLeft={1} paddingRight={1} paddingTop={1} paddingBottom={1}>
-                   <SelectableText selected={() => false} primary>{date}</SelectableText>
-                 </box>
-                <SelectableBox
-                  selected={() => groupIndex() === selectedIndex()}
-                  flexDirection="column"
-                  gap={0}
-                  paddingLeft={1}
-                  paddingRight={1}
-                  paddingTop={0}
-                  paddingBottom={0}
-                  onMouseDown={() => setSelectedIndex(groupIndex())}
-                >
-                   <SelectableText selected={() => groupIndex() === selectedIndex()} primary>
-                    {groupIndex() === selectedIndex() ? ">" : " "}
-                  </SelectableText>
-                  <SelectableText
-                    selected={() => groupIndex() === selectedIndex()}
-                    primary
+        <scrollbox height="100%" focused={props.depth() == FeedPaneType.FEED}>
+          <For
+            each={Object.entries(episodesByDate()).sort(([a], [b]) =>
+              b.localeCompare(a),
+            )}
+          >
+            {([date, episode], groupIndex) => {
+              const selected = () => groupIndex() === selectedIndex();
+              return (
+                <>
+                  <box
+                    flexDirection="column"
+                    gap={0}
+                    paddingLeft={1}
+                    paddingRight={1}
+                    paddingTop={1}
+                    paddingBottom={1}
                   >
-                    {episode.episode.title}
-                  </SelectableText>
-                  <box flexDirection="row" gap={2} paddingLeft={2}>
-                    <SelectableText selected={() => groupIndex() === selectedIndex()} primary>
-                      {episode.feed.podcast.title}
-                    </SelectableText>
-                    <SelectableText selected={() => groupIndex() === selectedIndex()} tertiary>
-                      {formatDate(episode.episode.pubDate)}
-                    </SelectableText>
-                    <SelectableText selected={() => groupIndex() === selectedIndex()} tertiary>
-                      {formatDuration(episode.episode.duration)}
+                    <SelectableText selected={() => false} primary>
+                      {date}
                     </SelectableText>
                   </box>
-                </SelectableBox>
-              </>
-            )}
+                  <SelectableBox
+                    selected={selected}
+                    flexDirection="column"
+                    gap={0}
+                    paddingLeft={1}
+                    paddingRight={1}
+                    paddingTop={0}
+                    paddingBottom={0}
+                    onMouseDown={() => setSelectedIndex(groupIndex())}
+                  >
+                    <SelectableText selected={selected} primary>
+                      {selected() ? ">" : " "}
+                    </SelectableText>
+                    <SelectableText selected={selected} primary>
+                      {episode.episode.title}
+                    </SelectableText>
+                    <box flexDirection="row" gap={2} paddingLeft={2}>
+                      <SelectableText selected={selected} primary>
+                        {episode.feed.podcast.title}
+                      </SelectableText>
+                      <SelectableText selected={selected} tertiary>
+                        {formatDate(episode.episode.pubDate)}
+                      </SelectableText>
+                      <SelectableText selected={selected} tertiary>
+                        {formatDuration(episode.episode.duration)}
+                      </SelectableText>
+                    </box>
+                  </SelectableBox>
+                </>
+              );
+            }}
           </For>
         </scrollbox>
       </Show>

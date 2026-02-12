@@ -30,18 +30,19 @@ export function TabNavigation(props: TabNavigationProps) {
     >
       <For each={tabs}>
         {(tab) => (
-          <SelectableBox
-            border
-            selected={() => tab.id == props.activeTab}
-            onMouseDown={() => props.onTabSelect(tab.id)}
-          >
-            <SelectableText
-              selected={() => tab.id == props.activeTab}
-              alignSelf="center"
-            >
-              {tab.label}
-            </SelectableText>
-          </SelectableBox>
+           <SelectableBox
+             border
+             selected={() => tab.id == props.activeTab}
+             onMouseDown={() => props.onTabSelect(tab.id)}
+           >
+             <SelectableText
+               selected={() => tab.id == props.activeTab}
+               primary
+               alignSelf="center"
+             >
+               {tab.label}
+             </SelectableText>
+           </SelectableBox>
         )}
       </For>
     </box>

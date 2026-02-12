@@ -45,27 +45,27 @@ export function ResultCard(props: ResultCardProps) {
         </Show>
       </box>
 
-      <Show when={podcast().author}>
-            <SelectableText
-              selected={() => props.selected}
-              fg={theme.textMuted}
-            >
-              by {podcast().author}
-            </SelectableText>
-      </Show>
+       <Show when={podcast().author}>
+             <SelectableText
+               selected={() => props.selected}
+               tertiary
+             >
+               by {podcast().author}
+             </SelectableText>
+       </Show>
 
-      <Show when={podcast().description}>
-        {(description) => (
-            <SelectableText
-              selected={() => props.selected}
-              fg={theme.text}
-            >
-            {description().length > 120
-              ? description().slice(0, 120) + "..."
-              : description()}
-          </SelectableText>
-        )}
-      </Show>
+       <Show when={podcast().description}>
+         {(description) => (
+             <SelectableText
+               selected={() => props.selected}
+               tertiary
+             >
+             {description().length > 120
+               ? description().slice(0, 120) + "..."
+               : description()}
+           </SelectableText>
+         )}
+       </Show>
 
       <Show when={(podcast().categories ?? []).length > 0}>
         <box flexDirection="row" gap={1}>

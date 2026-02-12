@@ -62,18 +62,18 @@ export function SearchHistory(props: SearchHistoryProps) {
                     paddingRight={1}
                     onMouseDown={() => handleSearchClick(index(), query)}
                   >
-                    <SelectableText
-                      selected={isSelected}
-                      fg={theme.textMuted}
-                    >
-                      {">"}
-                    </SelectableText>
-                    <SelectableText
-                      selected={isSelected}
-                      fg={theme.primary}
-                    >
-                      {query}
-                    </SelectableText>
+                     <SelectableText
+                       selected={isSelected}
+                       tertiary
+                     >
+                       {">"}
+                     </SelectableText>
+                     <SelectableText
+                       selected={isSelected}
+                       primary
+                     >
+                       {query}
+                     </SelectableText>
                     <box onMouseDown={() => handleRemoveClick(query)} padding={0}>
                       <text fg={theme.error}>[x]</text>
                     </box>

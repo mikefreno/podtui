@@ -61,19 +61,19 @@ export function DiscoverPage(props: PageProps) {
                const isSelected = () =>
                  discoverStore.selectedCategory() === category.id;
 
-               return (
-                 <SelectableBox
-                   selected={isSelected}
-                   onMouseDown={() => handleCategorySelect(category.id)}
-                 >
-                   <SelectableText
-                     selected={isSelected}
-                     fg={theme.primary}
-                   >
-                     {category.icon} {category.name}
-                   </SelectableText>
-                 </SelectableBox>
-               );
+                return (
+                  <SelectableBox
+                    selected={isSelected}
+                    onMouseDown={() => handleCategorySelect(category.id)}
+                  >
+                    <SelectableText
+                      selected={isSelected}
+                      primary
+                    >
+                      {category.icon} {category.name}
+                    </SelectableText>
+                  </SelectableBox>
+                );
              }}
            </For>
          </box>
@@ -85,14 +85,15 @@ export function DiscoverPage(props: PageProps) {
         borderColor={theme.border}
       >
         <box padding={1}>
-          <text
-            fg={props.depth() == DiscoverPagePaneType.SHOWS ? theme.primary : theme.textMuted}
-          >
+             <SelectableText
+               selected={() => false}
+               primary={props.depth() == DiscoverPagePaneType.SHOWS}
+             >
             Trending in{" "}
             {DISCOVER_CATEGORIES.find(
               (c) => c.id === discoverStore.selectedCategory(),
             )?.name ?? "All"}
-          </text>
+          </SelectableText>
         </box>
         <box flexDirection="column" height="100%">
           <Show

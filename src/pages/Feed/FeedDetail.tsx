@@ -86,54 +86,54 @@ export function FeedDetail(props: FeedDetailProps) {
       {/* Header with back button */}
       <box flexDirection="row" justifyContent="space-between">
         <box border padding={0} onMouseDown={props.onBack} borderColor={theme.border}>
-            <text fg={theme.primary}>[Esc] Back</text>
+            <SelectableText selected={() => false} primary>[Esc] Back</SelectableText>
         </box>
         <box border padding={0} onMouseDown={() => setShowInfo((v) => !v)} borderColor={theme.border}>
-            <text fg={theme.primary}>[i] {showInfo() ? "Hide" : "Show"} Info</text>
+            <SelectableText selected={() => false} primary>[i] {showInfo() ? "Hide" : "Show"} Info</SelectableText>
         </box>
       </box>
 
       {/* Podcast info section */}
       <Show when={showInfo()}>
         <box border padding={1} flexDirection="column" gap={0} borderColor={theme.border}>
-          <text fg={theme.text}>
+          <SelectableText selected={() => false} primary>
             <strong>{props.feed.customName || props.feed.podcast.title}</strong>
-          </text>
+          </SelectableText>
           {props.feed.podcast.author && (
             <box flexDirection="row" gap={1}>
-                <text fg={theme.textMuted}>by</text>
-                <text fg={theme.primary}>{props.feed.podcast.author}</text>
+                <SelectableText selected={() => false} tertiary>by</SelectableText>
+                <SelectableText selected={() => false} primary>{props.feed.podcast.author}</SelectableText>
             </box>
           )}
           <box height={1} />
-          <text fg={theme.textMuted}>
+          <SelectableText selected={() => false} tertiary>
             {props.feed.podcast.description?.slice(0, 200)}
             {(props.feed.podcast.description?.length || 0) > 200 ? "..." : ""}
-          </text>
+          </SelectableText>
           <box height={1} />
           <box flexDirection="row" gap={2}>
             <box flexDirection="row" gap={1}>
-              <text fg={theme.textMuted}>Episodes:</text>
-              <text fg={theme.text}>{props.feed.episodes.length}</text>
+              <SelectableText selected={() => false} tertiary>Episodes:</SelectableText>
+              <SelectableText selected={() => false} tertiary>{props.feed.episodes.length}</SelectableText>
             </box>
             <box flexDirection="row" gap={1}>
-              <text fg={theme.textMuted}>Updated:</text>
-              <text fg={theme.text}>{formatDate(props.feed.lastUpdated)}</text>
+              <SelectableText selected={() => false} tertiary>Updated:</SelectableText>
+              <SelectableText selected={() => false} tertiary>{formatDate(props.feed.lastUpdated)}</SelectableText>
             </box>
-            <text fg={props.feed.visibility === "public" ? theme.success : theme.warning}>
+            <SelectableText selected={() => false} tertiary>
               {props.feed.visibility === "public" ? "[Public]" : "[Private]"}
-            </text>
-            {props.feed.isPinned && <text fg={theme.warning}>[Pinned]</text>}
+            </SelectableText>
+            {props.feed.isPinned && <SelectableText selected={() => false} tertiary>[Pinned]</SelectableText>}
           </box>
         </box>
       </Show>
 
       {/* Episodes header */}
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={theme.text}>
+        <SelectableText selected={() => false} primary>
           <strong>Episodes</strong>
-        </text>
-        <text fg={theme.textMuted}>({episodes().length} total)</text>
+        </SelectableText>
+        <SelectableText selected={() => false} tertiary>({episodes().length} total)</SelectableText>
       </box>
 
       {/* Episode list */}
@@ -154,20 +154,20 @@ export function FeedDetail(props: FeedDetailProps) {
             >
               <SelectableText
                 selected={() => index() === selectedIndex()}
-                fg={theme.primary}
+                primary
               >
                 {index() === selectedIndex() ? ">" : " "}
               </SelectableText>
               <SelectableText
                 selected={() => index() === selectedIndex()}
-                fg={theme.text}
+                primary
               >
                 {episode.episodeNumber ? `#${episode.episodeNumber} - ` : ""}
                 {episode.title}
               </SelectableText>
               <box flexDirection="row" gap={2} paddingLeft={2}>
-                  <text fg={theme.textMuted}>{formatDate(episode.pubDate)}</text>
-                  <text fg={theme.textMuted}>{formatDuration(episode.duration)}</text>
+                  <SelectableText selected={() => index() === selectedIndex()} tertiary>{formatDate(episode.pubDate)}</SelectableText>
+                  <SelectableText selected={() => index() === selectedIndex()} tertiary>{formatDuration(episode.duration)}</SelectableText>
               </box>
             </SelectableBox>
           )}

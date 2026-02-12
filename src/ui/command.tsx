@@ -295,39 +295,30 @@ function CommandDialog(props: {
                 }
               }}
             >
-              <box flexDirection="column" flexGrow={1}>
-                <SelectableText
-                  selected={() => index() === selectedIndex()}
-                  fg={
-                    index() === selectedIndex()
-                      ? theme.selectedListItemText
-                      : theme.text
-                  }
-                  attributes={
-                    index() === selectedIndex()
-                      ? TextAttributes.BOLD
-                      : undefined
-                  }
-                >
-                  {option.title}
-                </SelectableText>
-                <Show when={option.footer}>
-                  <SelectableText
-                    selected={() => index() === selectedIndex()}
-                    fg={theme.textMuted}
-                  >
-                    {option.footer}
-                  </SelectableText>
-                </Show>
-                <Show when={option.description}>
-                  <SelectableText
-                    selected={() => index() === selectedIndex()}
-                    fg={theme.textMuted}
-                  >
-                    {option.description}
-                  </SelectableText>
-                </Show>
-              </box>
+               <box flexDirection="column" flexGrow={1}>
+                 <SelectableText
+                   selected={() => index() === selectedIndex()}
+                   primary
+                 >
+                   {option.title}
+                 </SelectableText>
+                 <Show when={option.footer}>
+                   <SelectableText
+                     selected={() => index() === selectedIndex()}
+                     tertiary
+                   >
+                     {option.footer}
+                   </SelectableText>
+                 </Show>
+                 <Show when={option.description}>
+                   <SelectableText
+                     selected={() => index() === selectedIndex()}
+                     tertiary
+                   >
+                     {option.description}
+                   </SelectableText>
+                 </Show>
+               </box>
             </SelectableBox>
           )}
         </For>

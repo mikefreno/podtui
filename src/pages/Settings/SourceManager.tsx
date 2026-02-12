@@ -198,23 +198,20 @@ export function SourceManager(props: SourceManagerProps) {
                     feedStore.toggleSource(source.id);
                   }}
                 >
-                <text
-                  fg={
-                    focusArea() === "list" && index() === selectedIndex()
-                      ? theme.primary
-                      : theme.textMuted
-                  }
-                >
-                  {focusArea() === "list" && index() === selectedIndex()
-                    ? ">"
-                    : " "}
-                </text>
-                <SelectableText
-                  selected={() => focusArea() === "list" && index() === selectedIndex()}
-                  fg={theme.text}
-                >
-                  {source.name}
-                </SelectableText>
+                 <SelectableText
+                   selected={() => focusArea() === "list" && index() === selectedIndex()}
+                   primary
+                 >
+                   {focusArea() === "list" && index() === selectedIndex()
+                     ? ">"
+                     : " "}
+                 </SelectableText>
+                 <SelectableText
+                   selected={() => focusArea() === "list" && index() === selectedIndex()}
+                   primary
+                 >
+                   {source.name}
+                 </SelectableText>
               </SelectableBox>
             )}
           </For>
@@ -223,114 +220,98 @@ export function SourceManager(props: SourceManagerProps) {
           Space/Enter to toggle, d to delete, a to add
         </text>
 
-        {/* API settings */}
-        <box flexDirection="column" gap={1}>
-          <text fg={isApiSource() ? theme.textMuted : theme.accent}>
-            {isApiSource()
-              ? "API Settings"
-              : "API Settings (select an API source)"}
-          </text>
-          <box flexDirection="row" gap={2}>
-            <box
-              border
-              borderColor={theme.border}
-              padding={0}
-              backgroundColor={
-                focusArea() === "country" ? theme.primary : undefined
-              }
-            >
-              <text
-                fg={focusArea() === "country" ? theme.primary : theme.textMuted}
-              >
-                Country: {sourceCountry()}
-              </text>
-            </box>
-            <box
-              border
-              borderColor={theme.border}
-              padding={0}
-              backgroundColor={
-                focusArea() === "language" ? theme.primary : undefined
-              }
-            >
-              <text
-                fg={
-                  focusArea() === "language" ? theme.primary : theme.textMuted
-                }
-              >
-                Language:{" "}
-                {sourceLanguage() === "ja_jp" ? "Japanese" : "English"}
-              </text>
-            </box>
-            <box
-              border
-              borderColor={theme.border}
-              padding={0}
-              backgroundColor={
-                focusArea() === "explicit" ? theme.primary : undefined
-              }
-            >
-              <text
-                fg={
-                  focusArea() === "explicit" ? theme.primary : theme.textMuted
-                }
-              >
-                Explicit: {sourceExplicit() ? "Yes" : "No"}
-              </text>
-            </box>
-          </box>
-          <text fg={theme.textMuted}>
-            Enter/Space to toggle focused setting
-          </text>
-        </box>
+         {/* API settings */}
+         <box flexDirection="column" gap={1}>
+           <SelectableText selected={() => false} primary={isApiSource()}>
+             {isApiSource()
+               ? "API Settings"
+               : "API Settings (select an API source)"}
+           </SelectableText>
+           <box flexDirection="row" gap={2}>
+             <box
+               border
+               borderColor={theme.border}
+               padding={0}
+               backgroundColor={
+                 focusArea() === "country" ? theme.primary : undefined
+               }
+             >
+               <SelectableText selected={() => false} primary={focusArea() === "country"}>
+                 Country: {sourceCountry()}
+               </SelectableText>
+             </box>
+             <box
+               border
+               borderColor={theme.border}
+               padding={0}
+               backgroundColor={
+                 focusArea() === "language" ? theme.primary : undefined
+               }
+             >
+               <SelectableText selected={() => false} primary={focusArea() === "language"}>
+                 Language:{" "}
+                 {sourceLanguage() === "ja_jp" ? "Japanese" : "English"}
+               </SelectableText>
+             </box>
+             <box
+               border
+               borderColor={theme.border}
+               padding={0}
+               backgroundColor={
+                 focusArea() === "explicit" ? theme.primary : undefined
+               }
+             >
+               <SelectableText selected={() => false} primary={focusArea() === "explicit"}>
+                 Explicit: {sourceExplicit() ? "Yes" : "No"}
+               </SelectableText>
+             </box>
+           </box>
+           <SelectableText selected={() => false} tertiary>
+             Enter/Space to toggle focused setting
+           </SelectableText>
+         </box>
       </box>
 
-      {/* Add new source form */}
-      <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
-        <text
-          fg={
-            focusArea() === "add" || focusArea() === "url"
-              ? theme.primary
-              : theme.textMuted
-          }
-        >
-          Add New Source:
-        </text>
+         {/* Add new source form */}
+         <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
+           <SelectableText selected={() => false} primary={focusArea() === "add" || focusArea() === "url"}>
+             Add New Source:
+           </SelectableText>
 
-        <box flexDirection="row" gap={1}>
-          <text fg={theme.textMuted}>Name:</text>
-          <input
-            value={newSourceName()}
-            onInput={setNewSourceName}
-            placeholder="My Custom Feed"
-            focused={props.focused && focusArea() === "add"}
-            width={25}
-          />
-        </box>
+           <box flexDirection="row" gap={1}>
+             <SelectableText selected={() => false} tertiary>Name:</SelectableText>
+             <input
+               value={newSourceName()}
+               onInput={setNewSourceName}
+               placeholder="My Custom Feed"
+               focused={props.focused && focusArea() === "add"}
+               width={25}
+             />
+           </box>
 
-        <box flexDirection="row" gap={1}>
-          <text fg={theme.textMuted}>URL:</text>
-          <input
-            value={newSourceUrl()}
-            onInput={(v) => {
-              setNewSourceUrl(v);
-              setError(null);
-            }}
-            placeholder="https://example.com/feed.rss"
-            focused={props.focused && focusArea() === "url"}
-            width={35}
-          />
-        </box>
+           <box flexDirection="row" gap={1}>
+             <SelectableText selected={() => false} tertiary>URL:</SelectableText>
+             <input
+               value={newSourceUrl()}
+               onInput={(v) => {
+                 setNewSourceUrl(v);
+                 setError(null);
+               }}
+               placeholder="https://example.com/feed.rss"
+               focused={props.focused && focusArea() === "url"}
+               width={35}
+             />
+           </box>
 
-        <box border borderColor={theme.border} padding={0} width={15} onMouseDown={handleAddSource}>
-          <text fg={theme.success}>[+] Add Source</text>
-        </box>
-      </box>
+           <box border borderColor={theme.border} padding={0} width={15} onMouseDown={handleAddSource}>
+             <SelectableText selected={() => false} primary>[+] Add Source</SelectableText>
+           </box>
+         </box>
 
-      {/* Error message */}
-      {error() && <text fg={theme.error}>{error()}</text>}
+         {/* Error message */}
+         {error() && <SelectableText selected={() => false} tertiary>{error()}</SelectableText>}
 
-      <text fg={theme.textMuted}>Tab to switch sections, Esc to close</text>
+         <SelectableText selected={() => false} tertiary>Tab to switch sections, Esc to close</SelectableText>
     </box>
   );
 }
