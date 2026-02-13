@@ -14,4 +14,6 @@
   "audio-play": [],
   "audio-next": ["<leader>n"],
   "audio-prev": ["<leader>l"],
+  "audio-seek-forward": ["<leader>sf"],
+  "audio-seek-backward": ["<leader>sb"],
 }

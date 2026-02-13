@@ -16,6 +16,7 @@ import { DEFAULT_THEME } from "../constants/themes";
 
 const APP_STATE_FILE = "app-state.json";
 const PROGRESS_FILE = "progress.json";
+const AUDIO_NAV_FILE = "audio-nav.json";
 
 // --- Defaults ---
 
@@ -114,6 +115,42 @@ export async function saveProgressToFile(
     await ensureConfigDir();
     await backupConfigFile(PROGRESS_FILE);
     const filePath = getConfigFilePath(PROGRESS_FILE);
+    await Bun.write(filePath, JSON.stringify(data, null, 2));
+  } catch {
+    // Silently ignore write errors
+  }
+}
+
+interface AudioNavEntry {
+  source: string;
+  currentIndex: number;
+  podcastId?: string;
+  lastUpdated: string;
+}
+
+/** Load audio navigation state from JSON file */
+export async function loadAudioNavFromFile<T>(): Promise<T | null> {
+  try {
+    const filePath = getConfigFilePath(AUDIO_NAV_FILE);
+    const file = Bun.file(filePath);
+    if (!(await file.exists())) return null;
+
+    const raw = await file.json();
+    if (!raw || typeof raw !== "object") return null;
+
+    return raw as T;
+  } catch {
+    return null;
+  }
+}
+
+/** Save audio navigation state to JSON file */
+export async function saveAudioNavToFile<T>(
+  data: T,
+): Promise<void> {
+  try {
+    await ensureConfigDir();
+    const filePath = getConfigFilePath(AUDIO_NAV_FILE);
     await Bun.write(filePath, JSON.stringify(data, null, 2));
   } catch {
     // Silently ignore write errors

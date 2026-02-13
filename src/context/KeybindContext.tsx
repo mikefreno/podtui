@@ -7,8 +7,6 @@ import {
 } from "../utils/keybinds-persistence";
 import { createStore } from "solid-js/store";
 
-// ── Type Definitions ────────────────────────────────────────────────────────────
-
 export type KeybindsResolved = {
   up: string[];
   down: string[];
@@ -25,9 +23,27 @@ export type KeybindsResolved = {
   "audio-play": string[];
   "audio-next": string[];
   "audio-prev": string[];
+  "audio-seek-forward": string[];
+  "audio-seek-backward": string[];
 };
 
-// ── Context Implementation ────────────────────────────────────────────────────────────
+export enum KeybindAction {
+  UP,
+  DOWN,
+  LEFT,
+  RIGHT,
+  CYCLE,
+  DIVE,
+  OUT,
+  QUIT,
+  AUDIO_TOGGLE,
+  AUDIO_PAUSE,
+  AUDIO_PLAY,
+  AUDIO_NEXT,
+  AUDIO_PREV,
+  AUDIO_SEEK_F,
+  AUDIO_SEEK_B,
+}
 
 export const { use: useKeybinds, provider: KeybindProvider } =
   createSimpleContext({
@@ -49,7 +65,9 @@ export const { use: useKeybinds, provider: KeybindProvider } =
         "audio-play": [],
         "audio-next": [],
         "audio-prev": [],
-      });
+        "audio-seek-forward": [],
+        "audio-seek-backward": [],
+      } as KeybindsResolved);
       const [ready, setReady] = createSignal(false);
 
       async function load() {

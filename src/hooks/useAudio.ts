@@ -25,6 +25,9 @@ import { useAppStore } from "../stores/app"
 import { useProgressStore } from "../stores/progress"
 import { useMediaRegistry } from "../utils/media-registry"
 import type { Episode } from "../types/episode"
+import type { Feed } from "../types/feed"
+import { useAudioNavStore, AudioSource } from "../stores/audio-nav"
+import { useFeedStore } from "../stores/feed"
 
 export interface AudioControls {
   // Signals (reactive getters)
@@ -49,6 +52,8 @@ export interface AudioControls {
   setVolume: (volume: number) => Promise<void>
   setSpeed: (speed: number) => Promise<void>
   switchBackend: (name: BackendName) => Promise<void>
+  prev: () => Promise<void>
+  next: () => Promise<void>
 }
 
 // Singleton state — shared across all components that call useAudio()
@@ -401,6 +406,76 @@ export function useAudio(): AudioControls {
     await doSetSpeed(next)
   })
 
+  const audioNav = useAudioNavStore();
+  const feedStore = useFeedStore();
+
+  async function prev(): Promise<void> {
+    const current = currentEpisode();
+    if (!current) return;
+
+    const currentPos = position();
+    const currentDur = duration();
+
+    const NAV_START_THRESHOLD = 30;
+
+    if (currentPos > NAV_START_THRESHOLD && currentDur > 0) {
+      await seek(NAV_START_THRESHOLD);
+    } else {
+      const source = audioNav.getSource();
+      let episodes: Array<{ episode: Episode; feed: Feed }> = [];
+
+      if (source === AudioSource.FEED) {
+        episodes = feedStore.getAllEpisodesChronological();
+      } else if (source === AudioSource.MY_SHOWS) {
+        const podcastId = audioNav.getPodcastId();
+        if (!podcastId) return;
+
+        const feed = feedStore.getFilteredFeeds().find(f => f.podcast.id === podcastId);
+        if (!feed) return;
+
+        episodes = feed.episodes.map(ep => ({ episode: ep, feed }));
+      }
+
+      const currentIndex = audioNav.getCurrentIndex();
+      const newIndex = Math.max(0, currentIndex - 1);
+
+      if (newIndex < episodes.length && episodes[newIndex]) {
+        const { episode } = episodes[newIndex];
+        await play(episode);
+        audioNav.prev(newIndex);
+      }
+    }
+  }
+
+  async function next(): Promise<void> {
+    const current = currentEpisode();
+    if (!current) return;
+
+    const source = audioNav.getSource();
+    let episodes: Array<{ episode: Episode; feed: Feed }> = [];
+
+    if (source === AudioSource.FEED) {
+      episodes = feedStore.getAllEpisodesChronological();
+    } else if (source === AudioSource.MY_SHOWS) {
+      const podcastId = audioNav.getPodcastId();
+      if (!podcastId) return;
+
+      const feed = feedStore.getFilteredFeeds().find(f => f.podcast.id === podcastId);
+      if (!feed) return;
+
+      episodes = feed.episodes.map(ep => ({ episode: ep, feed }));
+    }
+
+    const currentIndex = audioNav.getCurrentIndex();
+    const newIndex = Math.min(episodes.length - 1, currentIndex + 1);
+
+    if (newIndex >= 0 && episodes[newIndex]) {
+      const { episode } = episodes[newIndex];
+      await play(episode);
+      audioNav.next(newIndex);
+    }
+  }
+
   onCleanup(() => {
     refCount--
     unsubPlay()
@@ -447,5 +522,7 @@ export function useAudio(): AudioControls {
     setVolume: doSetVolume,
     setSpeed: doSetSpeed,
     switchBackend,
+    prev,
+    next,
   }
 }

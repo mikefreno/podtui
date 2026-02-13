@@ -11,7 +11,12 @@ import { parseJSONC } from "./jsonc";
 import { getConfigFilePath, ensureConfigDir } from "./config-dir";
 import type { KeybindsResolved } from "../context/KeybindContext";
 
-const KEYBINDS_SOURCE = path.join(process.cwd(), "src", "config", "keybind.jsonc");
+const KEYBINDS_SOURCE = path.join(
+  process.cwd(),
+  "src",
+  "config",
+  "keybind.jsonc",
+);
 const KEYBINDS_FILE = "keybinds.jsonc";
 
 /** Default keybinds from package */
@@ -31,6 +36,8 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
   "audio-play": [],
   "audio-next": ["<leader>n"],
   "audio-prev": ["<leader>l"],
+  "audio-seek-forward": ["<leader>sf"],
+  "audio-seek-backward": ["<leader>sb"],
 };
 
 /** Copy keybind.jsonc to user config directory on first run */
@@ -69,7 +76,9 @@ export async function loadKeybindsFromFile(): Promise<KeybindsResolved> {
 }
 
 /** Save keybinds to JSONC file */
-export async function saveKeybindsToFile(keybinds: KeybindsResolved): Promise<void> {
+export async function saveKeybindsToFile(
+  keybinds: KeybindsResolved,
+): Promise<void> {
   try {
     await ensureConfigDir();
     const filePath = getConfigFilePath(KEYBINDS_FILE);

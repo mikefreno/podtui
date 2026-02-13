@@ -24,7 +24,6 @@ const ITEMS_PER_BATCH = 50;
 
 export function FeedPage(props: PageProps) {
   const feedStore = useFeedStore();
-  const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [isRefreshing, setIsRefreshing] = createSignal(false);
   const [loadedEpisodesCount, setLoadedEpisodesCount] = createSignal(ITEMS_PER_BATCH);
 
@@ -64,11 +63,6 @@ export function FeedPage(props: PageProps) {
     setIsRefreshing(false);
   };
 
-  const handleScrollDown = async () => {
-    if (feedStore.isLoadingMore() || !feedStore.hasMoreEpisodes()) return;
-    await feedStore.loadMoreEpisodes();
-  };
-
   const { theme } = useTheme();
   return (
     <box
@@ -99,7 +93,8 @@ export function FeedPage(props: PageProps) {
             )}
           >
             {([date, episode], groupIndex) => {
-              const selected = () => groupIndex() === selectedIndex();
+              const index = typeof props.focusedIndex === 'function' ? props.focusedIndex() : props.focusedIndex;
+              const selected = () => groupIndex() === index;
               return (
                 <>
                   <box
@@ -122,7 +117,9 @@ export function FeedPage(props: PageProps) {
                     paddingRight={1}
                     paddingTop={0}
                     paddingBottom={0}
-                    onMouseDown={() => setSelectedIndex(groupIndex())}
+                    onMouseDown={() => {
+                      // Selection is handled by App's keyboard navigation
+                    }}
                   >
                     <SelectableText selected={selected} primary>
                       {selected() ? ">" : " "}

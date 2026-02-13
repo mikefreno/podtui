@@ -12,14 +12,17 @@ import { useToast } from "@/ui/toast";
 import { useRenderer } from "@opentui/solid";
 import type { AuthScreen } from "@/types/auth";
 import type { Episode } from "@/types/episode";
-import { DIRECTION, LayerGraph, TABS } from "./utils/navigation";
+import { DIRECTION, LayerGraph, TABS, LayerDepths } from "./utils/navigation";
 import { useTheme, ThemeProvider } from "./context/ThemeContext";
 import { KeybindProvider, useKeybinds } from "./context/KeybindContext";
+import { useAudioNavStore, AudioSource } from "./stores/audio-nav";
 
 const DEBUG = import.meta.env.DEBUG;
 
 export interface PageProps {
   depth: Accessor<number>;
+  focusedIndex?: Accessor<number> | number;
+  focusedIndexValue?: number;
 }
 
 export function App() {
@@ -29,6 +32,8 @@ export function App() {
   const [showAuthPanel, setShowAuthPanel] = createSignal(false);
   const [inputFocused, setInputFocused] = createSignal(false);
   const [layerDepth, setLayerDepth] = createSignal(0);
+  const [focusedIndex, setFocusedIndex] = createSignal(0);
+
   const auth = useAuthStore();
   const feedStore = useFeedStore();
   const audio = useAudio();
@@ -36,6 +41,7 @@ export function App() {
   const renderer = useRenderer();
   const { theme } = useTheme();
   const keybind = useKeybinds();
+  const audioNav = useAudioNavStore();
 
   useMultimediaKeys({
     playerFocused: () => activeTab() === TABS.PLAYER && layerDepth() > 0,
@@ -47,6 +53,7 @@ export function App() {
     audio.play(episode);
     setActiveTab(TABS.PLAYER);
     setLayerDepth(1);
+    audioNav.setSource(AudioSource.FEED);
   };
 
   useSelectionHandler((selection: any) => {
@@ -64,55 +71,110 @@ export function App() {
       });
   });
 
-  // Handle keyboard input with dynamic keybinds
   useKeyboard(
     (keyEvent) => {
-      const name = keyEvent.name;
+      const isUp = keybind.match("up", keyEvent);
+      const isDown = keybind.match("down", keyEvent);
+      const isLeft = keybind.match("left", keyEvent);
+      const isRight = keybind.match("right", keyEvent);
+      const isCycle = keybind.match("cycle", keyEvent);
+      const isDive = keybind.match("dive", keyEvent);
+      const isOut = keybind.match("out", keyEvent);
+      const isToggle = keybind.match("audio-toggle", keyEvent);
+      const isNext = keybind.match("audio-next", keyEvent);
+      const isPrev = keybind.match("audio-prev", keyEvent);
+      const isSeekForward = keybind.match("audio-seek-forward", keyEvent);
+      const isSeekBackward = keybind.match("audio-seek-backward", keyEvent);
+      const isQuit = keybind.match("quit", keyEvent);
 
-      // Navigation: up/down
-      if (keybind.match("up", keyEvent) || keybind.match("down", keyEvent)) {
-        // TODO: Implement navigation logic
+      if (DEBUG) {
+        console.log("KeyEvent:", keyEvent);
+        console.log("Keybinds loaded:", {
+          up: keybind.keybinds.up,
+          down: keybind.keybinds.down,
+          left: keybind.keybinds.left,
+          right: keybind.keybinds.right,
+        });
       }
 
-      // Navigation: left/right
-      if (keybind.match("left", keyEvent) || keybind.match("right", keyEvent)) {
-        // TODO: Implement navigation logic
+      if (isUp || isDown) {
+        const currentDepth = activeDepth();
+        const maxDepth = LayerDepths[activeTab()];
+
+        console.log("Navigation:", { isUp, isDown, currentDepth, maxDepth });
+
+        // Navigate within current depth layer
+        if (currentDepth < maxDepth) {
+          const newIndex = isUp ? focusedIndex() - 1 : focusedIndex() + 1;
+          setFocusedIndex(Math.max(0, Math.min(newIndex, maxDepth)));
+        }
       }
 
-      // Cycle through options
-      if (keybind.match("cycle", keyEvent)) {
-        // TODO: Implement cycle logic
+      // Horizontal movement - move within current layer
+      if (isLeft || isRight) {
+        const currentDepth = activeDepth();
+        const maxDepth = LayerDepths[activeTab()];
+
+        if (currentDepth < maxDepth) {
+          const newIndex = isLeft ? focusedIndex() - 1 : focusedIndex() + 1;
+          setFocusedIndex(Math.max(0, Math.min(newIndex, maxDepth)));
+        }
       }
 
-      // Dive into content
-      if (keybind.match("dive", keyEvent)) {
-        // TODO: Implement dive logic
+      // Cycle through current depth
+      if (isCycle) {
+        const currentDepth = activeDepth();
+        const maxDepth = LayerDepths[activeTab()];
+
+        if (currentDepth < maxDepth) {
+          const newIndex = (focusedIndex() + 1) % (maxDepth + 1);
+          setFocusedIndex(newIndex);
+        }
       }
 
-      // Out of content
-      if (keybind.match("out", keyEvent)) {
-        setActiveDepth((prev) => Math.max(0, prev - 1));
-        return;
+      // Increase depth
+      if (isDive) {
+        const currentDepth = activeDepth();
+        const maxDepth = LayerDepths[activeTab()];
+
+        if (currentDepth < maxDepth) {
+          setActiveDepth(currentDepth + 1);
+          setFocusedIndex(0);
+        }
       }
 
-      // Audio controls
-      if (keybind.match("audio-toggle", keyEvent)) {
+      // Decrease depth
+      if (isOut) {
+        const currentDepth = activeDepth();
+
+        if (currentDepth > 0) {
+          setActiveDepth(currentDepth - 1);
+          setFocusedIndex(0);
+        }
+      }
+
+      if (isToggle) {
         audio.togglePlayback();
-        return;
       }
 
-      if (keybind.match("audio-next", keyEvent)) {
-        audio.seekRelative(30); // Skip forward 30 seconds
-        return;
+      if (isNext) {
+        audio.next();
       }
 
-      if (keybind.match("audio-prev", keyEvent)) {
-        audio.seekRelative(-30); // Skip back 30 seconds
-        return;
+      if (isPrev) {
+        audio.prev();
+      }
+
+      if (isSeekForward) {
+        audio.seekRelative(15);
+      }
+
+      if (isSeekBackward) {
+        audio.seekRelative(-15);
       }
 
       // Quit application
-      if (keybind.match("quit", keyEvent)) {
+      if (isQuit) {
         process.exit(0);
       }
     },
@@ -169,8 +231,11 @@ export function App() {
             backgroundColor={theme.surface}
           >
             <TabNavigation activeTab={activeTab()} onTabSelect={setActiveTab} />
-            {LayerGraph[activeTab()]({ depth: activeDepth })}
-            {/**TODO: Contextual controls based on tab/depth**/}
+            {LayerGraph[activeTab()]({
+              depth: activeDepth,
+              focusedIndex: focusedIndex(),
+            })}
+            {/** TODO: Contextual controls based on tab/depth**/}
           </box>
         </ErrorBoundary>
       </ThemeProvider>

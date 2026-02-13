@@ -11,6 +11,7 @@ import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
 import { PageProps } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
+import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 
 enum MyShowsPaneType {
   SHOWS = 1,
@@ -22,8 +23,7 @@ export const MyShowsPaneCount = 2;
 export function MyShowsPage(props: PageProps) {
   const feedStore = useFeedStore();
   const downloadStore = useDownloadStore();
-  const [showIndex, setShowIndex] = createSignal(0);
-  const [episodeIndex, setEpisodeIndex] = createSignal(0);
+  const audioNav = useAudioNavStore();
   const [isRefreshing, setIsRefreshing] = createSignal(false);
   const { theme } = useTheme();
   const mutedColor = () => theme.muted || theme.text;
@@ -35,8 +35,8 @@ export function MyShowsPage(props: PageProps) {
 
   const selectedShow = createMemo(() => {
     const s = shows();
-    const idx = showIndex();
-    return idx < s.length ? s[idx] : undefined;
+    const index = typeof props.focusedIndex === 'function' ? props.focusedIndex() : props.focusedIndex;
+    return index < s.length ? s[index] : undefined;
   });
 
   const episodes = createMemo(() => {
@@ -45,23 +45,6 @@ export function MyShowsPage(props: PageProps) {
     return [...show.episodes].sort(
       (a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
     );
-  });
-
-  // Detect when user navigates near the bottom and load more episodes
-  createEffect(() => {
-    const idx = episodeIndex();
-    const eps = episodes();
-    const show = selectedShow();
-    if (!show || eps.length === 0) return;
-
-    const nearBottom = idx >= eps.length - LOAD_MORE_THRESHOLD;
-    if (
-      nearBottom &&
-      feedStore.hasMoreEpisodes(show.id) &&
-      !feedStore.isLoadingMore()
-    ) {
-      feedStore.loadMoreEpisodes(show.id);
-    }
   });
 
   const formatDate = (date: Date): string => {
@@ -160,6 +143,7 @@ export function MyShowsPage(props: PageProps) {
                   onMouseDown={() => {
                     setShowIndex(index());
                     setEpisodeIndex(0);
+                    audioNav.setSource(AudioSource.MY_SHOWS, selectedShow()?.podcast.id);
                   }}
                 >
                   <text
