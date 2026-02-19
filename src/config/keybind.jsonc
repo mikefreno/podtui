@@ -9,6 +9,7 @@
   "inverse": ["shift"],
   "leader": ":", // will not trigger while focused on input
   "quit": ["<leader>q"],
+    "refresh": ["<leader>r"],
   "audio-toggle": ["<leader>p"],
   "audio-pause": [],
   "audio-play": [],

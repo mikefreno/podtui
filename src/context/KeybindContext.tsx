@@ -60,6 +60,7 @@ export const { use: useKeybinds, provider: KeybindProvider } =
         inverse: [],
         leader: "",
         quit: [],
+        refresh: [],
         "audio-toggle": [],
         "audio-pause": [],
         "audio-play": [],
@@ -95,9 +96,6 @@ export const { use: useKeybinds, provider: KeybindProvider } =
 
         for (const key of keys) {
           if (evt.name === key) return true;
-          if (evt.shift && key.toLowerCase() !== key) return false;
-          if (evt.ctrl && !key.toLowerCase().includes("ctrl")) return false;
-          if (evt.meta && !key.toLowerCase().includes("meta")) return false;
         }
         return false;
       }

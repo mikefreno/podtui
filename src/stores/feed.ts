@@ -48,13 +48,6 @@ export function createFeedStore() {
   const [sources, setSources] = createSignal<PodcastSource[]>([
     ...DEFAULT_SOURCES,
   ]);
-
-  (async () => {
-    const loadedFeeds = await loadFeedsFromFile();
-    if (loadedFeeds.length > 0) setFeeds(loadedFeeds);
-    const loadedSources = await loadSourcesFromFile<PodcastSource>();
-    if (loadedSources && loadedSources.length > 0) setSources(loadedSources);
-  })();
   const [filter, setFilter] = createSignal<FeedFilter>({
     visibility: "all",
     sortBy: "updated" as FeedSortField,
@@ -62,6 +55,7 @@ export function createFeedStore() {
   });
   const [selectedFeedId, setSelectedFeedId] = createSignal<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = createSignal(false);
+  const [isLoadingFeeds, setIsLoadingFeeds] = createSignal(false);
 
   /** Get filtered and sorted feeds */
   const getFilteredFeeds = (): Feed[] => {
@@ -148,6 +142,13 @@ export function createFeedStore() {
     return allEpisodes;
   };
 
+  /** Sort episodes in reverse chronological order (newest first) */
+  const sortEpisodesReverseChronological = (episodes: Episode[]): Episode[] => {
+    return [...episodes].sort(
+      (a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
+    );
+  };
+
   /** Fetch latest episodes from an RSS feed URL, caching all parsed episodes */
   const fetchEpisodes = async (
     feedUrl: string,
@@ -164,7 +165,7 @@ export function createFeedStore() {
       if (!response.ok) return [];
       const xml = await response.text();
       const parsed = parseRSSFeed(xml, feedUrl);
-      const allEpisodes = parsed.episodes;
+      const allEpisodes = sortEpisodesReverseChronological(parsed.episodes);
 
       // Cache all parsed episodes for pagination
       if (feedId) {
@@ -264,11 +265,24 @@ export function createFeedStore() {
 
   /** Refresh all feeds */
   const refreshAllFeeds = async () => {
-    const currentFeeds = feeds();
-    for (const feed of currentFeeds) {
-      await refreshFeed(feed.id);
+    setIsLoadingFeeds(true);
+    try {
+      const currentFeeds = feeds();
+      for (const feed of currentFeeds) {
+        await refreshFeed(feed.id);
+      }
+    } finally {
+      setIsLoadingFeeds(false);
     }
   };
+
+  (async () => {
+    const loadedFeeds = await loadFeedsFromFile();
+    if (loadedFeeds.length > 0) setFeeds(loadedFeeds);
+    const loadedSources = await loadSourcesFromFile<PodcastSource>();
+    if (loadedSources && loadedSources.length > 0) setSources(loadedSources);
+    await refreshAllFeeds();
+  })();
 
   /** Remove a feed */
   const removeFeed = (feedId: string) => {
@@ -445,6 +459,7 @@ export function createFeedStore() {
     getFeed,
     getSelectedFeed,
     hasMoreEpisodes,
+    isLoadingFeeds,
 
     // Actions
     setFilter,

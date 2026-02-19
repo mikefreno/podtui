@@ -2,6 +2,7 @@ import { createMemo, ErrorBoundary, Accessor } from "solid-js";
 import { useKeyboard, useSelectionHandler } from "@opentui/solid";
 import { TabNavigation } from "./components/TabNavigation";
 import { CodeValidation } from "@/components/CodeValidation";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useAuthStore } from "@/stores/auth";
 import { useFeedStore } from "@/stores/feed";
 import { useAudio } from "@/hooks/useAudio";
@@ -89,10 +90,13 @@ export function App() {
         audioSeekBackward: isSeekBackward,
         quit: isQuit,
       });
-      if (isCycle) {
-      }
 
-      // only handling top
+      // only handling top navigation here, cycle through tabs, just to high priority(player) all else to be handled in each tab
+      if (nav.activeDepth == 0) {
+        if (isCycle) {
+          nav.nextTab();
+        }
+      }
     },
     { release: false },
   );
@@ -109,6 +113,7 @@ export function App() {
         </box>
       )}
     >
+      <LoadingIndicator isLoading={feedStore.isLoadingFeeds()} />
       {DEBUG && (
         <box flexDirection="row" width="100%" height={1}>
           <text fg={theme.primary}>█</text>
@@ -149,7 +154,6 @@ export function App() {
           onTabSelect={nav.setActiveTab}
         />
         {LayerGraph[nav.activeTab]()}
-        {/** TODO: Contextual controls based on tab/depth**/}
       </box>
     </ErrorBoundary>
   );

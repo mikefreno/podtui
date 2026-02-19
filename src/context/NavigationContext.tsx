@@ -1,27 +1,48 @@
 import { createSignal } from "solid-js";
 import { createSimpleContext } from "./helper";
-import { TABS } from "../utils/navigation";
+import { TABS, TabsCount } from "@/utils/navigation";
 
-export const { use: useNavigation, provider: NavigationProvider } = createSimpleContext({
-  name: "Navigation",
-  init: () => {
-    const [activeTab, setActiveTab] = createSignal<TABS>(TABS.FEED);
-    const [activeDepth, setActiveDepth] = createSignal(0);
-    const [inputFocused, setInputFocused] = createSignal(false);
+export const { use: useNavigation, provider: NavigationProvider } =
+  createSimpleContext({
+    name: "Navigation",
+    init: () => {
+      const [activeTab, setActiveTab] = createSignal<TABS>(TABS.FEED);
+      const [activeDepth, setActiveDepth] = createSignal(0);
+      const [inputFocused, setInputFocused] = createSignal(false);
 
-    return {
-      get activeTab() {
-        return activeTab();
-      },
-      get activeDepth() {
-        return activeDepth();
-      },
-      get inputFocused() {
-        return inputFocused();
-      },
-      setActiveTab,
-      setActiveDepth,
-      setInputFocused,
-    };
-  },
-});
+      //conveniences
+      const nextTab = () => {
+        if (activeTab() >= TabsCount) {
+          setActiveTab(1);
+          return;
+        }
+        setActiveTab(activeTab() + 1);
+      };
+
+      const prevTab = () => {
+        if (activeTab() <= 1) {
+          setActiveTab(TabsCount);
+          return;
+        }
+
+        setActiveTab(activeTab() - 1);
+      };
+
+      return {
+        get activeTab() {
+          return activeTab();
+        },
+        get activeDepth() {
+          return activeDepth();
+        },
+        get inputFocused() {
+          return inputFocused();
+        },
+        setActiveTab,
+        setActiveDepth,
+        setInputFocused,
+        nextTab,
+        prevTab,
+      };
+    },
+  });
