@@ -9,9 +9,9 @@ import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
 import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
-import { PageProps } from "@/App";
 import { useTheme } from "@/context/ThemeContext";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
+import { useNavigation } from "@/context/NavigationContext";
 
 enum MyShowsPaneType {
   SHOWS = 1,
@@ -20,13 +20,16 @@ enum MyShowsPaneType {
 
 export const MyShowsPaneCount = 2;
 
-export function MyShowsPage(props: PageProps) {
+export function MyShowsPage() {
   const feedStore = useFeedStore();
   const downloadStore = useDownloadStore();
   const audioNav = useAudioNavStore();
   const [isRefreshing, setIsRefreshing] = createSignal(false);
+  const [showIndex, setShowIndex] = createSignal(0);
+  const [episodeIndex, setEpisodeIndex] = createSignal(0);
   const { theme } = useTheme();
   const mutedColor = () => theme.muted || theme.text;
+  const nav = useNavigation();
 
   /** Threshold: load more when within this many items of the end */
   const LOAD_MORE_THRESHOLD = 5;
@@ -34,9 +37,7 @@ export function MyShowsPage(props: PageProps) {
   const shows = () => feedStore.getFilteredFeeds();
 
   const selectedShow = createMemo(() => {
-    const s = shows();
-    const index = typeof props.focusedIndex === 'function' ? props.focusedIndex() : props.focusedIndex;
-    return index < s.length ? s[index] : undefined;
+    return shows()[0]; //TODO: Integrate with locally handled keyboard navigation
   });
 
   const episodes = createMemo(() => {
@@ -128,7 +129,7 @@ export function MyShowsPage(props: PageProps) {
         >
           <scrollbox
             height="100%"
-            focused={props.depth() == MyShowsPaneType.SHOWS}
+            focused={nav.activeDepth == MyShowsPaneType.SHOWS}
           >
             <For each={shows()}>
               {(feed, index) => (
@@ -143,7 +144,10 @@ export function MyShowsPage(props: PageProps) {
                   onMouseDown={() => {
                     setShowIndex(index());
                     setEpisodeIndex(0);
-                    audioNav.setSource(AudioSource.MY_SHOWS, selectedShow()?.podcast.id);
+                    audioNav.setSource(
+                      AudioSource.MY_SHOWS,
+                      selectedShow()?.podcast.id,
+                    );
                   }}
                 >
                   <text
@@ -184,7 +188,7 @@ export function MyShowsPage(props: PageProps) {
           >
             <scrollbox
               height="100%"
-              focused={props.depth() == MyShowsPaneType.EPISODES}
+              focused={nav.activeDepth == MyShowsPaneType.EPISODES}
             >
               <For each={episodes()}>
                 {(episode, index) => (

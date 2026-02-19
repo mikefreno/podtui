@@ -5,7 +5,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { PreferencesPanel } from "./PreferencesPanel";
 import { SyncPanel } from "./SyncPanel";
 import { VisualizerSettings } from "./VisualizerSettings";
-import { PageProps } from "@/App";
+import { useNavigation } from "@/context/NavigationContext";
 
 enum SettingsPaneType {
   SYNC = 1,
@@ -24,11 +24,9 @@ const SECTIONS: Array<{ id: SettingsPaneType; label: string }> = [
   { id: SettingsPaneType.ACCOUNT, label: "Account" },
 ];
 
-export function SettingsPage(props: PageProps) {
+export function SettingsPage() {
   const { theme } = useTheme();
-  const [activeSection, setActiveSection] = createSignal<SettingsPaneType>(
-    SettingsPaneType.SYNC,
-  );
+  const nav = useNavigation();
 
   return (
     <box flexDirection="column" gap={1} height="100%" width="100%">
@@ -40,13 +38,13 @@ export function SettingsPage(props: PageProps) {
               borderColor={theme.border}
               padding={0}
               backgroundColor={
-                activeSection() === section.id ? theme.primary : undefined
+                nav.activeDepth === section.id ? theme.primary : undefined
               }
-              onMouseDown={() => setActiveSection(section.id)}
+              onMouseDown={() => nav.setActiveDepth(section.id)}
             >
               <text
                 fg={
-                  activeSection() === section.id ? theme.text : theme.textMuted
+                  nav.activeDepth === section.id ? theme.text : theme.textMuted
                 }
               >
                 [{index() + 1}] {section.label}
@@ -56,18 +54,25 @@ export function SettingsPage(props: PageProps) {
         </For>
       </box>
 
-      <box border borderColor={theme.border} flexGrow={1} padding={1} flexDirection="column" gap={1}>
-        {activeSection() === SettingsPaneType.SYNC && <SyncPanel />}
-        {activeSection() === SettingsPaneType.SOURCES && (
+      <box
+        border
+        borderColor={theme.border}
+        flexGrow={1}
+        padding={1}
+        flexDirection="column"
+        gap={1}
+      >
+        {nav.activeDepth === SettingsPaneType.SYNC && <SyncPanel />}
+        {nav.activeDepth === SettingsPaneType.SOURCES && (
           <SourceManager focused />
         )}
-        {activeSection() === SettingsPaneType.PREFERENCES && (
+        {nav.activeDepth === SettingsPaneType.PREFERENCES && (
           <PreferencesPanel />
         )}
-        {activeSection() === SettingsPaneType.VISUALIZER && (
+        {nav.activeDepth === SettingsPaneType.VISUALIZER && (
           <VisualizerSettings />
         )}
-        {activeSection() === SettingsPaneType.ACCOUNT && (
+        {nav.activeDepth === SettingsPaneType.ACCOUNT && (
           <box flexDirection="column" gap={1}>
             <text fg={theme.textMuted}>Account</text>
           </box>

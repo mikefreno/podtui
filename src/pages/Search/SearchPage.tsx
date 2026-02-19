@@ -8,9 +8,9 @@ import { useSearchStore } from "@/stores/search";
 import { SearchResults } from "./SearchResults";
 import { SearchHistory } from "./SearchHistory";
 import type { SearchResult } from "@/types/source";
-import { PageProps } from "@/App";
 import { MyShowsPage } from "../MyShows/MyShowsPage";
 import { useTheme } from "@/context/ThemeContext";
+import { useNavigation } from "@/context/NavigationContext";
 
 enum SearchPaneType {
   INPUT = 1,
@@ -19,19 +19,13 @@ enum SearchPaneType {
 }
 export const SearchPaneCount = 3;
 
-export function SearchPage(props: PageProps) {
+export function SearchPage() {
   const searchStore = useSearchStore();
   const [inputValue, setInputValue] = createSignal("");
   const [resultIndex, setResultIndex] = createSignal(0);
   const [historyIndex, setHistoryIndex] = createSignal(0);
   const { theme } = useTheme();
-
-  // Keep parent informed about input focus state
-  // TODO: have a global input focused prop in useKeyboard hook
-  //createEffect(() => {
-  //const isInputFocused = props.focused && focusArea() === "input";
-  //props.onInputFocusChange?.(isInputFocused);
-  //});
+  const nav = useNavigation();
 
   const handleSearch = async () => {
     const query = inputValue().trim();
@@ -75,7 +69,7 @@ export function SearchPage(props: PageProps) {
               setInputValue(value);
             }}
             placeholder="Enter podcast name, topic, or author..."
-            focused={props.depth() === SearchPaneType.INPUT}
+            focused={nav.activeDepth === SearchPaneType.INPUT}
             width={50}
           />
           <box
@@ -98,33 +92,42 @@ export function SearchPage(props: PageProps) {
         </Show>
       </box>
 
-        {/* Main Content - Results or History */}
-        <box flexDirection="row" height="100%" gap={2}>
-          {/* Results Panel */}
-          <box flexDirection="column" flexGrow={1} border borderColor={theme.border}>
-            <box padding={1}>
-              <text
-                fg={props.depth() === SearchPaneType.RESULTS ? theme.primary : theme.muted}
-              >
-                Results ({searchStore.results().length})
-              </text>
-            </box>
-            <Show
-              when={searchStore.results().length > 0}
-              fallback={
-                <box padding={2}>
-                  <text fg={theme.muted}>
-                    {searchStore.query()
-                      ? "No results found"
-                      : "Enter a search term to find podcasts"}
-                  </text>
-                </box>
+      {/* Main Content - Results or History */}
+      <box flexDirection="row" height="100%" gap={2}>
+        {/* Results Panel */}
+        <box
+          flexDirection="column"
+          flexGrow={1}
+          border
+          borderColor={theme.border}
+        >
+          <box padding={1}>
+            <text
+              fg={
+                nav.activeDepth === SearchPaneType.RESULTS
+                  ? theme.primary
+                  : theme.muted
               }
             >
+              Results ({searchStore.results().length})
+            </text>
+          </box>
+          <Show
+            when={searchStore.results().length > 0}
+            fallback={
+              <box padding={2}>
+                <text fg={theme.muted}>
+                  {searchStore.query()
+                    ? "No results found"
+                    : "Enter a search term to find podcasts"}
+                </text>
+              </box>
+            }
+          >
             <SearchResults
               results={searchStore.results()}
               selectedIndex={resultIndex()}
-              focused={props.depth() === SearchPaneType.RESULTS}
+              focused={nav.activeDepth === SearchPaneType.RESULTS}
               onSelect={handleResultSelect}
               onChange={setResultIndex}
               isSearching={searchStore.isSearching()}
@@ -138,7 +141,11 @@ export function SearchPage(props: PageProps) {
           <box padding={1} flexDirection="column">
             <box paddingBottom={1}>
               <text
-                fg={props.depth() === SearchPaneType.HISTORY ? theme.primary : theme.muted}
+                fg={
+                  nav.activeDepth === SearchPaneType.HISTORY
+                    ? theme.primary
+                    : theme.muted
+                }
               >
                 History
               </text>
@@ -146,7 +153,7 @@ export function SearchPage(props: PageProps) {
             <SearchHistory
               history={searchStore.history()}
               selectedIndex={historyIndex()}
-              focused={props.depth() === SearchPaneType.HISTORY}
+              focused={nav.activeDepth === SearchPaneType.HISTORY}
               onSelect={handleHistorySelect}
               onRemove={searchStore.removeFromHistory}
               onClear={searchStore.clearHistory}

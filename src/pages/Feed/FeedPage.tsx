@@ -10,9 +10,9 @@ import { format } from "date-fns";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { useTheme } from "@/context/ThemeContext";
-import { PageProps } from "@/App";
 import { SelectableBox, SelectableText } from "@/components/Selectable";
 import { se } from "date-fns/locale";
+import { useNavigation } from "@/context/NavigationContext";
 
 enum FeedPaneType {
   FEED = 1,
@@ -22,10 +22,12 @@ export const FeedPaneCount = 1;
 /** Episodes to load per batch */
 const ITEMS_PER_BATCH = 50;
 
-export function FeedPage(props: PageProps) {
+export function FeedPage() {
   const feedStore = useFeedStore();
   const [isRefreshing, setIsRefreshing] = createSignal(false);
-  const [loadedEpisodesCount, setLoadedEpisodesCount] = createSignal(ITEMS_PER_BATCH);
+  const [loadedEpisodesCount, setLoadedEpisodesCount] =
+    createSignal(ITEMS_PER_BATCH);
+  const nav = useNavigation();
 
   const allEpisodes = () => feedStore.getAllEpisodesChronological();
 
@@ -86,15 +88,14 @@ export function FeedPage(props: PageProps) {
           </box>
         }
       >
-        <scrollbox height="100%" focused={props.depth() == FeedPaneType.FEED}>
+        <scrollbox height="100%" focused={nav.activeDepth == FeedPaneType.FEED}>
           <For
             each={Object.entries(episodesByDate()).sort(([a], [b]) =>
               b.localeCompare(a),
             )}
           >
             {([date, episode], groupIndex) => {
-              const index = typeof props.focusedIndex === 'function' ? props.focusedIndex() : props.focusedIndex;
-              const selected = () => groupIndex() === index;
+              const selected = () => groupIndex() === 1; // TODO: Manage selections locally
               return (
                 <>
                   <box

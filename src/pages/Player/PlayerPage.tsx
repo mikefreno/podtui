@@ -1,4 +1,3 @@
-import { PageProps } from "@/App";
 import { PlaybackControls } from "./PlaybackControls";
 import { RealtimeWaveform } from "./RealtimeWaveform";
 import { useAudio } from "@/hooks/useAudio";
@@ -10,7 +9,7 @@ enum PlayerPaneType {
 }
 export const PlayerPaneCount = 1;
 
-export function PlayerPage(props: PageProps) {
+export function PlayerPage() {
   const audio = useAudio();
   const { theme } = useTheme();
 
@@ -40,7 +39,13 @@ export function PlayerPage(props: PageProps) {
 
       {audio.error() && <text fg={theme.error}>{audio.error()}</text>}
 
-      <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
+      <box
+        border
+        borderColor={theme.border}
+        padding={1}
+        flexDirection="column"
+        gap={1}
+      >
         <text fg={theme.text}>
           <strong>{audio.currentEpisode()?.title}</strong>
         </text>
