@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 import { useNavigation } from "@/context/NavigationContext";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 
 enum MyShowsPaneType {
   SHOWS = 1,
@@ -245,7 +246,7 @@ export function MyShowsPage() {
               </For>
               <Show when={feedStore.isLoadingMore()}>
                 <box paddingLeft={2} paddingTop={1}>
-                  <text fg={theme.warning}>Loading more episodes...</text>
+                  <LoadingIndicator />
                 </box>
               </Show>
               <Show

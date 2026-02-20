@@ -1,36 +1,24 @@
-/**
- * Loading indicator component
- * Displays an animated sliding bar at the top of the screen
- */
-
-import { For } from "solid-js";
+import { createSignal, createMemo, onCleanup } from "solid-js";
 import { useTheme } from "@/context/ThemeContext";
 
-interface LoadingIndicatorProps {
-  isLoading: boolean;
-}
+const spinnerChars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-export function LoadingIndicator(props: LoadingIndicatorProps) {
+//TODO: Watch for actual loading state (fetching feeds)
+export function LoadingIndicator() {
   const { theme } = useTheme();
+  const [index, setIndex] = createSignal(0);
 
-  if (!props.isLoading) return null;
+  const interval = setInterval(() => {
+    setIndex((i) => (i + 1) % spinnerChars.length);
+  }, 65);
+
+  onCleanup(() => clearInterval(interval));
+
+  const currentChar = createMemo(() => spinnerChars[index()]);
 
   return (
-    <box
-      flexDirection="row"
-      width="100%"
-      height={1}
-      backgroundColor={theme.background}
-    >
-      <For each={Array.from({ length: 10 })}>
-        {(_, index) => (
-          <box
-            width={2}
-            backgroundColor={theme.primary}
-            style={{ opacity: 0.1 + index() * 0.1 }}
-          />
-        )}
-      </For>
+    <box flexDirection="row" justifyContent="flex-end" alignItems="flex-start">
+      <text fg={theme.primary} content={currentChar()} />
     </box>
   );
 }
