@@ -19,7 +19,7 @@ export function TabNavigation() {
   return (
     <box
       border
-      borderColor={activeDepth !== 0 ? "transparent" : theme.accent}
+      borderColor={activeDepth() !== 0 ? theme.border : theme.accent}
       backgroundColor={"transparent"}
       style={{
         flexDirection: "column",
@@ -32,11 +32,11 @@ export function TabNavigation() {
           <SelectableBox
             border
             height={3}
-            selected={() => tab.id == activeTab}
+            selected={() => tab.id == activeTab()}
             onMouseDown={() => setActiveTab(tab.id)}
           >
             <SelectableText
-              selected={() => tab.id == activeTab}
+              selected={() => tab.id == activeTab()}
               primary
               alignSelf="center"
             >

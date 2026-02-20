@@ -29,15 +29,9 @@ export const { use: useNavigation, provider: NavigationProvider } =
       };
 
       return {
-        get activeTab() {
-          return activeTab();
-        },
-        get activeDepth() {
-          return activeDepth();
-        },
-        get inputFocused() {
-          return inputFocused();
-        },
+        activeTab,
+        activeDepth,
+        inputFocused,
         setActiveTab,
         setActiveDepth,
         setInputFocused,

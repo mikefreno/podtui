@@ -86,7 +86,7 @@ export function App() {
       const isInverting = keybind.isInverting(keyEvent);
 
       // only handling top navigation here, cycle through tabs, just to high priority(player) all else to be handled in each tab
-      if (nav.activeDepth == 0) {
+      if (nav.activeDepth() == 0) {
         if (
           (isCycle && !isInverting) ||
           (isDown && !isInverting) ||
@@ -103,11 +103,24 @@ export function App() {
           nav.prevTab();
           return;
         }
-        if ((isRight && !isInverting) || (isLeft && isInverting)) {
+        if (
+          (isDive && !isInverting) ||
+          (isOut && isInverting) ||
+          (isRight && !isInverting) ||
+          (isLeft && isInverting)
+        ) {
           nav.setActiveDepth(1);
         }
       }
-      if (nav.activeDepth == 1) {
+      if (nav.activeDepth() == 1) {
+        if (
+          (isDive && isInverting) ||
+          (isOut && !isInverting) ||
+          (isRight && isInverting) ||
+          (isLeft && !isInverting)
+        ) {
+          nav.setActiveDepth(0);
+        }
       }
     },
     { release: false },
@@ -166,7 +179,7 @@ export function App() {
         )}
         <box flexDirection="row" width="100%" height="100%">
           <TabNavigation />
-          {LayerGraph[nav.activeTab]()}
+          {LayerGraph[nav.activeTab()]()}
         </box>
       </box>
     </ErrorBoundary>

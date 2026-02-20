@@ -19,7 +19,6 @@ enum FeedPaneType {
 }
 export const FeedPaneCount = 1;
 
-/** Episodes to load per batch */
 const ITEMS_PER_BATCH = 50;
 
 export function FeedPage() {
@@ -64,6 +63,10 @@ export function FeedPage() {
 
   return (
     <box
+      border
+      borderColor={
+        nav.activeDepth() !== FeedPaneType.FEED ? theme.border : theme.accent
+      }
       backgroundColor={theme.background}
       flexDirection="column"
       height="100%"
@@ -79,7 +82,10 @@ export function FeedPage() {
           </box>
         }
       >
-        <scrollbox height="100%" focused={nav.activeDepth == FeedPaneType.FEED}>
+        <scrollbox
+          height="100%"
+          focused={nav.activeDepth() == FeedPaneType.FEED}
+        >
           <For each={groupEpisodesByDate()}>
             {([date, items]) => (
               <box flexDirection="column" gap={1} padding={1}>
@@ -90,8 +96,8 @@ export function FeedPage() {
                   {(item) => {
                     const isSelected = () => {
                       if (
-                        nav.activeTab == TABS.FEED &&
-                        nav.activeDepth == FeedPaneType.FEED &&
+                        nav.activeTab() == TABS.FEED &&
+                        nav.activeDepth() == FeedPaneType.FEED &&
                         selectedEpisodeID() &&
                         selectedEpisodeID() === item.episode.id
                       ) {
