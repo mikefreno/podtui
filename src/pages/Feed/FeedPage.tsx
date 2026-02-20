@@ -51,7 +51,14 @@ export function FeedPage() {
       groups[dateKey].push(item);
     }
 
-    return groups;
+    return Object.entries(groups)
+      .sort(([a, _aItems], [b, _bItems]) => {
+        // Convert date strings back to Date objects for proper chronological sorting
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+        // Sort in descending order (newest first)
+        return dateB.getTime() - dateA.getTime();
+      });
   };
 
   const formatDuration = (seconds: number): string => {
@@ -85,13 +92,13 @@ export function FeedPage() {
         }
       >
         <scrollbox height="100%" focused={nav.activeDepth == FeedPaneType.FEED}>
-          <For each={Object.entries(groupEpisodesByDate()).sort(([a], [b]) => b.localeCompare(a))}>
-            {([date, episodes]) => (
+          <For each={groupEpisodesByDate()}>
+            {([date, items]) => (
               <box flexDirection="column" gap={1} padding={1}>
                 <SelectableText selected={() => false} primary>
                   {date}
                 </SelectableText>
-                <For each={episodes}>
+                <For each={items}>
                   {(item) => (
                     <SelectableBox
                       selected={() => false}
