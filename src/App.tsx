@@ -28,7 +28,15 @@ export function App() {
   const audio = useAudio();
   const toast = useToast();
   const renderer = useRenderer();
-  const { theme } = useTheme();
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+
+  // Create a reactive expression for background color
+  const backgroundColor = () => {
+    return themeContext.selected === "system"
+      ? "transparent"
+      : themeContext.theme.surface;
+  };
   const keybind = useKeybinds();
   const audioNav = useAudioNavStore();
 
@@ -62,11 +70,11 @@ export function App() {
 
   useKeyboard(
     (keyEvent) => {
+      const isCycle = keybind.match("cycle", keyEvent);
       const isUp = keybind.match("up", keyEvent);
       const isDown = keybind.match("down", keyEvent);
       const isLeft = keybind.match("left", keyEvent);
       const isRight = keybind.match("right", keyEvent);
-      const isCycle = keybind.match("cycle", keyEvent);
       const isDive = keybind.match("dive", keyEvent);
       const isOut = keybind.match("out", keyEvent);
       const isToggle = keybind.match("audio-toggle", keyEvent);
@@ -75,27 +83,31 @@ export function App() {
       const isSeekForward = keybind.match("audio-seek-forward", keyEvent);
       const isSeekBackward = keybind.match("audio-seek-backward", keyEvent);
       const isQuit = keybind.match("quit", keyEvent);
-      console.log({
-        up: isUp,
-        down: isDown,
-        left: isLeft,
-        right: isRight,
-        cycle: isCycle,
-        dive: isDive,
-        out: isOut,
-        audioToggle: isToggle,
-        audioNext: isNext,
-        audioPrev: isPrev,
-        audioSeekForward: isSeekForward,
-        audioSeekBackward: isSeekBackward,
-        quit: isQuit,
-      });
+      const isInverting = keybind.isInverting(keyEvent);
 
       // only handling top navigation here, cycle through tabs, just to high priority(player) all else to be handled in each tab
       if (nav.activeDepth == 0) {
-        if (isCycle) {
+        if (
+          (isCycle && !isInverting) ||
+          (isDown && !isInverting) ||
+          (isUp && isInverting)
+        ) {
           nav.nextTab();
+          return;
         }
+        if (
+          (isCycle && isInverting) ||
+          (isDown && isInverting) ||
+          (isUp && !isInverting)
+        ) {
+          nav.prevTab();
+          return;
+        }
+        if ((isRight && !isInverting) || (isLeft && isInverting)) {
+          nav.setActiveDepth(1);
+        }
+      }
+      if (nav.activeDepth == 1) {
       }
     },
     { release: false },
@@ -117,7 +129,11 @@ export function App() {
         flexDirection="column"
         width="100%"
         height="100%"
-        backgroundColor={theme.surface}
+        backgroundColor={
+          themeContext.selected === "system"
+            ? "transparent"
+            : themeContext.theme.surface
+        }
       >
         <LoadingIndicator />
         {DEBUG && (
@@ -149,10 +165,7 @@ export function App() {
           </box>
         )}
         <box flexDirection="row" width="100%" height="100%">
-          <TabNavigation
-            activeTab={nav.activeTab}
-            onTabSelect={nav.setActiveTab}
-          />
+          <TabNavigation />
           {LayerGraph[nav.activeTab]()}
         </box>
       </box>

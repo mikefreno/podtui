@@ -28,7 +28,7 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
   cycle: ["tab"],
   dive: ["return"],
   out: ["esc"],
-  inverse: ["shift"],
+  inverseModifier: "shift",
   leader: ":",
   quit: ["<leader>q"],
   "audio-toggle": ["<leader>p"],

@@ -1,12 +1,8 @@
 import { useTheme } from "@/context/ThemeContext";
-import { TABS } from "@/utils/navigation";
+import { TABS, TabsCount } from "@/utils/navigation";
 import { For } from "solid-js";
 import { SelectableBox, SelectableText } from "@/components/Selectable";
-
-interface TabNavigationProps {
-  activeTab: TABS;
-  onTabSelect: (tab: TABS) => void;
-}
+import { useNavigation } from "@/context/NavigationContext";
 
 export const tabs: TabDefinition[] = [
   { id: TABS.FEED, label: "Feed" },
@@ -17,32 +13,36 @@ export const tabs: TabDefinition[] = [
   { id: TABS.SETTINGS, label: "Settings" },
 ];
 
-export function TabNavigation(props: TabNavigationProps) {
+export function TabNavigation() {
   const { theme } = useTheme();
+  const { activeTab, setActiveTab, activeDepth } = useNavigation();
   return (
     <box
-      backgroundColor={theme.surface}
+      border
+      borderColor={activeDepth !== 0 ? "transparent" : theme.accent}
+      backgroundColor={"transparent"}
       style={{
         flexDirection: "column",
-        width: 10,
-        flexGrow: 1,
+        width: 12,
+        height: TabsCount * 3 + 2,
       }}
     >
       <For each={tabs}>
         {(tab) => (
-           <SelectableBox
-             border
-             selected={() => tab.id == props.activeTab}
-             onMouseDown={() => props.onTabSelect(tab.id)}
-           >
-             <SelectableText
-               selected={() => tab.id == props.activeTab}
-               primary
-               alignSelf="center"
-             >
-               {tab.label}
-             </SelectableText>
-           </SelectableBox>
+          <SelectableBox
+            border
+            height={3}
+            selected={() => tab.id == activeTab}
+            onMouseDown={() => setActiveTab(tab.id)}
+          >
+            <SelectableText
+              selected={() => tab.id == activeTab}
+              primary
+              alignSelf="center"
+            >
+              {tab.label}
+            </SelectableText>
+          </SelectableBox>
         )}
       </For>
     </box>

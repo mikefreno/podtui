@@ -15,7 +15,7 @@ export type KeybindsResolved = {
   cycle: string[]; // this will cycle no matter the depth/orientation
   dive: string[];
   out: string[];
-  inverse: string[];
+  inverseModifier: string;
   leader: string; // will not trigger while focused on input
   quit: string[];
   "audio-toggle": string[];
@@ -57,7 +57,7 @@ export const { use: useKeybinds, provider: KeybindProvider } =
         cycle: [],
         dive: [],
         out: [],
-        inverse: [],
+        inverseModifier: "",
         leader: "",
         quit: [],
         refresh: [],
@@ -100,6 +100,18 @@ export const { use: useKeybinds, provider: KeybindProvider } =
         return false;
       }
 
+      function isInverting(evt: {
+        name: string;
+        ctrl?: boolean;
+        meta?: boolean;
+        shift?: boolean;
+      }) {
+        if (store.inverseModifier === "ctrl" && evt.ctrl) return true;
+        if (store.inverseModifier === "meta" && evt.meta) return true;
+        if (store.inverseModifier === "shift" && evt.shift) return true;
+        return false;
+      }
+
       // Load on mount
       onMount(() => {
         load().catch(() => {});
@@ -115,6 +127,7 @@ export const { use: useKeybinds, provider: KeybindProvider } =
         save,
         print,
         match,
+        isInverting,
       };
     },
   });

@@ -12,6 +12,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { SelectableBox, SelectableText } from "@/components/Selectable";
 import { useNavigation } from "@/context/NavigationContext";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
+import { TABS } from "@/utils/navigation";
 
 enum FeedPaneType {
   FEED = 1,
@@ -23,17 +24,12 @@ const ITEMS_PER_BATCH = 50;
 
 export function FeedPage() {
   const feedStore = useFeedStore();
-  const [isRefreshing, setIsRefreshing] = createSignal(false);
-  const [loadedEpisodesCount, setLoadedEpisodesCount] =
-    createSignal(ITEMS_PER_BATCH);
   const nav = useNavigation();
-
+  const { theme } = useTheme();
+  const [selectedEpisodeID, setSelectedEpisodeID] = createSignal<
+    string | undefined
+  >();
   const allEpisodes = () => feedStore.getAllEpisodesChronological();
-
-  const paginatedEpisodes = () => {
-    const episodes = allEpisodes();
-    return episodes.slice(0, loadedEpisodesCount());
-  };
 
   const formatDate = (date: Date): string => {
     return format(date, "MMM d, yyyy");
@@ -41,9 +37,8 @@ export function FeedPage() {
 
   const groupEpisodesByDate = () => {
     const groups: Record<string, Array<{ episode: Episode; feed: Feed }>> = {};
-    const episodes = paginatedEpisodes();
 
-    for (const item of episodes) {
+    for (const item of allEpisodes()) {
       const dateKey = formatDate(new Date(item.episode.pubDate));
       if (!groups[dateKey]) {
         groups[dateKey] = [];
@@ -51,14 +46,13 @@ export function FeedPage() {
       groups[dateKey].push(item);
     }
 
-    return Object.entries(groups)
-      .sort(([a, _aItems], [b, _bItems]) => {
-        // Convert date strings back to Date objects for proper chronological sorting
-        const dateA = new Date(a);
-        const dateB = new Date(b);
-        // Sort in descending order (newest first)
-        return dateB.getTime() - dateA.getTime();
-      });
+    return Object.entries(groups).sort(([a, _aItems], [b, _bItems]) => {
+      // Convert date strings back to Date objects for proper chronological sorting
+      const dateA = new Date(a);
+      const dateB = new Date(b);
+      // Sort in descending order (newest first)
+      return dateB.getTime() - dateA.getTime();
+    });
   };
 
   const formatDuration = (seconds: number): string => {
@@ -68,7 +62,6 @@ export function FeedPage() {
     return `${mins}m`;
   };
 
-  const { theme } = useTheme();
   return (
     <box
       backgroundColor={theme.background}
@@ -76,11 +69,6 @@ export function FeedPage() {
       height="100%"
       width="100%"
     >
-      {/* Status line */}
-      <Show when={isRefreshing()}>
-        <text fg={theme.warning}>Refreshing feeds...</text>
-      </Show>
-
       <Show
         when={allEpisodes().length > 0}
         fallback={
@@ -99,42 +87,49 @@ export function FeedPage() {
                   {date}
                 </SelectableText>
                 <For each={items}>
-                  {(item) => (
-                    <SelectableBox
-                      selected={() => false}
-                      flexDirection="column"
-                      gap={0}
-                      paddingLeft={1}
-                      paddingRight={1}
-                      paddingTop={0}
-                      paddingBottom={0}
-                      onMouseDown={() => {
-                        // Selection is handled by App's keyboard navigation
-                      }}
-                    >
-                      <SelectableText selected={() => false} primary>
-                        {item.episode.title}
-                      </SelectableText>
-                      <box flexDirection="row" gap={2} paddingLeft={2}>
-                        <SelectableText selected={() => false} primary>
-                          {item.feed.podcast.title}
+                  {(item) => {
+                    const isSelected = () => {
+                      if (
+                        nav.activeTab == TABS.FEED &&
+                        nav.activeDepth == FeedPaneType.FEED &&
+                        selectedEpisodeID() &&
+                        selectedEpisodeID() === item.episode.id
+                      ) {
+                        return true;
+                      }
+                      return false;
+                    };
+                    return (
+                      <SelectableBox
+                        selected={isSelected}
+                        flexDirection="column"
+                        gap={0}
+                        paddingLeft={1}
+                        paddingRight={1}
+                        paddingTop={0}
+                        paddingBottom={0}
+                        onMouseDown={() => {
+                          // Selection is handled by App's keyboard navigation
+                        }}
+                      >
+                        <SelectableText selected={isSelected} primary>
+                          {item.episode.title}
                         </SelectableText>
-                        <SelectableText selected={() => false} tertiary>
-                          {formatDuration(item.episode.duration)}
-                        </SelectableText>
-                      </box>
-                    </SelectableBox>
-                  )}
+                        <box flexDirection="row" gap={2} paddingLeft={2}>
+                          <SelectableText selected={isSelected} primary>
+                            {item.feed.podcast.title}
+                          </SelectableText>
+                          <SelectableText selected={isSelected} tertiary>
+                            {formatDuration(item.episode.duration)}
+                          </SelectableText>
+                        </box>
+                      </SelectableBox>
+                    );
+                  }}
                 </For>
               </box>
             )}
           </For>
-          {/* Loading indicator */}
-          <Show when={feedStore.isLoadingMore()}>
-            <box padding={1}>
-              <LoadingIndicator />
-            </box>
-          </Show>
         </scrollbox>
       </Show>
     </box>
