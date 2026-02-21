@@ -3,7 +3,7 @@
  * Reverse chronological order, grouped by date
  */
 
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, onMount } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { format } from "date-fns";
 import type { Episode } from "@/types/episode";
@@ -13,6 +13,8 @@ import { SelectableBox, SelectableText } from "@/components/Selectable";
 import { useNavigation } from "@/context/NavigationContext";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { TABS } from "@/utils/navigation";
+import { useKeyboard } from "@opentui/solid";
+import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
 
 enum FeedPaneType {
   FEED = 1,
@@ -29,6 +31,37 @@ export function FeedPage() {
     string | undefined
   >();
   const allEpisodes = () => feedStore.getAllEpisodesChronological();
+  const keybind = useKeybinds();
+  const [focusedIndex, setFocusedIndex] = createSignal(0);
+
+  onMount(() => {
+    useKeyboard(
+      (keyEvent: any) => {
+        const isDown = keybind.match("down", keyEvent);
+        const isUp = keybind.match("up", keyEvent);
+        const isEnter = keyEvent.name === "Enter" || keyEvent.name === " ";
+        const isSpace = keyEvent.name === " ";
+
+        if (isEnter || isSpace) {
+          const episodes = allEpisodes();
+          if (episodes.length > 0 && episodes[focusedIndex()]) {
+            setSelectedEpisodeID(episodes[focusedIndex()].episode.id);
+          }
+          return;
+        }
+
+        const episodes = allEpisodes();
+        if (episodes.length === 0) return;
+
+        if (isDown && focusedIndex() < episodes.length - 1) {
+          setFocusedIndex(focusedIndex() + 1);
+        } else if (isUp && focusedIndex() > 0) {
+          setFocusedIndex(focusedIndex() - 1);
+        }
+      },
+      { release: false },
+    );
+  });
 
   const formatDate = (date: Date): string => {
     return format(date, "MMM d, yyyy");
@@ -105,6 +138,13 @@ export function FeedPage() {
                       }
                       return false;
                     };
+                    const isFocused = () => {
+                      const episodes = allEpisodes();
+                      const currentIndex = episodes.findIndex(
+                        (e: any) => e.episode.id === item.episode.id,
+                      );
+                      return currentIndex === focusedIndex();
+                    };
                     return (
                       <SelectableBox
                         selected={isSelected}
@@ -115,7 +155,11 @@ export function FeedPage() {
                         paddingTop={0}
                         paddingBottom={0}
                         onMouseDown={() => {
-                          // Selection is handled by App's keyboard navigation
+                          setSelectedEpisodeID(item.episode.id);
+                          const episodes = allEpisodes();
+                          setFocusedIndex(
+                            episodes.findIndex((e: any) => e.episode.id === item.episode.id),
+                          );
                         }}
                       >
                         <SelectableText selected={isSelected} primary>

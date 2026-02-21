@@ -2,7 +2,7 @@
  * SearchPage component - Main search interface for PodTUI
  */
 
-import { createSignal, createEffect, Show } from "solid-js";
+import { createSignal, createEffect, Show, onMount } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import { useSearchStore } from "@/stores/search";
 import { SearchResults } from "./SearchResults";
@@ -26,6 +26,37 @@ export function SearchPage() {
   const [historyIndex, setHistoryIndex] = createSignal(0);
   const { theme } = useTheme();
   const nav = useNavigation();
+
+  onMount(() => {
+    useKeyboard(
+      (keyEvent: any) => {
+        const isDown =
+          keyEvent.key === "j" || keyEvent.key === "ArrowDown";
+        const isUp =
+          keyEvent.key === "k" || keyEvent.key === "ArrowUp";
+        const isSelect =
+          keyEvent.key === "Enter" || keyEvent.key === " ";
+
+        if (isSelect) {
+          const results = searchStore.results();
+          if (results.length > 0 && resultIndex() < results.length) {
+            setResultIndex(resultIndex() + 1);
+          }
+          return;
+        }
+
+        const results = searchStore.results();
+        if (results.length === 0) return;
+
+        if (isDown && resultIndex() < results.length - 1) {
+          setResultIndex(resultIndex() + 1);
+        } else if (isUp && resultIndex() > 0) {
+          setResultIndex(resultIndex() - 1);
+        }
+      },
+      { release: false },
+    );
+  });
 
   const handleSearch = async () => {
     const query = inputValue().trim();

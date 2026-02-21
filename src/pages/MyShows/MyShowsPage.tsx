@@ -4,7 +4,8 @@
  * Right panel: episodes for the selected show
  */
 
-import { createSignal, For, Show, createMemo, createEffect } from "solid-js";
+import { createSignal, For, Show, createMemo, createEffect, onMount } from "solid-js";
+import { useKeyboard } from "@opentui/solid";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
 import { DownloadStatus } from "@/types/episode";
@@ -31,6 +32,50 @@ export function MyShowsPage() {
   const { theme } = useTheme();
   const mutedColor = () => theme.muted || theme.text;
   const nav = useNavigation();
+
+  onMount(() => {
+    useKeyboard(
+      (keyEvent: any) => {
+        const isDown =
+          keyEvent.key === "j" || keyEvent.key === "ArrowDown";
+        const isUp =
+          keyEvent.key === "k" || keyEvent.key === "ArrowUp";
+        const isSelect =
+          keyEvent.key === "Enter" || keyEvent.key === " ";
+
+        const shows = feedStore.getFilteredFeeds();
+        const episodesList = episodes();
+        const selected = selectedShow();
+
+        if (isSelect) {
+          if (shows.length > 0 && showIndex() < shows.length) {
+            setShowIndex(showIndex() + 1);
+          }
+          if (episodesList.length > 0 && episodeIndex() < episodesList.length) {
+            setEpisodeIndex(episodeIndex() + 1);
+          }
+          return;
+        }
+
+        if (shows.length > 0) {
+          if (isDown && showIndex() < shows.length - 1) {
+            setShowIndex(showIndex() + 1);
+          } else if (isUp && showIndex() > 0) {
+            setShowIndex(showIndex() - 1);
+          }
+        }
+
+        if (episodesList.length > 0) {
+          if (isDown && episodeIndex() < episodesList.length - 1) {
+            setEpisodeIndex(episodeIndex() + 1);
+          } else if (isUp && episodeIndex() > 0) {
+            setEpisodeIndex(episodeIndex() - 1);
+          }
+        }
+      },
+      { release: false },
+    );
+  });
 
   /** Threshold: load more when within this many items of the end */
   const LOAD_MORE_THRESHOLD = 5;

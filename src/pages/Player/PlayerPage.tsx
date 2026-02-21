@@ -4,6 +4,8 @@ import { useAudio } from "@/hooks/useAudio";
 import { useAppStore } from "@/stores/app";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation } from "@/context/NavigationContext";
+import { useKeyboard } from "@opentui/solid";
+import { onMount } from "solid-js";
 
 enum PlayerPaneType {
   PLAYER = 1,
@@ -14,6 +16,32 @@ export function PlayerPage() {
   const audio = useAudio();
   const { theme } = useTheme();
   const nav = useNavigation();
+
+  onMount(() => {
+    useKeyboard(
+      (keyEvent: any) => {
+        const isNext = keyEvent.key === "l" || keyEvent.key === "ArrowRight";
+        const isPrev = keyEvent.key === "h" || keyEvent.key === "ArrowLeft";
+        const isPlayPause = keyEvent.key === " " || keyEvent.key === "Enter";
+
+        if (isPlayPause) {
+          audio.togglePlayback();
+          return;
+        }
+
+        if (isNext) {
+          audio.seek(audio.currentEpisode()?.duration ?? 0);
+          return;
+        }
+
+        if (isPrev) {
+          audio.seek(0);
+          return;
+        }
+      },
+      { release: false },
+    );
+  });
 
   const progressPercent = () => {
     const d = audio.duration();

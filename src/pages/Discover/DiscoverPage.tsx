@@ -2,13 +2,14 @@
  * DiscoverPage component - Main discover/browse interface for PodTUI
  */
 
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, onMount } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import { useDiscoverStore, DISCOVER_CATEGORIES } from "@/stores/discover";
 import { useTheme } from "@/context/ThemeContext";
 import { PodcastCard } from "./PodcastCard";
 import { SelectableBox, SelectableText } from "@/components/Selectable";
 import { useNavigation } from "@/context/NavigationContext";
+import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
 
 enum DiscoverPagePaneType {
   CATEGORIES = 1,
@@ -21,6 +22,36 @@ export function DiscoverPage() {
   const [showIndex, setShowIndex] = createSignal(0);
   const [categoryIndex, setCategoryIndex] = createSignal(0);
   const nav = useNavigation();
+  const keybind = useKeybinds();
+
+  onMount(() => {
+    useKeyboard(
+      (keyEvent: any) => {
+        const isDown = keybind.match("down", keyEvent);
+        const isUp = keybind.match("up", keyEvent);
+        const isEnter = keyEvent.name === "Enter" || keyEvent.name === " ";
+        const isSpace = keyEvent.name === " ";
+
+        if (isEnter || isSpace) {
+          const filteredPodcasts = discoverStore.filteredPodcasts();
+          if (filteredPodcasts.length > 0 && showIndex() < filteredPodcasts.length) {
+            setShowIndex(showIndex() + 1);
+          }
+          return;
+        }
+
+        const filteredPodcasts = discoverStore.filteredPodcasts();
+        if (filteredPodcasts.length === 0) return;
+
+        if (isDown && showIndex() < filteredPodcasts.length - 1) {
+          setShowIndex(showIndex() + 1);
+        } else if (isUp && showIndex() > 0) {
+          setShowIndex(showIndex() - 1);
+        }
+      },
+      { release: false },
+    );
+  });
 
   const handleCategorySelect = (categoryId: string) => {
     discoverStore.setSelectedCategory(categoryId);

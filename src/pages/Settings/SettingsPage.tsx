@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createSignal, For, onMount } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import { SourceManager } from "./SourceManager";
 import { useTheme } from "@/context/ThemeContext";
@@ -32,6 +32,31 @@ export function SettingsPage() {
   const isActive = (depth: SettingsPaneType): boolean => {
     return nav.activeDepth() === depth;
   };
+
+  onMount(() => {
+    useKeyboard(
+      (keyEvent: any) => {
+        const isDown =
+          keyEvent.key === "j" || keyEvent.key === "ArrowDown";
+        const isUp =
+          keyEvent.key === "k" || keyEvent.key === "ArrowUp";
+        const isSelect =
+          keyEvent.key === "Enter" || keyEvent.key === " ";
+
+        if (isSelect) {
+          nav.setActiveDepth((nav.activeDepth() % SettingsPaneCount) + 1);
+          return;
+        }
+
+        const nextDepth = isDown
+          ? (nav.activeDepth() % SettingsPaneCount) + 1
+          : (nav.activeDepth() - 2 + SettingsPaneCount) % SettingsPaneCount + 1;
+
+        nav.setActiveDepth(nextDepth);
+      },
+      { release: false },
+    );
+  });
 
   return (
     <box flexDirection="column" gap={1} height="100%" width="100%">
