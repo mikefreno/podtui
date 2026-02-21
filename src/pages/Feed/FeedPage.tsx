@@ -39,10 +39,9 @@ export function FeedPage() {
       (keyEvent: any) => {
         const isDown = keybind.match("down", keyEvent);
         const isUp = keybind.match("up", keyEvent);
-        const isEnter = keyEvent.name === "Enter" || keyEvent.name === " ";
-        const isSpace = keyEvent.name === " ";
+        const isSelect = keybind.match("select", keyEvent);
 
-        if (isEnter || isSpace) {
+        if (isSelect) {
           const episodes = allEpisodes();
           if (episodes.length > 0 && episodes[focusedIndex()]) {
             setSelectedEpisodeID(episodes[focusedIndex()].episode.id);

@@ -18,8 +18,9 @@ export type KeybindsResolved = {
   inverseModifier: string;
   leader: string; // will not trigger while focused on input
   quit: string[];
+  select: string[]; // for selecting/activating items
   "audio-toggle": string[];
-  "audio-pause": [];
+  "audio-pause": string[];
   "audio-play": string[];
   "audio-next": string[];
   "audio-prev": string[];
@@ -36,6 +37,7 @@ export enum KeybindAction {
   DIVE,
   OUT,
   QUIT,
+  SELECT,
   AUDIO_TOGGLE,
   AUDIO_PAUSE,
   AUDIO_PLAY,
@@ -60,6 +62,7 @@ export const { use: useKeybinds, provider: KeybindProvider } =
         inverseModifier: "",
         leader: "",
         quit: [],
+        select: [],
         refresh: [],
         "audio-toggle": [],
         "audio-pause": [],

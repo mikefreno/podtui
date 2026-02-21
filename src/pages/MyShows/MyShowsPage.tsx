@@ -14,6 +14,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 import { useNavigation } from "@/context/NavigationContext";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
+import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
 
 enum MyShowsPaneType {
   SHOWS = 1,
@@ -32,16 +33,14 @@ export function MyShowsPage() {
   const { theme } = useTheme();
   const mutedColor = () => theme.muted || theme.text;
   const nav = useNavigation();
+  const keybind = useKeybinds();
 
   onMount(() => {
     useKeyboard(
       (keyEvent: any) => {
-        const isDown =
-          keyEvent.key === "j" || keyEvent.key === "ArrowDown";
-        const isUp =
-          keyEvent.key === "k" || keyEvent.key === "ArrowUp";
-        const isSelect =
-          keyEvent.key === "Enter" || keyEvent.key === " ";
+        const isDown = keybind.match("down", keyEvent);
+        const isUp = keybind.match("up", keyEvent);
+        const isSelect = keybind.match("select", keyEvent);
 
         const shows = feedStore.getFilteredFeeds();
         const episodesList = episodes();

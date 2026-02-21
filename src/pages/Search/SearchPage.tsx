@@ -11,6 +11,7 @@ import type { SearchResult } from "@/types/source";
 import { MyShowsPage } from "../MyShows/MyShowsPage";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation } from "@/context/NavigationContext";
+import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
 
 enum SearchPaneType {
   INPUT = 1,
@@ -26,16 +27,14 @@ export function SearchPage() {
   const [historyIndex, setHistoryIndex] = createSignal(0);
   const { theme } = useTheme();
   const nav = useNavigation();
+  const keybind = useKeybinds();
 
   onMount(() => {
     useKeyboard(
       (keyEvent: any) => {
-        const isDown =
-          keyEvent.key === "j" || keyEvent.key === "ArrowDown";
-        const isUp =
-          keyEvent.key === "k" || keyEvent.key === "ArrowUp";
-        const isSelect =
-          keyEvent.key === "Enter" || keyEvent.key === " ";
+        const isDown = keybind.match("down", keyEvent);
+        const isUp = keybind.match("up", keyEvent);
+        const isSelect = keybind.match("select", keyEvent);
 
         if (isSelect) {
           const results = searchStore.results();

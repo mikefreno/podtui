@@ -6,6 +6,7 @@ import { PreferencesPanel } from "./PreferencesPanel";
 import { SyncPanel } from "./SyncPanel";
 import { VisualizerSettings } from "./VisualizerSettings";
 import { useNavigation } from "@/context/NavigationContext";
+import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
 
 enum SettingsPaneType {
   SYNC = 1,
@@ -27,6 +28,7 @@ const SECTIONS: Array<{ id: SettingsPaneType; label: string }> = [
 export function SettingsPage() {
   const { theme } = useTheme();
   const nav = useNavigation();
+  const keybind = useKeybinds();
 
   // Helper function to check if a depth is active
   const isActive = (depth: SettingsPaneType): boolean => {
@@ -36,12 +38,9 @@ export function SettingsPage() {
   onMount(() => {
     useKeyboard(
       (keyEvent: any) => {
-        const isDown =
-          keyEvent.key === "j" || keyEvent.key === "ArrowDown";
-        const isUp =
-          keyEvent.key === "k" || keyEvent.key === "ArrowUp";
-        const isSelect =
-          keyEvent.key === "Enter" || keyEvent.key === " ";
+        const isDown = keybind.match("down", keyEvent);
+        const isUp = keybind.match("up", keyEvent);
+        const isSelect = keybind.match("select", keyEvent);
 
         if (isSelect) {
           nav.setActiveDepth((nav.activeDepth() % SettingsPaneCount) + 1);

@@ -4,6 +4,7 @@ import { useAudio } from "@/hooks/useAudio";
 import { useAppStore } from "@/stores/app";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation } from "@/context/NavigationContext";
+import { useKeybinds } from "@/context/KeybindContext";
 import { useKeyboard } from "@opentui/solid";
 import { onMount } from "solid-js";
 
@@ -17,24 +18,22 @@ export function PlayerPage() {
   const { theme } = useTheme();
   const nav = useNavigation();
 
+  const keybind = useKeybinds();
+
   onMount(() => {
     useKeyboard(
       (keyEvent: any) => {
-        const isNext = keyEvent.key === "l" || keyEvent.key === "ArrowRight";
-        const isPrev = keyEvent.key === "h" || keyEvent.key === "ArrowLeft";
-        const isPlayPause = keyEvent.key === " " || keyEvent.key === "Enter";
-
-        if (isPlayPause) {
+        if (keybind.match("audio-toggle", keyEvent)) {
           audio.togglePlayback();
           return;
         }
 
-        if (isNext) {
+        if (keybind.match("audio-seek-forward", keyEvent)) {
           audio.seek(audio.currentEpisode()?.duration ?? 0);
           return;
         }
 
-        if (isPrev) {
+        if (keybind.match("audio-seek-backward", keyEvent)) {
           audio.seek(0);
           return;
         }

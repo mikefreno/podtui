@@ -27,6 +27,7 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
   right: ["right", "l"],
   cycle: ["tab"],
   dive: ["return"],
+  select: ["return"],
   out: ["esc"],
   inverseModifier: "shift",
   leader: ":",

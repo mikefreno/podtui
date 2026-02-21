@@ -29,10 +29,9 @@ export function DiscoverPage() {
       (keyEvent: any) => {
         const isDown = keybind.match("down", keyEvent);
         const isUp = keybind.match("up", keyEvent);
-        const isEnter = keyEvent.name === "Enter" || keyEvent.name === " ";
-        const isSpace = keyEvent.name === " ";
+        const isSelect = keybind.match("select", keyEvent);
 
-        if (isEnter || isSpace) {
+        if (isSelect) {
           const filteredPodcasts = discoverStore.filteredPodcasts();
           if (filteredPodcasts.length > 0 && showIndex() < filteredPodcasts.length) {
             setShowIndex(showIndex() + 1);
