@@ -19,6 +19,7 @@ import {
 } from "../utils/feeds-persistence";
 import { useDownloadStore } from "./download";
 import { DownloadStatus } from "../types/episode";
+import { useAuthStore } from "./auth";
 
 /** Max episodes to load per page/chunk */
 const MAX_EPISODES_REFRESH = 50;
@@ -61,10 +62,14 @@ export function createFeedStore() {
   const getFilteredFeeds = (): Feed[] => {
     let result = [...feeds()];
     const f = filter();
+    const authStore = useAuthStore();
 
     // Filter by visibility
     if (f.visibility && f.visibility !== "all") {
       result = result.filter((feed) => feed.visibility === f.visibility);
+    } else if (f.visibility === "all") {
+      // Only show private feeds if authenticated
+      result = result.filter((feed) => feed.visibility === FeedVisibility.PUBLIC || authStore.isAuthenticated);
     }
 
     // Filter by source

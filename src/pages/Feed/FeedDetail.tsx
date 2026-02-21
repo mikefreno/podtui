@@ -56,6 +56,11 @@ export function FeedDetail(props: FeedDetailProps) {
       return;
     }
 
+    if (key.name === "v") {
+      props.feed.podcast.onToggleVisibility?.(props.feed.id);
+      return;
+    }
+
     if (key.name === "up" || key.name === "k") {
       setSelectedIndex((i) => Math.max(0, i - 1));
     } else if (key.name === "down" || key.name === "j") {
@@ -91,6 +96,9 @@ export function FeedDetail(props: FeedDetailProps) {
         <box border padding={0} onMouseDown={() => setShowInfo((v) => !v)} borderColor={theme.border}>
             <SelectableText selected={() => false} primary>[i] {showInfo() ? "Hide" : "Show"} Info</SelectableText>
         </box>
+        <box border padding={0} onMouseDown={() => props.feed.podcast.onToggleVisibility?.(props.feed.id)} borderColor={theme.border}>
+            <SelectableText selected={() => false} primary>[v] Toggle Visibility</SelectableText>
+        </box>
       </box>
 
       {/* Podcast info section */}
@@ -124,6 +132,9 @@ export function FeedDetail(props: FeedDetailProps) {
               {props.feed.visibility === "public" ? "[Public]" : "[Private]"}
             </SelectableText>
             {props.feed.isPinned && <SelectableText selected={() => false} tertiary>[Pinned]</SelectableText>}
+          </box>
+          <box flexDirection="row" gap={1}>
+            <SelectableText selected={() => false} tertiary>[v] Toggle Visibility</SelectableText>
           </box>
         </box>
       </Show>

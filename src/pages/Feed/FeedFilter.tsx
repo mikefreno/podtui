@@ -14,7 +14,7 @@ interface FeedFilterProps {
   onFilterChange: (filter: FeedFilter) => void;
 }
 
-type FilterField = "visibility" | "sort" | "pinned" | "search";
+type FilterField = "visibility" | "sort" | "pinned" | "private" | "search";
 
 export function FeedFilterComponent(props: FeedFilterProps) {
   const { theme } = useTheme();
@@ -23,7 +23,7 @@ export function FeedFilterComponent(props: FeedFilterProps) {
     props.filter.searchQuery || "",
   );
 
-  const fields: FilterField[] = ["visibility", "sort", "pinned", "search"];
+  const fields: FilterField[] = ["visibility", "sort", "pinned", "private", "search"];
 
   const handleKeyPress = (key: { name: string; shift?: boolean }) => {
     if (key.name === "tab") {
@@ -39,10 +39,14 @@ export function FeedFilterComponent(props: FeedFilterProps) {
         cycleSort();
       } else if (focusField() === "pinned") {
         togglePinned();
+      } else if (focusField() === "private") {
+        togglePrivate();
       }
     } else if (key.name === "space") {
       if (focusField() === "pinned") {
         togglePinned();
+      } else if (focusField() === "private") {
+        togglePrivate();
       }
     }
   };
@@ -74,6 +78,13 @@ export function FeedFilterComponent(props: FeedFilterProps) {
     props.onFilterChange({
       ...props.filter,
       pinnedOnly: !props.filter.pinnedOnly,
+    });
+  };
+
+  const togglePrivate = () => {
+    props.onFilterChange({
+      ...props.filter,
+      showPrivate: !props.filter.showPrivate,
     });
   };
 
@@ -157,6 +168,22 @@ export function FeedFilterComponent(props: FeedFilterProps) {
             </text>
             <text fg={props.filter.pinnedOnly ? theme.warning : theme.textMuted}>
               {props.filter.pinnedOnly ? "Yes" : "No"}
+            </text>
+          </box>
+        </box>
+
+        {/* Private filter */}
+        <box
+          border
+          padding={0}
+            backgroundColor={focusField() === "private" ? theme.backgroundElement : undefined}
+        >
+          <box flexDirection="row" gap={1}>
+            <text fg={focusField() === "private" ? theme.primary : theme.textMuted}>
+              Private:
+            </text>
+            <text fg={props.filter.showPrivate ? theme.warning : theme.textMuted}>
+              {props.filter.showPrivate ? "Yes" : "No"}
             </text>
           </box>
         </box>

@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createEffect, createSignal, on } from "solid-js";
 import { createSimpleContext } from "./helper";
 import { TABS, TabsCount } from "@/utils/navigation";
 
@@ -9,6 +9,13 @@ export const { use: useNavigation, provider: NavigationProvider } =
       const [activeTab, setActiveTab] = createSignal<TABS>(TABS.FEED);
       const [activeDepth, setActiveDepth] = createSignal(0);
       const [inputFocused, setInputFocused] = createSignal(false);
+
+      createEffect(
+        on(
+          () => activeTab,
+          () => setActiveDepth(0),
+        ),
+      );
 
       //conveniences
       const nextTab = () => {

@@ -41,8 +41,9 @@ export function App() {
   const audioNav = useAudioNavStore();
 
   useMultimediaKeys({
-    playerFocused: () => nav.activeTab === TABS.PLAYER && nav.activeDepth > 0,
-    inputFocused: () => nav.inputFocused,
+    playerFocused: () =>
+      nav.activeTab() === TABS.PLAYER && nav.activeDepth() > 0,
+    inputFocused: () => nav.inputFocused(),
     hasEpisode: () => !!audio.currentEpisode(),
   });
 

@@ -58,6 +58,13 @@ export function FeedList(props: FeedListProps) {
       if (feed) {
         feedStore.togglePinned(feed.id);
       }
+    } else if (key.name === "v") {
+      // Toggle visibility on selected feed
+      const feed = feeds[selectedIndex()];
+      if (feed) {
+        const newVisibility = feed.visibility === FeedVisibility.PUBLIC ? FeedVisibility.PRIVATE : FeedVisibility.PUBLIC;
+        feedStore.updateFeed(feed.id, { visibility: newVisibility });
+      }
     } else if (key.name === "f") {
       // Cycle visibility filter
       cycleVisibilityFilter();

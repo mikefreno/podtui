@@ -8,7 +8,8 @@ export const SelectableBox: ParentComponent<
     selected: () => boolean;
   } & BoxOptions
 > = (props) => {
-  const { theme } = useTheme();
+  const themeContext = useTheme();
+  const { theme } = themeContext;
 
   const child = solidChildren(() => props.children);
 
@@ -16,7 +17,13 @@ export const SelectableBox: ParentComponent<
     <box
       border={!!props.border}
       borderColor={props.selected() ? theme.surface : theme.border}
-      backgroundColor={props.selected() ? theme.primary : theme.surface}
+      backgroundColor={
+        props.selected()
+          ? theme.primary
+          : themeContext.selected === "system"
+            ? "transparent"
+            : themeContext.theme.surface
+      }
       {...props}
     >
       {child()}

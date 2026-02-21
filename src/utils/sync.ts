@@ -2,9 +2,10 @@ import type { SyncData } from "../types/sync-json"
 import type { SyncDataXML } from "../types/sync-xml"
 import { validateJSONSync, validateXMLSync } from "./sync-validation"
 import { syncFormats } from "../constants/sync-formats"
+import { FeedVisibility } from "../types/feed"
 
 export function exportToJSON(data: SyncData): string {
-  return `{\n  "version": "${data.version}",\n  "lastSyncedAt": "${data.lastSyncedAt}",\n  "feeds": [],\n  "sources": [],\n  "settings": {\n    "theme": "${data.settings.theme}",\n    "playbackSpeed": ${data.settings.playbackSpeed},\n    "downloadPath": "${data.settings.downloadPath}"\n  },\n  "preferences": {\n    "showExplicit": ${data.preferences.showExplicit},\n    "autoDownload": ${data.preferences.autoDownload}\n  }\n}`
+  return `{\n  "version": "${data.version}",\n  "lastSyncedAt": "${data.lastSyncedAt}",\n  "feeds": [],\n  "sources": [],\n  "settings": {\n    "theme": "${data.settings.theme}",\n    "playbackSpeed": ${data.settings.playbackSpeed},\n    "downloadPath": "${data.settings.downloadPath}"\n  },\n  "preferences": {\n    "showExplicit": ${data.preferences.showExplicit},\n    "autoDownload": ${data.preferences.autoDownload}\n  }\}`
 }
 
 export function importFromJSON(json: string): SyncData {

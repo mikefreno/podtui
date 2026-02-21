@@ -69,6 +69,8 @@ export interface FeedFilter {
   sortBy?: FeedSortField
   /** Sort direction */
   sortDirection?: "asc" | "desc"
+  /** Show private feeds */
+  showPrivate?: boolean
 }
 
 /** Feed sort fields */

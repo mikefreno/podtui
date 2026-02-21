@@ -26,6 +26,8 @@ export interface Podcast {
   lastUpdated: Date
   /** Whether the podcast is currently subscribed */
   isSubscribed: boolean
+  /** Callback to toggle feed visibility */
+  onToggleVisibility?: (feedId: string) => void
 }
 
 /** Podcast with episodes included */
