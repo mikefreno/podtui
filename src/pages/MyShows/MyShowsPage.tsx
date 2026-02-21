@@ -129,8 +129,14 @@ export function MyShowsPage() {
           }
         >
           <scrollbox
+            border
             height="100%"
-            focused={nav.activeDepth == MyShowsPaneType.SHOWS}
+            borderColor={
+              nav.activeDepth() == MyShowsPaneType.SHOWS
+                ? theme.accent
+                : theme.border
+            }
+            focused={nav.activeDepth() == MyShowsPaneType.SHOWS}
           >
             <For each={shows()}>
               {(feed, index) => (
@@ -171,26 +177,32 @@ export function MyShowsPage() {
         </Show>
       </box>
       <box flexDirection="column" height="100%">
-        <Show
-          when={selectedShow()}
-          fallback={
-            <box padding={1}>
-              <text fg={theme.muted}>Select a show</text>
-            </box>
-          }
-        >
           <Show
-            when={episodes().length > 0}
+            when={selectedShow()}
             fallback={
               <box padding={1}>
-                <text fg={theme.muted}>No episodes. Press [r] to refresh.</text>
+                <text fg={theme.muted}>Select a show</text>
               </box>
             }
           >
-            <scrollbox
-              height="100%"
-              focused={nav.activeDepth == MyShowsPaneType.EPISODES}
+            <Show
+              when={episodes().length > 0}
+              fallback={
+                <box padding={1}>
+                  <text fg={theme.muted}>No episodes. Press [r] to refresh.</text>
+                </box>
+              }
             >
+              <scrollbox
+                border
+                height="100%"
+                borderColor={
+                  nav.activeDepth() == MyShowsPaneType.EPISODES
+                    ? theme.accent
+                    : theme.border
+                }
+                focused={nav.activeDepth() == MyShowsPaneType.EPISODES}
+              >
               <For each={episodes()}>
                 {(episode, index) => (
                   <box

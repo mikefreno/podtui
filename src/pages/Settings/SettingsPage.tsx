@@ -28,6 +28,11 @@ export function SettingsPage() {
   const { theme } = useTheme();
   const nav = useNavigation();
 
+  // Helper function to check if a depth is active
+  const isActive = (depth: SettingsPaneType): boolean => {
+    return nav.activeDepth() === depth;
+  };
+
   return (
     <box flexDirection="column" gap={1} height="100%" width="100%">
       <box flexDirection="row" gap={1}>
@@ -56,23 +61,23 @@ export function SettingsPage() {
 
       <box
         border
-        borderColor={theme.border}
+        borderColor={isActive(SettingsPaneType.SYNC) || isActive(SettingsPaneType.SOURCES) || isActive(SettingsPaneType.PREFERENCES) || isActive(SettingsPaneType.VISUALIZER) || isActive(SettingsPaneType.ACCOUNT) ? theme.accent : theme.border}
         flexGrow={1}
         padding={1}
         flexDirection="column"
         gap={1}
       >
-        {nav.activeDepth === SettingsPaneType.SYNC && <SyncPanel />}
-        {nav.activeDepth === SettingsPaneType.SOURCES && (
+        {isActive(SettingsPaneType.SYNC) && <SyncPanel />}
+        {isActive(SettingsPaneType.SOURCES) && (
           <SourceManager focused />
         )}
-        {nav.activeDepth === SettingsPaneType.PREFERENCES && (
+        {isActive(SettingsPaneType.PREFERENCES) && (
           <PreferencesPanel />
         )}
-        {nav.activeDepth === SettingsPaneType.VISUALIZER && (
+        {isActive(SettingsPaneType.VISUALIZER) && (
           <VisualizerSettings />
         )}
-        {nav.activeDepth === SettingsPaneType.ACCOUNT && (
+        {isActive(SettingsPaneType.ACCOUNT) && (
           <box flexDirection="column" gap={1}>
             <text fg={theme.textMuted}>Account</text>
           </box>

@@ -69,7 +69,7 @@ export function SearchPage() {
               setInputValue(value);
             }}
             placeholder="Enter podcast name, topic, or author..."
-            focused={nav.activeDepth === SearchPaneType.INPUT}
+            focused={nav.activeDepth() === SearchPaneType.INPUT}
             width={50}
           />
           <box
@@ -92,76 +92,80 @@ export function SearchPage() {
         </Show>
       </box>
 
-      {/* Main Content - Results or History */}
-      <box flexDirection="row" height="100%" gap={2}>
-        {/* Results Panel */}
-        <box
-          flexDirection="column"
-          flexGrow={1}
-          border
-          borderColor={theme.border}
-        >
-          <box padding={1}>
-            <text
-              fg={
-                nav.activeDepth === SearchPaneType.RESULTS
-                  ? theme.primary
-                  : theme.muted
-              }
-            >
-              Results ({searchStore.results().length})
-            </text>
-          </box>
-          <Show
-            when={searchStore.results().length > 0}
-            fallback={
-              <box padding={2}>
-                <text fg={theme.muted}>
-                  {searchStore.query()
-                    ? "No results found"
-                    : "Enter a search term to find podcasts"}
-                </text>
-              </box>
+        {/* Main Content - Results or History */}
+        <box flexDirection="row" height="100%" gap={2}>
+          {/* Results Panel */}
+          <box
+            flexDirection="column"
+            flexGrow={1}
+            border
+            borderColor={
+              nav.activeDepth() === SearchPaneType.RESULTS
+                ? theme.accent
+                : theme.border
             }
           >
-            <SearchResults
-              results={searchStore.results()}
-              selectedIndex={resultIndex()}
-              focused={nav.activeDepth === SearchPaneType.RESULTS}
-              onSelect={handleResultSelect}
-              onChange={setResultIndex}
-              isSearching={searchStore.isSearching()}
-              error={searchStore.error()}
-            />
-          </Show>
-        </box>
-
-        {/* History Sidebar */}
-        <box width={30} border borderColor={theme.border}>
-          <box padding={1} flexDirection="column">
-            <box paddingBottom={1}>
+            <box padding={1}>
               <text
                 fg={
-                  nav.activeDepth === SearchPaneType.HISTORY
+                  nav.activeDepth() === SearchPaneType.RESULTS
                     ? theme.primary
                     : theme.muted
                 }
               >
-                History
+                Results ({searchStore.results().length})
               </text>
             </box>
-            <SearchHistory
-              history={searchStore.history()}
-              selectedIndex={historyIndex()}
-              focused={nav.activeDepth === SearchPaneType.HISTORY}
-              onSelect={handleHistorySelect}
-              onRemove={searchStore.removeFromHistory}
-              onClear={searchStore.clearHistory}
-              onChange={setHistoryIndex}
-            />
+            <Show
+              when={searchStore.results().length > 0}
+              fallback={
+                <box padding={2}>
+                  <text fg={theme.muted}>
+                    {searchStore.query()
+                      ? "No results found"
+                      : "Enter a search term to find podcasts"}
+                  </text>
+                </box>
+              }
+            >
+              <SearchResults
+                results={searchStore.results()}
+                selectedIndex={resultIndex()}
+                focused={nav.activeDepth() === SearchPaneType.RESULTS}
+                onSelect={handleResultSelect}
+                onChange={setResultIndex}
+                isSearching={searchStore.isSearching()}
+                error={searchStore.error()}
+              />
+            </Show>
+          </box>
+
+          {/* History Sidebar */}
+          <box width={30} border borderColor={theme.border}>
+            <box padding={1} flexDirection="column">
+              <box paddingBottom={1}>
+                <text
+                  fg={
+                    nav.activeDepth() === SearchPaneType.HISTORY
+                      ? theme.primary
+                      : theme.muted
+                  }
+                >
+                  History
+                </text>
+              </box>
+              <SearchHistory
+                history={searchStore.history()}
+                selectedIndex={historyIndex()}
+                focused={nav.activeDepth() === SearchPaneType.HISTORY}
+                onSelect={handleHistorySelect}
+                onRemove={searchStore.removeFromHistory}
+                onClear={searchStore.clearHistory}
+                onChange={setHistoryIndex}
+              />
+            </box>
           </box>
         </box>
-      </box>
     </box>
   );
 }

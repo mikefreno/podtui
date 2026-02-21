@@ -3,6 +3,7 @@ import { RealtimeWaveform } from "./RealtimeWaveform";
 import { useAudio } from "@/hooks/useAudio";
 import { useAppStore } from "@/stores/app";
 import { useTheme } from "@/context/ThemeContext";
+import { useNavigation } from "@/context/NavigationContext";
 
 enum PlayerPaneType {
   PLAYER = 1,
@@ -12,6 +13,7 @@ export const PlayerPaneCount = 1;
 export function PlayerPage() {
   const audio = useAudio();
   const { theme } = useTheme();
+  const nav = useNavigation();
 
   const progressPercent = () => {
     const d = audio.duration();
@@ -41,7 +43,7 @@ export function PlayerPage() {
 
       <box
         border
-        borderColor={theme.border}
+        borderColor={nav.activeDepth() == PlayerPaneType.PLAYER ? theme.accent : theme.border}
         padding={1}
         flexDirection="column"
         gap={1}

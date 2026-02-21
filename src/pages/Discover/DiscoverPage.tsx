@@ -43,13 +43,17 @@ export function DiscoverPage() {
       <box
         border
         padding={1}
-        borderColor={theme.border}
+        borderColor={
+          nav.activeDepth() != DiscoverPagePaneType.CATEGORIES
+            ? theme.border
+            : theme.accent
+        }
         flexDirection="column"
         gap={1}
       >
         <text
           fg={
-            nav.activeDepth == DiscoverPagePaneType.CATEGORIES
+            nav.activeDepth() == DiscoverPagePaneType.CATEGORIES
               ? theme.accent
               : theme.text
           }
@@ -76,61 +80,67 @@ export function DiscoverPage() {
           </For>
         </box>
       </box>
-      <box
-        flexDirection="column"
-        flexGrow={1}
-        border
-        borderColor={theme.border}
-      >
-        <box padding={1}>
-          <SelectableText
-            selected={() => false}
-            primary={nav.activeDepth == DiscoverPagePaneType.SHOWS}
-          >
-            Trending in{" "}
-            {DISCOVER_CATEGORIES.find(
-              (c) => c.id === discoverStore.selectedCategory(),
-            )?.name ?? "All"}
-          </SelectableText>
-        </box>
-        <box flexDirection="column" height="100%">
-          <Show
-            fallback={
-              <box padding={2}>
-                {discoverStore.filteredPodcasts().length !== 0 ? (
-                  <text fg={theme.warning}>Loading trending shows...</text>
-                ) : (
-                  <text fg={theme.textMuted}>
-                    No podcasts found in this category.
-                  </text>
-                )}
-              </box>
-            }
-            when={
-              !discoverStore.isLoading() &&
-              discoverStore.filteredPodcasts().length === 0
-            }
-          >
-            <scrollbox>
-              <box flexDirection="column">
-                <For each={discoverStore.filteredPodcasts()}>
-                  {(podcast, index) => (
-                    <PodcastCard
-                      podcast={podcast}
-                      selected={
-                        index() === showIndex() &&
-                        nav.activeDepth == DiscoverPagePaneType.SHOWS
-                      }
-                      onSelect={() => handleShowSelect(index())}
-                      onSubscribe={() => handleSubscribe(podcast)}
-                    />
+        <box
+          flexDirection="column"
+          flexGrow={1}
+          border
+          borderColor={
+            nav.activeDepth() == DiscoverPagePaneType.SHOWS
+              ? theme.accent
+              : theme.border
+          }
+        >
+          <box padding={1}>
+            <SelectableText
+              selected={() => false}
+              primary={nav.activeDepth() == DiscoverPagePaneType.SHOWS}
+            >
+              Trending in{" "}
+              {DISCOVER_CATEGORIES.find(
+                (c) => c.id === discoverStore.selectedCategory(),
+              )?.name ?? "All"}
+            </SelectableText>
+          </box>
+          <box flexDirection="column" height="100%">
+            <Show
+              fallback={
+                <box padding={2}>
+                  {discoverStore.filteredPodcasts().length !== 0 ? (
+                    <text fg={theme.warning}>Loading trending shows...</text>
+                  ) : (
+                    <text fg={theme.textMuted}>
+                      No podcasts found in this category.
+                    </text>
                   )}
-                </For>
-              </box>
-            </scrollbox>
-          </Show>
+                </box>
+              }
+              when={
+                !discoverStore.isLoading() &&
+                discoverStore.filteredPodcasts().length === 0
+              }
+            >
+              <scrollbox
+                focused={nav.activeDepth() == DiscoverPagePaneType.SHOWS}
+              >
+                <box flexDirection="column">
+                  <For each={discoverStore.filteredPodcasts()}>
+                    {(podcast, index) => (
+                      <PodcastCard
+                        podcast={podcast}
+                        selected={
+                          index() === showIndex() &&
+                          nav.activeDepth() == DiscoverPagePaneType.SHOWS
+                        }
+                        onSelect={() => handleShowSelect(index())}
+                        onSubscribe={() => handleSubscribe(podcast)}
+                      />
+                    )}
+                  </For>
+                </box>
+              </scrollbox>
+            </Show>
+          </box>
         </box>
-      </box>
     </box>
   );
 }
