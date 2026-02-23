@@ -40,6 +40,7 @@ export function MyShowsPage() {
       (keyEvent: any) => {
         const isDown = keybind.match("down", keyEvent);
         const isUp = keybind.match("up", keyEvent);
+        const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
 
         const shows = feedStore.getFilteredFeeds();
@@ -57,18 +58,22 @@ export function MyShowsPage() {
         }
 
         if (shows.length > 0) {
-          if (isDown && showIndex() < shows.length - 1) {
-            setShowIndex(showIndex() + 1);
-          } else if (isUp && showIndex() > 0) {
-            setShowIndex(showIndex() - 1);
+          if (isDown) {
+            setShowIndex((i) => (i + 1) % shows.length);
+          } else if (isUp) {
+            setShowIndex((i) => (i - 1 + shows.length) % shows.length);
+          } else if (isCycle) {
+            setShowIndex((i) => (i + 1) % shows.length);
           }
         }
 
         if (episodesList.length > 0) {
-          if (isDown && episodeIndex() < episodesList.length - 1) {
-            setEpisodeIndex(episodeIndex() + 1);
-          } else if (isUp && episodeIndex() > 0) {
-            setEpisodeIndex(episodeIndex() - 1);
+          if (isDown) {
+            setEpisodeIndex((i) => (i + 1) % episodesList.length);
+          } else if (isUp) {
+            setEpisodeIndex((i) => (i - 1 + episodesList.length) % episodesList.length);
+          } else if (isCycle) {
+            setEpisodeIndex((i) => (i + 1) % episodesList.length);
           }
         }
       },

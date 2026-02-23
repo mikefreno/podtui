@@ -29,6 +29,7 @@ export function DiscoverPage() {
       (keyEvent: any) => {
         const isDown = keybind.match("down", keyEvent);
         const isUp = keybind.match("up", keyEvent);
+        const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
 
         if (isSelect) {
@@ -42,10 +43,12 @@ export function DiscoverPage() {
         const filteredPodcasts = discoverStore.filteredPodcasts();
         if (filteredPodcasts.length === 0) return;
 
-        if (isDown && showIndex() < filteredPodcasts.length - 1) {
-          setShowIndex(showIndex() + 1);
-        } else if (isUp && showIndex() > 0) {
-          setShowIndex(showIndex() - 1);
+        if (isDown) {
+          setShowIndex((i) => (i + 1) % filteredPodcasts.length);
+        } else if (isUp) {
+          setShowIndex((i) => (i - 1 + filteredPodcasts.length) % filteredPodcasts.length);
+        } else if (isCycle) {
+          setShowIndex((i) => (i + 1) % filteredPodcasts.length);
         }
       },
       { release: false },

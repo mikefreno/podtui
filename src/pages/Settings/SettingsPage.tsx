@@ -35,11 +35,15 @@ export function SettingsPage() {
     return nav.activeDepth() === depth;
   };
 
+  // Helper function to get the current depth as a number
+  const currentDepth = () => nav.activeDepth() as number;
+
   onMount(() => {
     useKeyboard(
       (keyEvent: any) => {
         const isDown = keybind.match("down", keyEvent);
         const isUp = keybind.match("up", keyEvent);
+        const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
 
         if (isSelect) {
@@ -51,7 +55,11 @@ export function SettingsPage() {
           ? (nav.activeDepth() % SettingsPaneCount) + 1
           : (nav.activeDepth() - 2 + SettingsPaneCount) % SettingsPaneCount + 1;
 
-        nav.setActiveDepth(nextDepth);
+        if (isCycle) {
+          nav.setActiveDepth((nav.activeDepth() % SettingsPaneCount) + 1);
+        } else {
+          nav.setActiveDepth(nextDepth);
+        }
       },
       { release: false },
     );
@@ -67,13 +75,13 @@ export function SettingsPage() {
               borderColor={theme.border}
               padding={0}
               backgroundColor={
-                nav.activeDepth === section.id ? theme.primary : undefined
+                currentDepth() === section.id ? theme.primary : undefined
               }
               onMouseDown={() => nav.setActiveDepth(section.id)}
             >
               <text
                 fg={
-                  nav.activeDepth === section.id ? theme.text : theme.textMuted
+                  currentDepth() === section.id ? theme.text : theme.textMuted
                 }
               >
                 [{index() + 1}] {section.label}

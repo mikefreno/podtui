@@ -39,6 +39,7 @@ export function FeedPage() {
       (keyEvent: any) => {
         const isDown = keybind.match("down", keyEvent);
         const isUp = keybind.match("up", keyEvent);
+        const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
 
         if (isSelect) {
@@ -52,10 +53,12 @@ export function FeedPage() {
         const episodes = allEpisodes();
         if (episodes.length === 0) return;
 
-        if (isDown && focusedIndex() < episodes.length - 1) {
-          setFocusedIndex(focusedIndex() + 1);
-        } else if (isUp && focusedIndex() > 0) {
-          setFocusedIndex(focusedIndex() - 1);
+        if (isDown) {
+          setFocusedIndex((i) => (i + 1) % episodes.length);
+        } else if (isUp) {
+          setFocusedIndex((i) => (i - 1 + episodes.length) % episodes.length);
+        } else if (isCycle) {
+          setFocusedIndex((i) => (i + 1) % episodes.length);
         }
       },
       { release: false },

@@ -34,6 +34,7 @@ export function SearchPage() {
       (keyEvent: any) => {
         const isDown = keybind.match("down", keyEvent);
         const isUp = keybind.match("up", keyEvent);
+        const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
 
         if (isSelect) {
@@ -47,10 +48,12 @@ export function SearchPage() {
         const results = searchStore.results();
         if (results.length === 0) return;
 
-        if (isDown && resultIndex() < results.length - 1) {
-          setResultIndex(resultIndex() + 1);
-        } else if (isUp && resultIndex() > 0) {
-          setResultIndex(resultIndex() - 1);
+        if (isDown) {
+          setResultIndex((i) => (i + 1) % results.length);
+        } else if (isUp) {
+          setResultIndex((i) => (i - 1 + results.length) % results.length);
+        } else if (isCycle) {
+          setResultIndex((i) => (i + 1) % results.length);
         }
       },
       { release: false },
