@@ -31,6 +31,7 @@ export function DiscoverPage() {
         const isUp = keybind.match("up", keyEvent);
         const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
+        const isInverting = keybind.isInverting(keyEvent);
 
         if (isSelect) {
           const filteredPodcasts = discoverStore.filteredPodcasts();
@@ -40,15 +41,20 @@ export function DiscoverPage() {
           return;
         }
 
+        // don't handle pane navigation here - unified in App.tsx
+        if (nav.activeDepth() !== DiscoverPagePaneType.SHOWS) return;
+
         const filteredPodcasts = discoverStore.filteredPodcasts();
         if (filteredPodcasts.length === 0) return;
 
-        if (isDown) {
+        if (isDown && !isInverting()) {
           setShowIndex((i) => (i + 1) % filteredPodcasts.length);
-        } else if (isUp) {
+        } else if (isUp && isInverting()) {
           setShowIndex((i) => (i - 1 + filteredPodcasts.length) % filteredPodcasts.length);
-        } else if (isCycle) {
+        } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
           setShowIndex((i) => (i + 1) % filteredPodcasts.length);
+        } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
+          setShowIndex((i) => (i - 1 + filteredPodcasts.length) % filteredPodcasts.length);
         }
       },
       { release: false },

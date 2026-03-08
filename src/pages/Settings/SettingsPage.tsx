@@ -45,20 +45,19 @@ export function SettingsPage() {
         const isUp = keybind.match("up", keyEvent);
         const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
+        const isInverting = keybind.isInverting(keyEvent);
 
-        if (isSelect) {
+        // don't handle pane navigation here - unified in App.tsx
+        if (nav.activeDepth() < 1 || nav.activeDepth() > SettingsPaneCount) return;
+
+        if (isDown && !isInverting()) {
           nav.setActiveDepth((nav.activeDepth() % SettingsPaneCount) + 1);
-          return;
-        }
-
-        const nextDepth = isDown
-          ? (nav.activeDepth() % SettingsPaneCount) + 1
-          : (nav.activeDepth() - 2 + SettingsPaneCount) % SettingsPaneCount + 1;
-
-        if (isCycle) {
+        } else if (isUp && isInverting()) {
+          nav.setActiveDepth((nav.activeDepth() - 2 + SettingsPaneCount) % SettingsPaneCount + 1);
+        } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
           nav.setActiveDepth((nav.activeDepth() % SettingsPaneCount) + 1);
-        } else {
-          nav.setActiveDepth(nextDepth);
+        } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
+          nav.setActiveDepth((nav.activeDepth() - 2 + SettingsPaneCount) % SettingsPaneCount + 1);
         }
       },
       { release: false },

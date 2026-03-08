@@ -23,6 +23,8 @@ export function PlayerPage() {
   onMount(() => {
     useKeyboard(
       (keyEvent: any) => {
+        const isInverting = keybind.isInverting(keyEvent);
+
         if (keybind.match("audio-toggle", keyEvent)) {
           audio.togglePlayback();
           return;

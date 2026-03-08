@@ -41,6 +41,7 @@ export function FeedPage() {
         const isUp = keybind.match("up", keyEvent);
         const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
+        const isInverting = keybind.isInverting(keyEvent);
 
         if (isSelect) {
           const episodes = allEpisodes();
@@ -50,15 +51,20 @@ export function FeedPage() {
           return;
         }
 
+        // don't handle pane navigation here - unified in App.tsx
+        if (nav.activeDepth() !== FeedPaneType.FEED) return;
+
         const episodes = allEpisodes();
         if (episodes.length === 0) return;
 
-        if (isDown) {
+        if (isDown && !isInverting()) {
           setFocusedIndex((i) => (i + 1) % episodes.length);
-        } else if (isUp) {
+        } else if (isUp && isInverting()) {
           setFocusedIndex((i) => (i - 1 + episodes.length) % episodes.length);
-        } else if (isCycle) {
+        } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
           setFocusedIndex((i) => (i + 1) % episodes.length);
+        } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
+          setFocusedIndex((i) => (i - 1 + episodes.length) % episodes.length);
         }
       },
       { release: false },

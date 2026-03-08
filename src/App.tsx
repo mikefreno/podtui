@@ -86,8 +86,9 @@ export function App() {
       const isQuit = keybind.match("quit", keyEvent);
       const isInverting = keybind.isInverting(keyEvent);
 
-      // only handling top navigation here, cycle through tabs, just to high priority(player) all else to be handled in each tab
+      // unified navigation: left->right, top->bottom across all tabs
       if (nav.activeDepth() == 0) {
+        // at top level: cycle through tabs
         if (
           (isCycle && !isInverting) ||
           (isDown && !isInverting) ||
@@ -104,6 +105,7 @@ export function App() {
           nav.prevTab();
           return;
         }
+        // dive out to first pane
         if (
           (isDive && !isInverting) ||
           (isOut && isInverting) ||
@@ -112,8 +114,8 @@ export function App() {
         ) {
           nav.setActiveDepth(1);
         }
-      }
-      if (nav.activeDepth() == 1) {
+      } else {
+        // in panes: navigate between them
         if (
           (isDive && isInverting) ||
           (isOut && !isInverting) ||
@@ -121,6 +123,10 @@ export function App() {
           (isLeft && !isInverting)
         ) {
           nav.setActiveDepth(0);
+        } else if (isDown && !isInverting) {
+          nav.nextPane();
+        } else if (isUp && isInverting) {
+          nav.prevPane();
         }
       }
     },

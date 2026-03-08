@@ -42,10 +42,10 @@ export function MyShowsPage() {
         const isUp = keybind.match("up", keyEvent);
         const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
+        const isInverting = keybind.isInverting(keyEvent);
 
         const shows = feedStore.getFilteredFeeds();
         const episodesList = episodes();
-        const selected = selectedShow();
 
         if (isSelect) {
           if (shows.length > 0 && showIndex() < shows.length) {
@@ -57,23 +57,18 @@ export function MyShowsPage() {
           return;
         }
 
-        if (shows.length > 0) {
-          if (isDown) {
-            setShowIndex((i) => (i + 1) % shows.length);
-          } else if (isUp) {
-            setShowIndex((i) => (i - 1 + shows.length) % shows.length);
-          } else if (isCycle) {
-            setShowIndex((i) => (i + 1) % shows.length);
-          }
-        }
+        // don't handle pane navigation here - unified in App.tsx
+        if (nav.activeDepth() !== MyShowsPaneType.EPISODES) return;
 
         if (episodesList.length > 0) {
-          if (isDown) {
+          if (isDown && !isInverting()) {
             setEpisodeIndex((i) => (i + 1) % episodesList.length);
-          } else if (isUp) {
+          } else if (isUp && isInverting()) {
             setEpisodeIndex((i) => (i - 1 + episodesList.length) % episodesList.length);
-          } else if (isCycle) {
+          } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
             setEpisodeIndex((i) => (i + 1) % episodesList.length);
+          } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
+            setEpisodeIndex((i) => (i - 1 + episodesList.length) % episodesList.length);
           }
         }
       },

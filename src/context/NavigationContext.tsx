@@ -17,7 +17,7 @@ export const { use: useNavigation, provider: NavigationProvider } =
         ),
       );
 
-      //conveniences
+      // unified navigation: left->right, top->bottom across all tabs
       const nextTab = () => {
         if (activeTab() >= TabsCount) {
           setActiveTab(1);
@@ -31,8 +31,17 @@ export const { use: useNavigation, provider: NavigationProvider } =
           setActiveTab(TabsCount);
           return;
         }
-
         setActiveTab(activeTab() - 1);
+      };
+
+      const nextPane = () => {
+        // move to next pane in same tab, wrap around
+        setActiveDepth((prev) => (prev % TabsCount) + 1);
+      };
+
+      const prevPane = () => {
+        // move to previous pane in same tab, wrap around
+        setActiveDepth((prev) => (prev - 2 + TabsCount) % TabsCount + 1);
       };
 
       return {
@@ -44,6 +53,8 @@ export const { use: useNavigation, provider: NavigationProvider } =
         setInputFocused,
         nextTab,
         prevTab,
+        nextPane,
+        prevPane,
       };
     },
   });

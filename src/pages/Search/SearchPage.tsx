@@ -36,6 +36,7 @@ export function SearchPage() {
         const isUp = keybind.match("up", keyEvent);
         const isCycle = keybind.match("cycle", keyEvent);
         const isSelect = keybind.match("select", keyEvent);
+        const isInverting = keybind.isInverting(keyEvent);
 
         if (isSelect) {
           const results = searchStore.results();
@@ -45,15 +46,20 @@ export function SearchPage() {
           return;
         }
 
+        // don't handle pane navigation here - unified in App.tsx
+        if (nav.activeDepth() !== SearchPaneType.RESULTS) return;
+
         const results = searchStore.results();
         if (results.length === 0) return;
 
-        if (isDown) {
+        if (isDown && !isInverting()) {
           setResultIndex((i) => (i + 1) % results.length);
-        } else if (isUp) {
+        } else if (isUp && isInverting()) {
           setResultIndex((i) => (i - 1 + results.length) % results.length);
-        } else if (isCycle) {
+        } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
           setResultIndex((i) => (i + 1) % results.length);
+        } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
+          setResultIndex((i) => (i - 1 + results.length) % results.length);
         }
       },
       { release: false },
