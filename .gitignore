@@ -27,10 +27,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .eslintcache
 .cache
 *.tsbuildinfo
-*.lockb
+*.lock
 
-# IntelliJ based IDEs
-.idea
 
 # Finder (MacOS) folder config
 .DS_Store
