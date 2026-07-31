@@ -6,6 +6,7 @@ meta:
   priority: P1
   depends_on: [yazi-remake-03, yazi-remake-04, yazi-remake-05, yazi-remake-06]
   tags: [verification, tests-required]
+  status: BLOCKED  # see .harness/verification-07.md + tasks/yazi-remake/07-blocker-task-04-player-search.md
 
 objective:
 
