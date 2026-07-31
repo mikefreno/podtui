@@ -3,185 +3,201 @@
  * Manages search state, history, and results
  */
 
-import { createSignal } from "solid-js"
-import { searchPodcasts } from "../utils/search"
-import { useFeedStore } from "./feed"
-import type { SearchResult } from "../types/source"
+import { createSignal } from "solid-js";
+import { searchPodcasts } from "../utils/search";
+import { useFeedStore } from "./feed";
+import type { SearchResult } from "../types/source";
 
-const STORAGE_KEY = "podtui_search_history"
-const MAX_HISTORY = 20
+const STORAGE_KEY = "podtui_search_history";
+const MAX_HISTORY = 20;
 
 export interface SearchState {
-  query: string
-  isSearching: boolean
-  results: SearchResult[]
-  error: string | null
+	query: string;
+	isSearching: boolean;
+	results: SearchResult[];
+	error: string | null;
 }
 
-const CACHE_TTL = 1000 * 60 * 5
+const CACHE_TTL = 1000 * 60 * 5;
 
 /** Load search history from localStorage */
 function loadHistory(): string[] {
-  if (typeof localStorage === "undefined") return []
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    return stored ? JSON.parse(stored) : []
-  } catch {
-    return []
-  }
+	if (typeof localStorage === "undefined") return [];
+	try {
+		const stored = localStorage.getItem(STORAGE_KEY);
+		return stored ? JSON.parse(stored) : [];
+	} catch {
+		return [];
+	}
 }
 
 /** Save search history to localStorage */
 function saveHistory(history: string[]): void {
-  if (typeof localStorage === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history))
-  } catch {
-    // Ignore errors
-  }
+	if (typeof localStorage === "undefined") return;
+	try {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+	} catch {
+		// Ignore errors
+	}
 }
 
 /** Create search store */
 export function createSearchStore() {
-  const feedStore = useFeedStore()
-  const [query, setQuery] = createSignal("")
-  const [isSearching, setIsSearching] = createSignal(false)
-  const [results, setResults] = createSignal<SearchResult[]>([])
-  const [error, setError] = createSignal<string | null>(null)
-  const [history, setHistory] = createSignal<string[]>(loadHistory())
-  const [selectedSources, setSelectedSources] = createSignal<string[]>([])
+	const feedStore = useFeedStore();
+	const [query, setQuery] = createSignal("");
+	const [isSearching, setIsSearching] = createSignal(false);
+	const [results, setResults] = createSignal<SearchResult[]>([]);
+	const [error, setError] = createSignal<string | null>(null);
+	const [history, setHistory] = createSignal<string[]>(loadHistory());
+	const [selectedSources, setSelectedSources] = createSignal<string[]>([]);
 
-  const applySubscribedStatus = (items: SearchResult[]): SearchResult[] => {
-    const feeds = feedStore.feeds()
-    const subscribedUrls = new Set(feeds.map((feed) => feed.podcast.feedUrl))
-    const subscribedIds = new Set(feeds.map((feed) => feed.podcast.id))
+	const applySubscribedStatus = (items: SearchResult[]): SearchResult[] => {
+		const feeds = feedStore.feeds();
+		const subscribedUrls = new Set(feeds.map((feed) => feed.podcast.feedUrl));
+		const subscribedIds = new Set(feeds.map((feed) => feed.podcast.id));
 
-    return items.map((item) => ({
-      ...item,
-      podcast: {
-        ...item.podcast,
-        isSubscribed:
-          item.podcast.isSubscribed ||
-          subscribedUrls.has(item.podcast.feedUrl) ||
-          subscribedIds.has(item.podcast.id),
-      },
-    }))
-  }
+		return items.map((item) => ({
+			...item,
+			podcast: {
+				...item.podcast,
+				isSubscribed:
+					item.podcast.isSubscribed ||
+					subscribedUrls.has(item.podcast.feedUrl) ||
+					subscribedIds.has(item.podcast.id),
+			},
+		}));
+	};
 
-  /** Perform search (multi-source implementation) */
-  const search = async (searchQuery: string): Promise<void> => {
-    const q = searchQuery.trim()
-    if (!q) {
-      setResults([])
-      return
-    }
+	/** Perform search (multi-source implementation) */
+	const search = async (searchQuery: string): Promise<void> => {
+		const q = searchQuery.trim();
+		if (!q) {
+			setResults([]);
+			return;
+		}
 
-    setQuery(q)
-    setIsSearching(true)
-    setError(null)
+		setQuery(q);
+		setIsSearching(true);
+		setError(null);
 
-    // Add to history
-    addToHistory(q)
+		// Add to history
+		addToHistory(q);
 
-    try {
-      const sources = feedStore.sources()
-      const enabledSourceIds = sources.filter((s) => s.enabled).map((s) => s.id)
-      const sourceIds = selectedSources().length > 0
-        ? selectedSources()
-        : enabledSourceIds
+		try {
+			const sources = feedStore.sources();
+			const enabledSourceIds = sources
+				.filter((s) => s.enabled)
+				.map((s) => s.id);
+			const sourceIds =
+				selectedSources().length > 0 ? selectedSources() : enabledSourceIds;
 
-      const searchResults = await searchPodcasts(q, sourceIds, sources, {
-        cacheTtl: CACHE_TTL,
-      })
+			// Empty query guard already returned above; if there are no enabled
+			// sources, tell the user instead of returning an empty list that looks
+			// like a network outage.
+			if (enabledSourceIds.length === 0) {
+				setError(
+					"No search sources are enabled. Enable one in Settings → Sources.",
+				);
+				setResults([]);
+				return;
+			}
 
-      setResults(applySubscribedStatus(searchResults))
-    } catch (e) {
-      setError("Search failed. Please try again.")
-      setResults([])
-    } finally {
-      setIsSearching(false)
-    }
-  }
+			const searchResults = await searchPodcasts(q, sourceIds, sources, {
+				cacheTtl: CACHE_TTL,
+			});
 
-  /** Add query to history */
-  const addToHistory = (q: string) => {
-    setHistory((prev) => {
-      // Remove duplicates and add to front
-      const filtered = prev.filter((h) => h.toLowerCase() !== q.toLowerCase())
-      const updated = [q, ...filtered].slice(0, MAX_HISTORY)
-      saveHistory(updated)
-      return updated
-    })
-  }
+			setResults(applySubscribedStatus(searchResults));
+		} catch (e) {
+			setError(
+				e instanceof Error && e.message
+					? e.message
+					: "Search failed. Please try again.",
+			);
+			setResults([]);
+		} finally {
+			setIsSearching(false);
+		}
+	};
 
-  /** Clear search history */
-  const clearHistory = () => {
-    setHistory([])
-    saveHistory([])
-  }
+	/** Add query to history */
+	const addToHistory = (q: string) => {
+		setHistory((prev) => {
+			// Remove duplicates and add to front
+			const filtered = prev.filter((h) => h.toLowerCase() !== q.toLowerCase());
+			const updated = [q, ...filtered].slice(0, MAX_HISTORY);
+			saveHistory(updated);
+			return updated;
+		});
+	};
 
-  /** Remove single history item */
-  const removeFromHistory = (q: string) => {
-    setHistory((prev) => {
-      const updated = prev.filter((h) => h !== q)
-      saveHistory(updated)
-      return updated
-    })
-  }
+	/** Clear search history */
+	const clearHistory = () => {
+		setHistory([]);
+		saveHistory([]);
+	};
 
-  /** Clear results */
-  const clearResults = () => {
-    setResults([])
-    setQuery("")
-    setError(null)
-  }
+	/** Remove single history item */
+	const removeFromHistory = (q: string) => {
+		setHistory((prev) => {
+			const updated = prev.filter((h) => h !== q);
+			saveHistory(updated);
+			return updated;
+		});
+	};
 
-  /** Mark a podcast as subscribed in results */
-  const markSubscribed = (podcastId: string, feedUrl?: string) => {
-    setResults((prev) =>
-      prev.map((result) => {
-        const matchesId = result.podcast.id === podcastId
-        const matchesUrl = feedUrl ? result.podcast.feedUrl === feedUrl : false
-        if (matchesId || matchesUrl) {
-          return {
-            ...result,
-            podcast: {
-              ...result.podcast,
-              isSubscribed: true,
-            },
-          }
-        }
-        return result
-      })
-    )
-  }
+	/** Clear results */
+	const clearResults = () => {
+		setResults([]);
+		setQuery("");
+		setError(null);
+	};
 
-  return {
-    // State
-    query,
-    isSearching,
-    results,
-    error,
-    history,
-    selectedSources,
+	/** Mark a podcast as subscribed in results */
+	const markSubscribed = (podcastId: string, feedUrl?: string) => {
+		setResults((prev) =>
+			prev.map((result) => {
+				const matchesId = result.podcast.id === podcastId;
+				const matchesUrl = feedUrl ? result.podcast.feedUrl === feedUrl : false;
+				if (matchesId || matchesUrl) {
+					return {
+						...result,
+						podcast: {
+							...result.podcast,
+							isSubscribed: true,
+						},
+					};
+				}
+				return result;
+			}),
+		);
+	};
 
-    // Actions
-    search,
-    setQuery,
-    clearResults,
-    clearHistory,
-    removeFromHistory,
-    setSelectedSources,
-    markSubscribed,
-  }
+	return {
+		// State
+		query,
+		isSearching,
+		results,
+		error,
+		history,
+		selectedSources,
+
+		// Actions
+		search,
+		setQuery,
+		clearResults,
+		clearHistory,
+		removeFromHistory,
+		setSelectedSources,
+		markSubscribed,
+	};
 }
 
 /** Singleton search store */
-let searchStoreInstance: ReturnType<typeof createSearchStore> | null = null
+let searchStoreInstance: ReturnType<typeof createSearchStore> | null = null;
 
 export function useSearchStore() {
-  if (!searchStoreInstance) {
-    searchStoreInstance = createSearchStore()
-  }
-  return searchStoreInstance
+	if (!searchStoreInstance) {
+		searchStoreInstance = createSearchStore();
+	}
+	return searchStoreInstance;
 }

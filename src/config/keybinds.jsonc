@@ -1,0 +1,73 @@
+{
+  // ── Yazi-style keybinds for PodTui ──────────────────────────────────────
+  // Notation:
+  //   "j"            single lowercase key
+  //   "G"            shift + g  (uppercase letter = shift)
+  //   "ctrl-d"       ctrl modifier
+  //   "shift-j"      shift modifier (equivalent to "J")
+  //   "meta-x"       alt/meta modifier  (macOS users: map Option to Alt)
+  //   ["g","g"]      a two-key sequence (matches only when pressed in order)
+  //   "return"       special key (also: escape tab space backspace up down left right)
+  //
+  // Yazi heritage: j/k move, h/l swipe between panes, Enter open, Space select,
+  // v visual mode, gg/G top/bottom, [ ] switch tabs, 1-6 goto tab,
+  // : command bar, q quit, ~ help. Audio transport kept on shifted keys / ctrl.
+
+  // ── Movement (within a pane) ─────────────────────────────────────────────
+  "move-down":      ["j", "down"],
+  "move-up":        ["k", "up"],
+  "page-down":      ["ctrl-d"],
+  "page-up":        ["ctrl-u"],
+  "full-down":      ["ctrl-f"],
+  "full-up":        ["ctrl-b"],
+  "jump-down":      ["J"],            // 5 lines down  (shift+j)
+  "jump-up":        ["K"],            // 5 lines up    (shift+k)
+  "goto-top":       [["g", "g"]],
+  "goto-bottom":    ["G"],
+
+  // ── Pane focus / swipe (yazi h/l) ────────────────────────────────────────
+  "swipe-prev":     ["h", "left"],    // focus left pane (parent)
+  "swipe-next":     ["l", "right"],   // focus right pane (preview)
+
+  // ── Open / activate ──────────────────────────────────────────────────────
+  "open":           ["return", "enter"],
+  "open-interactive": ["shift-return"],
+
+  // ── Selection & visual mode ──────────────────────────────────────────────
+  "toggle-select":  ["space"],
+  "visual-mode":    ["v"],
+  "toggle-all":     ["ctrl-a"],
+  "invert-all":     ["ctrl-r"],
+  "escape":         ["escape", "ctrl-["],
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  "tab-prev":       ["["],
+  "tab-next":       ["]"],
+  "tab-goto-1":     ["1"],
+  "tab-goto-2":     ["2"],
+  "tab-goto-3":     ["3"],
+  "tab-goto-4":     ["4"],
+  "tab-goto-5":     ["5"],
+  "tab-goto-6":     ["6"],
+
+  // ── Command bar & help & quit ────────────────────────────────────────────
+  "command":        [":"],
+  "quit":           ["q", "ctrl-c"],
+  "help":           ["~", "f1"],
+
+  // ── List operations (yazi: s search, f filter, , sort, . hidden, r refresh)
+  "search":         ["s"],
+  "filter":         ["f"],
+  "sort":           [","],
+  "toggle-hidden":  ["."],
+  "refresh":        ["r"],
+
+  // ── Audio transport (preserved) ──────────────────────────────────────────
+  // Kept on shifted single keys so they never collide with the yazi core
+  // (space=select, s=search, f=filter, etc.). Edit freely in this file.
+  "audio-toggle":          ["P"],   // play / pause   (shift+p)
+  "audio-next":            ["N"],   // next episode   (shift+n)
+  "audio-prev":            ["B"],   // prev episode   (shift+b)
+  "audio-seek-forward":    ["shift-."],   // seek forward   (shift+.)
+  "audio-seek-backward":   ["shift-,"]    // seek backward  (shift+,)
+}

@@ -1,210 +1,395 @@
 /**
- * SearchPage component - Main search interface for PodTUI
+ * SearchPage — yazi-style 3-pane view.
+ *
+ *   pane 0 (parent)  — query input with recent-search history (clickable)
+ *   pane 1 (current) — search results list (navigate j/k)
+ *   pane 2 (preview)  — detail of the focused search result
+ *
+ * The Shell resets activePane to CURRENT(1) on tab enter so the user lands on
+ * the results pane. Swipe left (h) to pane 0 to type a query — the Shell
+ * router skips keys while `nav.inputFocused()` is true so the `<input>`
+ * element captures typing natively. Press Enter (onSubmit) to search and
+ * auto-swipe to the results pane.
  */
 
-import { createSignal, createEffect, Show, onMount } from "solid-js";
-import { useKeyboard } from "@opentui/solid";
+import {
+	createSignal,
+	createMemo,
+	createEffect,
+	For,
+	Show,
+	onMount,
+	onCleanup,
+} from "solid-js";
 import { useSearchStore } from "@/stores/search";
-import { SearchResults } from "./SearchResults";
-import { SearchHistory } from "./SearchHistory";
-import type { SearchResult } from "@/types/source";
-import { MyShowsPage } from "../MyShows/MyShowsPage";
+import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
-import { useNavigation } from "@/context/NavigationContext";
-import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
+import {
+	useNavigation,
+	NavMode,
+	PaneSlot,
+	type PaneId,
+} from "@/context/NavigationContext";
+import { on, off } from "@/utils/event-bus";
+import type { KeybindActionName } from "@/context/KeybindContext";
+import type { SearchResult } from "@/types/source";
+import { PANE_RATIO } from "@/utils/navigation";
 
-enum SearchPaneType {
-  INPUT = 1,
-  RESULTS = 2,
-  HISTORY = 3,
-}
 export const SearchPaneCount = 3;
 
-export function SearchPage() {
-  const searchStore = useSearchStore();
-  const [inputValue, setInputValue] = createSignal("");
-  const [resultIndex, setResultIndex] = createSignal(0);
-  const [historyIndex, setHistoryIndex] = createSignal(0);
-  const { theme } = useTheme();
-  const nav = useNavigation();
-  const keybind = useKeybinds();
+function SearchPage() {
+	const searchStore = useSearchStore();
+	const [inputValue, setInputValue] = createSignal("");
+	const { theme } = useTheme();
+	const muted = () => theme.muted || theme.text;
+	const nav = useNavigation();
 
-  onMount(() => {
-    useKeyboard(
-      (keyEvent: any) => {
-        const isDown = keybind.match("down", keyEvent);
-        const isUp = keybind.match("up", keyEvent);
-        const isCycle = keybind.match("cycle", keyEvent);
-        const isSelect = keybind.match("select", keyEvent);
-        const isInverting = keybind.isInverting(keyEvent);
+	const INPUT = PaneSlot.PARENT; // 0
+	const RESULTS = PaneSlot.CURRENT; // 1
+	const DETAIL = PaneSlot.PREVIEW; // 2
 
-        if (isSelect) {
-          const results = searchStore.results();
-          if (results.length > 0 && resultIndex() < results.length) {
-            setResultIndex(resultIndex() + 1);
-          }
-          return;
-        }
+	const results = () => searchStore.results();
 
-        // don't handle pane navigation here - unified in App.tsx
-        if (nav.activeDepth() !== SearchPaneType.RESULTS) return;
+	// The focused result tracks pane 1's focused row.
+	const focusedResult = createMemo(() => {
+		const list = results();
+		if (list.length === 0) return undefined;
+		const idx = Math.min(nav.focusedIndex(RESULTS), list.length - 1);
+		return list[idx];
+	});
 
-        const results = searchStore.results();
-        if (results.length === 0) return;
+	// Register a resolver so visual-mode range selection grows by result id.
+	onMount(() => {
+		nav.registerResolver(
+			`${nav.activeTab()}:${RESULTS}`,
+			(i) => results()[i]?.podcast.id,
+		);
+		const unsub = on("nav.action", () => {
+			nav.registerResolver(
+				`${nav.activeTab()}:${RESULTS}`,
+				(i) => results()[i]?.podcast.id,
+			);
+		});
+		onCleanup(() => unsub());
+	});
 
-        if (isDown && !isInverting()) {
-          setResultIndex((i) => (i + 1) % results.length);
-        } else if (isUp && isInverting()) {
-          setResultIndex((i) => (i - 1 + results.length) % results.length);
-        } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
-          setResultIndex((i) => (i + 1) % results.length);
-        } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
-          setResultIndex((i) => (i - 1 + results.length) % results.length);
-        }
-      },
-      { release: false },
-    );
-  });
+	// Keep results focus in range after searches complete.
+	const ensureFocus = () => {
+		const list = results();
+		if (list.length === 0) return;
+		const cur = nav.focusedIndex(RESULTS);
+		if (cur >= list.length) nav.setFocusedIndex(RESULTS, list.length - 1);
+	};
+	onMount(ensureFocus);
 
-  const handleSearch = async () => {
-    const query = inputValue().trim();
-    if (query) {
-      await searchStore.search(query);
-      if (searchStore.results().length > 0) {
-        //setFocusArea("results"); //TODO: move level
-        setResultIndex(0);
-      }
-    }
-  };
+	// ── input pane: set inputFocused so Shell router yields keys to <input> ─────
+	createEffect(() => {
+		const isInputPane = nav.activePane() === INPUT;
+		nav.setInputFocused(isInputPane);
+	});
+	onMount(() => {
+		onCleanup(() => nav.setInputFocused(false));
+	});
 
-  const handleHistorySelect = async (query: string) => {
-    setInputValue(query);
-    await searchStore.search(query);
-    if (searchStore.results().length > 0) {
-      //setFocusArea("results"); //TODO: move level
-      setResultIndex(0);
-    }
-  };
+	// ── helpers ─────────────────────────────────────────────────────────────────
+	const formatDate = (d: Date) => format(d, "MMM d, yyyy");
 
-  const handleResultSelect = (result: SearchResult) => {
-    //props.onSubscribe?.(result);
-    searchStore.markSubscribed(result.podcast.id);
-  };
+	const handleSubmit = () => {
+		const query = inputValue().trim();
+		if (!query) return;
+		searchStore.search(query).catch(() => {});
+		nav.setFocusedIndex(RESULTS, 0);
+		nav.setActivePane(RESULTS);
+	};
 
-  return (
-    <box flexDirection="column" height="100%" gap={1} width="100%">
-      {/* Search Header */}
-      <box flexDirection="column" gap={1}>
-        <text fg={theme.text}>
-          <strong>Search Podcasts</strong>
-        </text>
+	const handleHistorySelect = (query: string) => {
+		setInputValue(query);
+		searchStore.search(query).catch(() => {});
+		nav.setFocusedIndex(RESULTS, 0);
+		nav.setActivePane(RESULTS);
+	};
 
-        {/* Search Input */}
-        <box flexDirection="row" gap={1} alignItems="center">
-          <text fg="gray">Search:</text>
-          <input
-            value={inputValue()}
-            onInput={(value) => {
-              setInputValue(value);
-            }}
-            placeholder="Enter podcast name, topic, or author..."
-            focused={nav.activeDepth() === SearchPaneType.INPUT}
-            width={50}
-          />
-          <box
-            border
-            padding={0}
-            paddingLeft={1}
-            paddingRight={1}
-            onMouseDown={handleSearch}
-          >
-            <text fg={theme.primary}>[Enter] Search</text>
-          </box>
-        </box>
+	const handleSubscribe = (result: SearchResult) => {
+		searchStore.markSubscribed(result.podcast.id);
+	};
 
-        {/* Status */}
-        <Show when={searchStore.isSearching()}>
-          <text fg={theme.warning}>Searching...</text>
-        </Show>
-        <Show when={searchStore.error()}>
-          <text fg={theme.error}>{searchStore.error()}</text>
-        </Show>
-      </box>
+	// ── nav.action handler ──────────────────────────────────────────────────────
+	const PAGE_ACTIONS: Partial<
+		Record<KeybindActionName, (pane: PaneId) => void>
+	> = {
+		"move-down": (p) => step(p, 1),
+		"move-up": (p) => step(p, -1),
+		"jump-down": (p) => step(p, 5),
+		"jump-up": (p) => step(p, -5),
+		"page-down": (p) => step(p, 10),
+		"page-up": (p) => step(p, -10),
+		"goto-top": (p) => nav.gotoIndex(0, len(p)),
+		"goto-bottom": (p) => nav.gotoIndex(len(p) - 1, len(p)),
+		open: (p) => {
+			if (p === RESULTS || p === DETAIL) {
+				const result = focusedResult();
+				if (result) handleSubscribe(result);
+			}
+		},
+		"toggle-select": (p) => {
+			if (p === RESULTS) {
+				const result = focusedResult();
+				if (result) nav.toggleSelected(result.podcast.id);
+			}
+		},
+		search: () => {
+			nav.setActivePane(INPUT);
+		},
+		refresh: () => {
+			if (inputValue().trim()) {
+				searchStore.search(inputValue().trim()).catch(() => {});
+			}
+		},
+	};
 
-        {/* Main Content - Results or History */}
-        <box flexDirection="row" height="100%" gap={2}>
-          {/* Results Panel */}
-          <box
-            flexDirection="column"
-            flexGrow={1}
-            border
-            borderColor={
-              nav.activeDepth() === SearchPaneType.RESULTS
-                ? theme.accent
-                : theme.border
-            }
-          >
-            <box padding={1}>
-              <text
-                fg={
-                  nav.activeDepth() === SearchPaneType.RESULTS
-                    ? theme.primary
-                    : theme.muted
-                }
-              >
-                Results ({searchStore.results().length})
-              </text>
-            </box>
-            <Show
-              when={searchStore.results().length > 0}
-              fallback={
-                <box padding={2}>
-                  <text fg={theme.muted}>
-                    {searchStore.query()
-                      ? "No results found"
-                      : "Enter a search term to find podcasts"}
-                  </text>
-                </box>
-              }
-            >
-              <SearchResults
-                results={searchStore.results()}
-                selectedIndex={resultIndex()}
-                focused={nav.activeDepth() === SearchPaneType.RESULTS}
-                onSelect={handleResultSelect}
-                onChange={setResultIndex}
-                isSearching={searchStore.isSearching()}
-                error={searchStore.error()}
-              />
-            </Show>
-          </box>
+	function len(pane: PaneId): number {
+		if (pane === RESULTS) return results().length;
+		return 0;
+	}
+	function step(pane: PaneId, delta: number) {
+		nav.move(delta, len(pane));
+	}
 
-          {/* History Sidebar */}
-          <box width={30} border borderColor={theme.border}>
-            <box padding={1} flexDirection="column">
-              <box paddingBottom={1}>
-                <text
-                  fg={
-                    nav.activeDepth() === SearchPaneType.HISTORY
-                      ? theme.primary
-                      : theme.muted
-                  }
-                >
-                  History
-                </text>
-              </box>
-              <SearchHistory
-                history={searchStore.history()}
-                selectedIndex={historyIndex()}
-                focused={nav.activeDepth() === SearchPaneType.HISTORY}
-                onSelect={handleHistorySelect}
-                onRemove={searchStore.removeFromHistory}
-                onClear={searchStore.clearHistory}
-                onChange={setHistoryIndex}
-              />
-            </box>
-          </box>
-        </box>
-    </box>
-  );
+	const onAction = (data: {
+		action: KeybindActionName;
+		pane: PaneId;
+		mode: NavMode;
+	}) => {
+		ensureFocus();
+		const handler = PAGE_ACTIONS[data.action];
+		if (handler) handler(data.pane);
+	};
+
+	onMount(() => {
+		on("nav.action", onAction);
+		onCleanup(() => off("nav.action", onAction));
+	});
+
+	// ── render ──────────────────────────────────────────────────────────────────
+	const isActive = (p: PaneId) => nav.activePane() === p;
+	const border = (p: PaneId) => (isActive(p) ? theme.accent : theme.border);
+
+	const focusBg = (i: number, pane: PaneId) =>
+		i === nav.focusedIndex(pane) && isActive(pane)
+			? theme.primary
+			: i === nav.focusedIndex(pane)
+				? theme.border
+				: undefined;
+	const focusFg = (i: number, pane: PaneId) =>
+		i === nav.focusedIndex(pane) && isActive(pane) ? theme.surface : theme.text;
+
+	return (
+		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
+			{/* ── pane 0: query input ──────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.parent} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>Search</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={false}
+					border
+					borderColor={border(INPUT)}
+					backgroundColor={theme.background}
+				>
+					<box flexDirection="column" gap={1} padding={1}>
+						<box flexDirection="row" gap={1} alignItems="center">
+							<text fg={muted()}>Query:</text>
+							<input
+								value={inputValue()}
+								onInput={setInputValue}
+								onSubmit={() => handleSubmit()}
+								placeholder="Enter podcast name..."
+								focused={isActive(INPUT)}
+								width={28}
+							/>
+						</box>
+						<text fg={muted()}>Enter to search · h/l: panes</text>
+
+						<Show when={searchStore.isSearching()}>
+							<text fg={theme.warning}>Searching...</text>
+						</Show>
+						<Show when={searchStore.error()}>
+							<text fg={theme.error}>{searchStore.error()}</text>
+						</Show>
+
+						<box height={1} />
+						<text fg={theme.textSecondary}>Recent</text>
+						<Show
+							when={searchStore.history().length > 0}
+							fallback={<text fg={muted()}>No recent searches</text>}
+						>
+							<For each={searchStore.history().slice(0, 12)}>
+								{(query) => (
+									<box
+										flexDirection="row"
+										paddingLeft={1}
+										onMouseDown={() => handleHistorySelect(query)}
+									>
+										<text fg={muted()}>
+											{">"} {query}
+										</text>
+									</box>
+								)}
+							</For>
+						</Show>
+					</box>
+				</scrollbox>
+			</box>
+
+			{/* ── pane 1: results ──────────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.current} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>Results · {results().length}</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={isActive(RESULTS)}
+					border
+					borderColor={border(RESULTS)}
+					backgroundColor={theme.background}
+				>
+					<Show
+						when={results().length > 0}
+						fallback={
+							<box padding={1}>
+								<text fg={muted()}>
+									{searchStore.query()
+										? "No results found"
+										: "Enter a search term to find podcasts"}
+								</text>
+							</box>
+						}
+					>
+						<For each={results()}>
+							{(result, index) => (
+								<box
+									flexDirection="column"
+									gap={0}
+									paddingLeft={1}
+									paddingRight={1}
+									backgroundColor={focusBg(index(), RESULTS)}
+									onMouseDown={() => {
+										nav.setActivePane(RESULTS);
+										nav.setFocusedIndex(RESULTS, index());
+									}}
+								>
+									<box flexDirection="row" gap={1}>
+										<text fg={focusFg(index(), RESULTS)}>
+											{index() === nav.focusedIndex(RESULTS) ? "❯" : " "}
+										</text>
+										<text fg={focusFg(index(), RESULTS)}>
+											{result.podcast.title}
+										</text>
+										<Show when={result.podcast.isSubscribed}>
+											<text
+												fg={
+													index() === nav.focusedIndex(RESULTS)
+														? theme.surface
+														: theme.success
+												}
+											>
+												[+]
+											</text>
+										</Show>
+									</box>
+									<Show when={result.podcast.author}>
+										<text
+											fg={
+												index() === nav.focusedIndex(RESULTS)
+													? theme.surface
+													: muted()
+											}
+											paddingLeft={2}
+										>
+											by {result.podcast.author}
+										</text>
+									</Show>
+								</box>
+							)}
+						</For>
+					</Show>
+				</scrollbox>
+			</box>
+
+			{/* ── pane 2: detail ───────────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.preview} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>Detail</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={isActive(DETAIL)}
+					border
+					borderColor={border(DETAIL)}
+					backgroundColor={theme.background}
+				>
+					<Show
+						when={focusedResult()}
+						fallback={
+							<box padding={1}>
+								<text fg={muted()}>No result focused</text>
+							</box>
+						}
+					>
+						{(result) => (
+							<box flexDirection="column" gap={1} padding={1}>
+								<text fg={theme.text}>
+									<strong>{result().podcast.title}</strong>
+								</text>
+
+								<Show when={result().podcast.author}>
+									<text fg={muted()}>by {result().podcast.author}</text>
+								</Show>
+
+								<Show when={result().podcast.description}>
+									<text fg={theme.textSecondary}>
+										{result().podcast.description!.slice(0, 400) ??
+											"No description available."}
+										{(result().podcast.description?.length ?? 0) > 400
+											? "…"
+											: ""}
+									</text>
+								</Show>
+
+								<Show when={(result().podcast.categories ?? []).length > 0}>
+									<box flexDirection="row" gap={1}>
+										<For each={(result().podcast.categories ?? []).slice(0, 4)}>
+											{(cat) => <text fg={theme.warning}>[{cat}]</text>}
+										</For>
+									</box>
+								</Show>
+
+								<text fg={muted()}>Feed: {result().podcast.feedUrl}</text>
+								<text fg={muted()}>
+									Updated: {formatDate(result().podcast.lastUpdated)}
+								</text>
+
+								<Show when={result().sourceName}>
+									<text fg={muted()}>Source: {result().sourceName}</text>
+								</Show>
+
+								<box height={1} />
+								<Show when={!result().podcast.isSubscribed}>
+									<text fg={theme.primary}>[+] Subscribe (enter)</text>
+								</Show>
+								<Show when={result().podcast.isSubscribed}>
+									<text fg={theme.success}>Already subscribed</text>
+								</Show>
+								<box height={1} />
+								<text fg={muted()}>enter: subscribe h/l: panes</text>
+							</box>
+						)}
+					</Show>
+				</scrollbox>
+			</box>
+		</box>
+	);
 }
+
+export { SearchPage };

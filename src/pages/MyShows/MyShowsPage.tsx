@@ -1,325 +1,431 @@
 /**
- * MyShowsPage - Two-panel file-explorer style view
- * Left panel: list of subscribed shows
- * Right panel: episodes for the selected show
+ * MyShowsPage — yazi-style 3-pane view (canonical reference migration).
+ *
+ *   pane 0 (parent)  — subscribed shows
+ *   pane 1 (current) — episodes of the focused show
+ *   pane 2 (preview) — detail of the focused episode
+ *
+ * Movement (j/k, gg/G, page-jumps) and selection (space, v) are driven by the
+ * Shell router via the `nav.action` event bus; this page only subscribes and
+ * translates actions against its own data. h/l swipe between panes is handled
+ * by the Shell (nav.swipe). The focused row is read from nav.focusedIndex(pane)
+ * so the page is purely reactive.
  */
 
-import { createSignal, For, Show, createMemo, createEffect, onMount } from "solid-js";
-import { useKeyboard } from "@opentui/solid";
+import { createMemo, For, Show, onMount, onCleanup } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
 import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
-import { useNavigation } from "@/context/NavigationContext";
+import {
+	useNavigation,
+	NavMode,
+	PaneSlot,
+	type PaneId,
+} from "@/context/NavigationContext";
+import { useAudio } from "@/hooks/useAudio";
+import { on, off } from "@/utils/event-bus";
+import type { KeybindActionName } from "@/context/KeybindContext";
+import type { Episode } from "@/types/episode";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
-import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
+import { PANE_RATIO } from "@/utils/navigation";
 
-enum MyShowsPaneType {
-  SHOWS = 1,
-  EPISODES = 2,
-}
-
-export const MyShowsPaneCount = 2;
+export const MyShowsPaneCount = 3;
 
 export function MyShowsPage() {
-  const feedStore = useFeedStore();
-  const downloadStore = useDownloadStore();
-  const audioNav = useAudioNavStore();
-  const [isRefreshing, setIsRefreshing] = createSignal(false);
-  const [showIndex, setShowIndex] = createSignal(0);
-  const [episodeIndex, setEpisodeIndex] = createSignal(0);
-  const { theme } = useTheme();
-  const mutedColor = () => theme.muted || theme.text;
-  const nav = useNavigation();
-  const keybind = useKeybinds();
+	const feedStore = useFeedStore();
+	const downloadStore = useDownloadStore();
+	const audioNav = useAudioNavStore();
+	const audio = useAudio();
+	const { theme } = useTheme();
+	const muted = () => theme.muted || theme.text;
+	const nav = useNavigation();
 
-  onMount(() => {
-    useKeyboard(
-      (keyEvent: any) => {
-        const isDown = keybind.match("down", keyEvent);
-        const isUp = keybind.match("up", keyEvent);
-        const isCycle = keybind.match("cycle", keyEvent);
-        const isSelect = keybind.match("select", keyEvent);
-        const isInverting = keybind.isInverting(keyEvent);
+	const SHOWS = PaneSlot.PARENT;
+	const EPS = PaneSlot.CURRENT;
+	const PREV = PaneSlot.PREVIEW;
 
-        const shows = feedStore.getFilteredFeeds();
-        const episodesList = episodes();
+	const shows = () => feedStore.getFilteredFeeds();
 
-        if (isSelect) {
-          if (shows.length > 0 && showIndex() < shows.length) {
-            setShowIndex(showIndex() + 1);
-          }
-          if (episodesList.length > 0 && episodeIndex() < episodesList.length) {
-            setEpisodeIndex(episodeIndex() + 1);
-          }
-          return;
-        }
+	// The selected show tracks the focused row of pane 0.
+	const selectedShow = createMemo(() => {
+		const list = shows();
+		if (list.length === 0) return undefined;
+		const idx = Math.min(nav.focusedIndex(SHOWS), list.length - 1);
+		return list[idx];
+	});
 
-        // don't handle pane navigation here - unified in App.tsx
-        if (nav.activeDepth() !== MyShowsPaneType.EPISODES) return;
+	const episodes = createMemo(() => {
+		const show = selectedShow();
+		if (!show) return [] as Episode[];
+		return [...show.episodes].sort(
+			(a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
+		);
+	});
 
-        if (episodesList.length > 0) {
-          if (isDown && !isInverting()) {
-            setEpisodeIndex((i) => (i + 1) % episodesList.length);
-          } else if (isUp && isInverting()) {
-            setEpisodeIndex((i) => (i - 1 + episodesList.length) % episodesList.length);
-          } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
-            setEpisodeIndex((i) => (i + 1) % episodesList.length);
-          } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
-            setEpisodeIndex((i) => (i - 1 + episodesList.length) % episodesList.length);
-          }
-        }
-      },
-      { release: false },
-    );
-  });
+	// Register a resolver so visual-mode range selection grows by episode id.
+	onMount(() => {
+		nav.registerResolver(`${nav.activeTab()}:${EPS}`, (i) => episodes()[i]?.id);
+		// keep the resolver fresh as the episode list changes
+		const unsub = on("nav.action", () => {
+			nav.registerResolver(
+				`${nav.activeTab()}:${EPS}`,
+				(i) => episodes()[i]?.id,
+			);
+		});
+		onCleanup(() => unsub());
+	});
 
-  /** Threshold: load more when within this many items of the end */
-  const LOAD_MORE_THRESHOLD = 5;
+	// Keep shows-focus in range after feeds load/change.
+	const ensureShowsFocus = () => {
+		const list = shows();
+		if (list.length === 0) return;
+		const cur = nav.focusedIndex(SHOWS);
+		if (cur >= list.length) nav.setFocusedIndex(SHOWS, list.length - 1);
+	};
+	onMount(ensureShowsFocus);
 
-  const shows = () => feedStore.getFilteredFeeds();
+	// When the show changes, reset episode focus + set audio-nav source + show count.
+	const onShowChanged = () => {
+		const show = selectedShow();
+		if (!show) return;
+		if (nav.focusedIndex(EPS) > episodes().length - 1)
+			nav.setFocusedIndex(EPS, 0);
+		audioNav.setSource(AudioSource.MY_SHOWS, show.podcast.id);
+	};
+	onMount(onShowChanged);
 
-  const selectedShow = createMemo(() => {
-    return shows()[0]; //TODO: Integrate with locally handled keyboard navigation
-  });
+	const focusedEpisode = createMemo(() => {
+		const eps = episodes();
+		if (eps.length === 0) return undefined;
+		const idx = Math.min(nav.focusedIndex(EPS), eps.length - 1);
+		return eps[idx];
+	});
 
-  const episodes = createMemo(() => {
-    const show = selectedShow();
-    if (!show) return [];
-    return [...show.episodes].sort(
-      (a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
-    );
-  });
+	// ── helpers ─────────────────────────────────────────────────────────────────
+	const formatDate = (d: Date) => format(d, "MMM d, yyyy");
+	const formatDuration = (s: number) => {
+		const mins = Math.floor(s / 60);
+		const hrs = Math.floor(mins / 60);
+		return hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
+	};
+	const downloadLabel = (id: string) => {
+		switch (downloadStore.getDownloadStatus(id)) {
+			case DownloadStatus.QUEUED:
+				return "[Q]";
+			case DownloadStatus.DOWNLOADING:
+				return `[${downloadStore.getDownloadProgress(id)}%]`;
+			case DownloadStatus.COMPLETED:
+				return "[DL]";
+			case DownloadStatus.FAILED:
+				return "[ERR]";
+			default:
+				return "";
+		}
+	};
+	const downloadColor = (id: string) => {
+		switch (downloadStore.getDownloadStatus(id)) {
+			case DownloadStatus.QUEUED:
+				return theme.warning;
+			case DownloadStatus.DOWNLOADING:
+				return theme.primary;
+			case DownloadStatus.COMPLETED:
+				return theme.success;
+			case DownloadStatus.FAILED:
+				return theme.error;
+			default:
+				return muted();
+		}
+	};
 
-  const formatDate = (date: Date): string => {
-    return format(date, "MMM d, yyyy");
-  };
+	const playEpisode = (ep: Episode) => {
+		audio.play(ep).catch(() => {});
+		audioNav.setSource(AudioSource.MY_SHOWS, selectedShow()?.podcast.id);
+	};
 
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const hrs = Math.floor(mins / 60);
-    if (hrs > 0) return `${hrs}h ${mins % 60}m`;
-    return `${mins}m`;
-  };
+	// ── nav.action handler ──────────────────────────────────────────────────────
+	const PAGE_ACTIONS: Partial<
+		Record<KeybindActionName, (pane: PaneId) => void>
+	> = {
+		"move-down": (p) => step(p, 1),
+		"move-up": (p) => step(p, -1),
+		"jump-down": (p) => step(p, 5),
+		"jump-up": (p) => step(p, -5),
+		"page-down": (p) => step(p, 10),
+		"page-up": (p) => step(p, -10),
+		"goto-top": (p) => nav.gotoIndex(0, len(p)),
+		"goto-bottom": (p) => nav.gotoIndex(len(p) - 1, len(p)),
+		open: (p) => {
+			if (p === SHOWS) {
+				nav.swipe(1, MyShowsPaneCount);
+				onShowChanged();
+			} else if (p === EPS) {
+				const ep = focusedEpisode();
+				if (ep) playEpisode(ep);
+			}
+		},
+		"toggle-select": (p) => {
+			if (p === EPS) {
+				const ep = focusedEpisode();
+				if (ep) nav.toggleSelected(ep.id);
+			}
+		},
+		refresh: () => {
+			const show = selectedShow();
+			if (show) feedStore.refreshFeed(show.id).catch(() => {});
+		},
+	};
 
-  /** Get download status label for an episode */
-  const downloadLabel = (episodeId: string): string => {
-    const status = downloadStore.getDownloadStatus(episodeId);
-    switch (status) {
-      case DownloadStatus.QUEUED:
-        return "[Q]";
-      case DownloadStatus.DOWNLOADING: {
-        const pct = downloadStore.getDownloadProgress(episodeId);
-        return `[${pct}%]`;
-      }
-      case DownloadStatus.COMPLETED:
-        return "[DL]";
-      case DownloadStatus.FAILED:
-        return "[ERR]";
-      default:
-        return "";
-    }
-  };
+	function len(pane: PaneId): number {
+		if (pane === SHOWS) return shows().length;
+		if (pane === EPS) return episodes().length;
+		return 0;
+	}
+	function step(pane: PaneId, delta: number) {
+		nav.move(delta, len(pane));
+		if (pane === SHOWS) {
+			// clamp episode focus + re-resolve after show change
+			nav.setFocusedIndex(
+				EPS,
+				Math.min(nav.focusedIndex(EPS), Math.max(0, episodes().length - 1)),
+			);
+			onShowChanged();
+		}
+	}
 
-  const handleRefresh = async () => {
-    const show = selectedShow();
-    if (!show) return;
-    setIsRefreshing(true);
-    await feedStore.refreshFeed(show.id);
-    setIsRefreshing(false);
-  };
+	const onAction = (data: {
+		action: KeybindActionName;
+		pane: PaneId;
+		mode: NavMode;
+	}) => {
+		// Only react when our tab is active.
+		// (Shell always emits; router guarantees our tab is active.)
+		ensureShowsFocus();
+		const handler = PAGE_ACTIONS[data.action];
+		if (handler) handler(data.pane);
+		// visual selection growth is handled inside nav.move/registerResolver
+	};
 
-  const handleUnsubscribe = () => {
-    const show = selectedShow();
-    if (!show) return;
-    feedStore.removeFeed(show.id);
-    setShowIndex((i) => Math.max(0, i - 1));
-    setEpisodeIndex(0);
-  };
+	onMount(() => {
+		on("nav.action", onAction);
+		onCleanup(() => off("nav.action", onAction));
+	});
 
-  /** Get download status color */
-  const downloadColor = (episodeId: string): string => {
-    const status = downloadStore.getDownloadStatus(episodeId);
-    switch (status) {
-      case DownloadStatus.QUEUED:
-        return theme.warning.toString();
-      case DownloadStatus.DOWNLOADING:
-        return theme.primary.toString();
-      case DownloadStatus.COMPLETED:
-        return theme.success.toString();
-      case DownloadStatus.FAILED:
-        return theme.error.toString();
-      default:
-        return mutedColor().toString();
-    }
-  };
+	// ── render ──────────────────────────────────────────────────────────────────
+	const isActive = (p: PaneId) => nav.activePane() === p;
+	const border = (p: PaneId) => (isActive(p) ? theme.accent : theme.border);
 
-  return (
-    <box flexDirection="row" flexGrow={1} width="100%">
-      <box flexDirection="column" height="100%">
-        <Show when={isRefreshing()}>
-          <text fg={theme.warning}>Refreshing...</text>
-        </Show>
-        <Show
-          when={shows().length > 0}
-          fallback={
-            <box padding={1}>
-              <text fg={theme.muted}>
-                No shows yet. Subscribe from Discover or Search.
-              </text>
-            </box>
-          }
-        >
-          <scrollbox
-            border
-            height="100%"
-            borderColor={
-              nav.activeDepth() == MyShowsPaneType.SHOWS
-                ? theme.accent
-                : theme.border
-            }
-            focused={nav.activeDepth() == MyShowsPaneType.SHOWS}
-          >
-            <For each={shows()}>
-              {(feed, index) => (
-                <box
-                  flexDirection="row"
-                  gap={1}
-                  paddingLeft={1}
-                  paddingRight={1}
-                  backgroundColor={
-                    index() === showIndex() ? theme.primary : undefined
-                  }
-                  onMouseDown={() => {
-                    setShowIndex(index());
-                    setEpisodeIndex(0);
-                    audioNav.setSource(
-                      AudioSource.MY_SHOWS,
-                      selectedShow()?.podcast.id,
-                    );
-                  }}
-                >
-                  <text
-                    fg={index() === showIndex() ? theme.surface : theme.text}
-                  >
-                    {index() === showIndex() ? ">" : " "}
-                  </text>
-                  <text
-                    fg={index() === showIndex() ? theme.surface : theme.text}
-                  >
-                    {feed.customName || feed.podcast.title}
-                  </text>
-                  <text fg={index() === showIndex() ? undefined : theme.text}>
-                    ({feed.episodes.length})
-                  </text>
-                </box>
-              )}
-            </For>
-          </scrollbox>
-        </Show>
-      </box>
-      <box flexDirection="column" height="100%">
-          <Show
-            when={selectedShow()}
-            fallback={
-              <box padding={1}>
-                <text fg={theme.muted}>Select a show</text>
-              </box>
-            }
-          >
-            <Show
-              when={episodes().length > 0}
-              fallback={
-                <box padding={1}>
-                  <text fg={theme.muted}>No episodes. Press [r] to refresh.</text>
-                </box>
-              }
-            >
-              <scrollbox
-                border
-                height="100%"
-                borderColor={
-                  nav.activeDepth() == MyShowsPaneType.EPISODES
-                    ? theme.accent
-                    : theme.border
-                }
-                focused={nav.activeDepth() == MyShowsPaneType.EPISODES}
-              >
-              <For each={episodes()}>
-                {(episode, index) => (
-                  <box
-                    flexDirection="column"
-                    gap={0}
-                    paddingLeft={1}
-                    paddingRight={1}
-                    backgroundColor={
-                      index() === episodeIndex() ? theme.primary : undefined
-                    }
-                    onMouseDown={() => setEpisodeIndex(index())}
-                  >
-                    <box flexDirection="row" gap={1}>
-                      <text
-                        fg={
-                          index() === episodeIndex()
-                            ? theme.surface
-                            : theme.text
-                        }
-                      >
-                        {index() === episodeIndex() ? ">" : " "}
-                      </text>
-                      <text
-                        fg={
-                          index() === episodeIndex()
-                            ? theme.surface
-                            : theme.text
-                        }
-                      >
-                        {episode.episodeNumber
-                          ? `#${episode.episodeNumber} `
-                          : ""}
-                        {episode.title}
-                      </text>
-                    </box>
-                    <box flexDirection="row" gap={2} paddingLeft={2}>
-                      <text
-                        fg={index() === episodeIndex() ? undefined : theme.info}
-                      >
-                        {formatDate(episode.pubDate)}
-                      </text>
-                      <text fg={theme.muted}>
-                        {formatDuration(episode.duration)}
-                      </text>
-                      <Show when={downloadLabel(episode.id)}>
-                        <text fg={downloadColor(episode.id)}>
-                          {downloadLabel(episode.id)}
-                        </text>
-                      </Show>
-                    </box>
-                  </box>
-                )}
-              </For>
-              <Show when={feedStore.isLoadingMore()}>
-                <box paddingLeft={2} paddingTop={1}>
-                  <LoadingIndicator />
-                </box>
-              </Show>
-              <Show
-                when={
-                  !feedStore.isLoadingMore() &&
-                  selectedShow() &&
-                  feedStore.hasMoreEpisodes(selectedShow()!.id)
-                }
-              >
-                <box paddingLeft={2} paddingTop={1}>
-                  <text fg={theme.muted}>Scroll down for more episodes</text>
-                </box>
-              </Show>
-            </scrollbox>
-          </Show>
-        </Show>
-      </box>
-    </box>
-  );
+	const focusBg = (i: number, pane: PaneId) =>
+		i === nav.focusedIndex(pane) && isActive(pane)
+			? theme.primary
+			: i === nav.focusedIndex(pane)
+				? theme.border
+				: undefined;
+	const focusFg = (i: number, pane: PaneId) =>
+		i === nav.focusedIndex(pane) && isActive(pane) ? theme.surface : theme.text;
+
+	return (
+		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
+			{/* ── pane 0: shows ─────────────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.parent} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>Shows ({shows().length})</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={isActive(SHOWS)}
+					border
+					borderColor={border(SHOWS)}
+					backgroundColor={theme.background}
+				>
+					<Show
+						when={shows().length > 0}
+						fallback={
+							<box padding={1}>
+								<text fg={muted()}>
+									No shows. Subscribe from Discover/Search.
+								</text>
+							</box>
+						}
+					>
+						<For each={shows()}>
+							{(feed, index) => (
+								<box
+									flexDirection="row"
+									gap={1}
+									paddingLeft={1}
+									paddingRight={1}
+									backgroundColor={focusBg(index(), SHOWS)}
+									onMouseDown={() => {
+										nav.setActivePane(SHOWS);
+										nav.setFocusedIndex(SHOWS, index());
+										onShowChanged();
+									}}
+								>
+									<text fg={focusFg(index(), SHOWS)}>
+										{index() === nav.focusedIndex(SHOWS) ? "❯" : " "}
+									</text>
+									<text fg={focusFg(index(), SHOWS)}>
+										{feed.customName || feed.podcast.title}
+									</text>
+									<text
+										fg={
+											index() === nav.focusedIndex(SHOWS)
+												? theme.surface
+												: muted()
+										}
+									>
+										({feed.episodes.length})
+									</text>
+								</box>
+							)}
+						</For>
+					</Show>
+				</scrollbox>
+			</box>
+
+			{/* ── pane 1: episodes ──────────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.current} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>
+						{selectedShow()?.customName ||
+							selectedShow()?.podcast.title ||
+							"Episodes"}{" "}
+						· {episodes().length}
+					</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={isActive(EPS)}
+					border
+					borderColor={border(EPS)}
+					backgroundColor={theme.background}
+				>
+					<Show
+						when={episodes().length > 0}
+						fallback={
+							<box padding={1}>
+								<text fg={muted()}>No episodes. :refresh</text>
+							</box>
+						}
+					>
+						<For each={episodes()}>
+							{(ep, index) => (
+								<box
+									flexDirection="column"
+									gap={0}
+									paddingLeft={1}
+									paddingRight={1}
+									backgroundColor={focusBg(index(), EPS)}
+									onMouseDown={() => {
+										nav.setActivePane(EPS);
+										nav.setFocusedIndex(EPS, index());
+									}}
+								>
+									<box flexDirection="row" gap={1}>
+										<text fg={focusFg(index(), EPS)}>
+											{index() === nav.focusedIndex(EPS) ? "❯" : " "}
+										</text>
+										<text fg={focusFg(index(), EPS)}>
+											{ep.episodeNumber ? `#${ep.episodeNumber} ` : ""}
+											{ep.title}
+										</text>
+									</box>
+									<box flexDirection="row" gap={2} paddingLeft={2}>
+										<text
+											fg={
+												index() === nav.focusedIndex(EPS)
+													? theme.surface
+													: theme.info
+											}
+										>
+											{formatDate(ep.pubDate)}
+										</text>
+										<text
+											fg={
+												index() === nav.focusedIndex(EPS)
+													? theme.surface
+													: muted()
+											}
+										>
+											{formatDuration(ep.duration)}
+										</text>
+										<Show when={nav.isSelected(ep.id)}>
+											<text fg={theme.warning}>●</text>
+										</Show>
+										<Show when={downloadLabel(ep.id)}>
+											<text fg={downloadColor(ep.id)}>
+												{downloadLabel(ep.id)}
+											</text>
+										</Show>
+									</box>
+								</box>
+							)}
+						</For>
+						<Show when={feedStore.isLoadingMore()}>
+							<box paddingLeft={2} paddingTop={1}>
+								<LoadingIndicator />
+							</box>
+						</Show>
+					</Show>
+				</scrollbox>
+			</box>
+
+			{/* ── pane 2: preview ───────────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.preview} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>Preview</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={isActive(PREV)}
+					border
+					borderColor={border(PREV)}
+					backgroundColor={theme.background}
+				>
+					<Show
+						when={focusedEpisode()}
+						fallback={
+							<box padding={1}>
+								<text fg={muted()}>No episode focused</text>
+							</box>
+						}
+					>
+						{(ep) => (
+							<box flexDirection="column" gap={1} padding={1}>
+								<text fg={theme.textPrimary ?? theme.text}>
+									<strong>
+										{ep().episodeNumber ? `#${ep().episodeNumber} ` : ""}
+										{ep().title}
+									</strong>
+								</text>
+								<box flexDirection="row" gap={2}>
+									<text fg={theme.info}>{formatDate(ep().pubDate)}</text>
+									<text fg={muted()}>{formatDuration(ep().duration)}</text>
+									<Show when={downloadLabel(ep().id)}>
+										<text fg={downloadColor(ep().id)}>
+											{downloadLabel(ep().id)}
+										</text>
+									</Show>
+								</box>
+								<Show when={selectedShow()?.podcast.author}>
+									<text fg={muted()}>by {selectedShow()!.podcast.author}</text>
+								</Show>
+								<box height={1} />
+								<text fg={theme.textSecondary}>
+									{ep().description?.slice(0, 400) ??
+										"No description available."}
+									{(ep().description?.length ?? 0) > 400 ? "…" : ""}
+								</text>
+								<box height={1} />
+								<text fg={muted()}>enter: play space: select h/l: panes</text>
+							</box>
+						)}
+					</Show>
+				</scrollbox>
+			</box>
+		</box>
+	);
 }

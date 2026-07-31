@@ -1,119 +1,185 @@
-import { createSignal, For, onMount } from "solid-js";
-import { useKeyboard } from "@opentui/solid";
+/**
+ * SettingsPage — yazi-style 2-pane view.
+ *
+ *   pane 0 (parent)  — section list (Sync, Sources, Preferences, ...)
+ *   pane 1 (current) — active panel for the focused section
+ *
+ * Movement (j/k, gg/G, page-jumps) on pane 0 navigates the section list.
+ * The panel (pane 1) reactively shows the focused section's content.
+ * Audio transport and tab/pane swipes are handled by the Shell router.
+ */
+
+import { For, Show, onMount, onCleanup } from "solid-js";
 import { SourceManager } from "./SourceManager";
-import { useTheme } from "@/context/ThemeContext";
 import { PreferencesPanel } from "./PreferencesPanel";
 import { SyncPanel } from "./SyncPanel";
 import { VisualizerSettings } from "./VisualizerSettings";
-import { useNavigation } from "@/context/NavigationContext";
-import { KeybindProvider, useKeybinds } from "@/context/KeybindContext";
+import { useTheme } from "@/context/ThemeContext";
+import {
+	useNavigation,
+	NavMode,
+	PaneSlot,
+	type PaneId,
+} from "@/context/NavigationContext";
+import { on, off } from "@/utils/event-bus";
+import type { KeybindActionName } from "@/context/KeybindContext";
+import { PANE_RATIO } from "@/utils/navigation";
 
-enum SettingsPaneType {
-  SYNC = 1,
-  SOURCES = 2,
-  PREFERENCES = 3,
-  VISUALIZER = 4,
-  ACCOUNT = 5,
-}
-export const SettingsPaneCount = 5;
+export const SettingsPaneCount = 2;
 
-const SECTIONS: Array<{ id: SettingsPaneType; label: string }> = [
-  { id: SettingsPaneType.SYNC, label: "Sync" },
-  { id: SettingsPaneType.SOURCES, label: "Sources" },
-  { id: SettingsPaneType.PREFERENCES, label: "Preferences" },
-  { id: SettingsPaneType.VISUALIZER, label: "Visualizer" },
-  { id: SettingsPaneType.ACCOUNT, label: "Account" },
-];
+const SECTIONS = [
+	{ id: 0, label: "Sync" },
+	{ id: 1, label: "Sources" },
+	{ id: 2, label: "Preferences" },
+	{ id: 3, label: "Visualizer" },
+	{ id: 4, label: "Account" },
+] as const;
 
 export function SettingsPage() {
-  const { theme } = useTheme();
-  const nav = useNavigation();
-  const keybind = useKeybinds();
+	const { theme } = useTheme();
+	const muted = () => theme.muted || theme.text;
+	const nav = useNavigation();
 
-  // Helper function to check if a depth is active
-  const isActive = (depth: SettingsPaneType): boolean => {
-    return nav.activeDepth() === depth;
-  };
+	const SECTIONS_PANE = PaneSlot.PARENT; // 0
+	const PANEL = PaneSlot.CURRENT; // 1
 
-  // Helper function to get the current depth as a number
-  const currentDepth = () => nav.activeDepth() as number;
+	// The focused section tracks pane 0's focused index.
+	const focusedSection = () => {
+		const idx = nav.focusedIndex(SECTIONS_PANE);
+		return SECTIONS[Math.min(idx, SECTIONS.length - 1)] ?? SECTIONS[0];
+	};
 
-  onMount(() => {
-    useKeyboard(
-      (keyEvent: any) => {
-        const isDown = keybind.match("down", keyEvent);
-        const isUp = keybind.match("up", keyEvent);
-        const isCycle = keybind.match("cycle", keyEvent);
-        const isSelect = keybind.match("select", keyEvent);
-        const isInverting = keybind.isInverting(keyEvent);
+	// Register a resolver so visual-mode range selection grows by section id.
+	onMount(() => {
+		nav.registerResolver(`${nav.activeTab()}:${SECTIONS_PANE}`, (i) =>
+			SECTIONS[Math.min(i, SECTIONS.length - 1)]?.id.toString(),
+		);
+	});
 
-        // don't handle pane navigation here - unified in App.tsx
-        if (nav.activeDepth() < 1 || nav.activeDepth() > SettingsPaneCount) return;
+	// ── nav.action handler ──────────────────────────────────────────────────────
+	const PAGE_ACTIONS: Partial<
+		Record<KeybindActionName, (pane: PaneId) => void>
+	> = {
+		"move-down": (p) => step(p, 1),
+		"move-up": (p) => step(p, -1),
+		"jump-down": (p) => step(p, 5),
+		"jump-up": (p) => step(p, -5),
+		"page-down": (p) => step(p, 10),
+		"page-up": (p) => step(p, -10),
+		"goto-top": (p) => nav.gotoIndex(0, len(p)),
+		"goto-bottom": (p) => nav.gotoIndex(len(p) - 1, len(p)),
+		open: (p) => {
+			if (p === SECTIONS_PANE) {
+				nav.swipe(1, SettingsPaneCount);
+			}
+		},
+	};
 
-        if (isDown && !isInverting()) {
-          nav.setActiveDepth((nav.activeDepth() % SettingsPaneCount) + 1);
-        } else if (isUp && isInverting()) {
-          nav.setActiveDepth((nav.activeDepth() - 2 + SettingsPaneCount) % SettingsPaneCount + 1);
-        } else if ((isCycle && !isInverting()) || (isDown && !isInverting())) {
-          nav.setActiveDepth((nav.activeDepth() % SettingsPaneCount) + 1);
-        } else if ((isCycle && isInverting()) || (isUp && isInverting())) {
-          nav.setActiveDepth((nav.activeDepth() - 2 + SettingsPaneCount) % SettingsPaneCount + 1);
-        }
-      },
-      { release: false },
-    );
-  });
+	function len(pane: PaneId): number {
+		if (pane === SECTIONS_PANE) return SECTIONS.length;
+		return 0;
+	}
+	function step(pane: PaneId, delta: number) {
+		nav.move(delta, len(pane));
+	}
 
-  return (
-    <box flexDirection="column" gap={1} height="100%" width="100%">
-      <box flexDirection="row" gap={1}>
-        <For each={SECTIONS}>
-          {(section, index) => (
-            <box
-              border
-              borderColor={theme.border}
-              padding={0}
-              backgroundColor={
-                currentDepth() === section.id ? theme.primary : undefined
-              }
-              onMouseDown={() => nav.setActiveDepth(section.id)}
-            >
-              <text
-                fg={
-                  currentDepth() === section.id ? theme.text : theme.textMuted
-                }
-              >
-                [{index() + 1}] {section.label}
-              </text>
-            </box>
-          )}
-        </For>
-      </box>
+	const onAction = (data: {
+		action: KeybindActionName;
+		pane: PaneId;
+		mode: NavMode;
+	}) => {
+		const handler = PAGE_ACTIONS[data.action];
+		if (handler) handler(data.pane);
+	};
 
-      <box
-        border
-        borderColor={isActive(SettingsPaneType.SYNC) || isActive(SettingsPaneType.SOURCES) || isActive(SettingsPaneType.PREFERENCES) || isActive(SettingsPaneType.VISUALIZER) || isActive(SettingsPaneType.ACCOUNT) ? theme.accent : theme.border}
-        flexGrow={1}
-        padding={1}
-        flexDirection="column"
-        gap={1}
-      >
-        {isActive(SettingsPaneType.SYNC) && <SyncPanel />}
-        {isActive(SettingsPaneType.SOURCES) && (
-          <SourceManager focused />
-        )}
-        {isActive(SettingsPaneType.PREFERENCES) && (
-          <PreferencesPanel />
-        )}
-        {isActive(SettingsPaneType.VISUALIZER) && (
-          <VisualizerSettings />
-        )}
-        {isActive(SettingsPaneType.ACCOUNT) && (
-          <box flexDirection="column" gap={1}>
-            <text fg={theme.textMuted}>Account</text>
-          </box>
-        )}
-      </box>
-    </box>
-  );
+	onMount(() => {
+		on("nav.action", onAction);
+		onCleanup(() => off("nav.action", onAction));
+	});
+
+	// ── render ──────────────────────────────────────────────────────────────────
+	const isActive = (p: PaneId) => nav.activePane() === p;
+	const border = (p: PaneId) => (isActive(p) ? theme.accent : theme.border);
+
+	const focusBg = (i: number, pane: PaneId) =>
+		i === nav.focusedIndex(pane) && isActive(pane)
+			? theme.primary
+			: i === nav.focusedIndex(pane)
+				? theme.border
+				: undefined;
+	const focusFg = (i: number, pane: PaneId) =>
+		i === nav.focusedIndex(pane) && isActive(pane) ? theme.surface : theme.text;
+
+	return (
+		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
+			{/* ── pane 0: sections ─────────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.parent} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>Settings</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={isActive(SECTIONS_PANE)}
+					border
+					borderColor={border(SECTIONS_PANE)}
+					backgroundColor={theme.background}
+				>
+					<For each={SECTIONS}>
+						{(section, index) => (
+							<box
+								flexDirection="row"
+								gap={1}
+								paddingLeft={1}
+								paddingRight={1}
+								backgroundColor={focusBg(index(), SECTIONS_PANE)}
+								onMouseDown={() => {
+									nav.setActivePane(SECTIONS_PANE);
+									nav.setFocusedIndex(SECTIONS_PANE, index());
+								}}
+							>
+								<text fg={focusFg(index(), SECTIONS_PANE)}>
+									{index() === nav.focusedIndex(SECTIONS_PANE) ? "❯" : " "}
+								</text>
+								<text fg={focusFg(index(), SECTIONS_PANE)}>
+									{section.label}
+								</text>
+							</box>
+						)}
+					</For>
+				</scrollbox>
+			</box>
+
+			{/* ── pane 1: panel ─────────────────────────────────────────────────────── */}
+			<box flexDirection="column" flexGrow={PANE_RATIO.current} height="100%">
+				<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+					<text fg={theme.textSecondary}>{focusedSection().label}</text>
+				</box>
+				<scrollbox
+					height="100%"
+					focused={isActive(PANEL)}
+					border
+					borderColor={border(PANEL)}
+					backgroundColor={theme.background}
+				>
+					<Show when={focusedSection().id === 0}>
+						<SyncPanel />
+					</Show>
+					<Show when={focusedSection().id === 1}>
+						<SourceManager focused />
+					</Show>
+					<Show when={focusedSection().id === 2}>
+						<PreferencesPanel />
+					</Show>
+					<Show when={focusedSection().id === 3}>
+						<VisualizerSettings />
+					</Show>
+					<Show when={focusedSection().id === 4}>
+						<box padding={1} flexDirection="column" gap={1}>
+							<text fg={muted()}>Account settings (not yet implemented)</text>
+						</box>
+					</Show>
+				</scrollbox>
+			</box>
+		</box>
+	);
 }
