@@ -2,14 +2,17 @@
  * FeedPage — yazi depth-stack view of episodes across subscribed shows.
  *
  *   depth 0 (current) — subscribed feeds list (containers); index 0 is a
- *                       virtual "All Feeds". Left pane empty at root.
+ *                       virtual "All Feeds". Parent pane shows the muted
+ *                       placeholder (1/7 slot kept).
  *   depth 1 (current) — flat episodes list for the drilled feed (reverse
- *                       chronological). Left pane = the feeds list (prev).
- *   right (preview)   — detail of the hovered item in the current column.
+ *                       chronological). Parent pane = the feeds list (prev).
+ *   preview            — detail of the hovered item in the current column.
  *
- * `l`/Enter drills in (feeds → episodes); `h` pops back (or yields to the
- * sidebar at depth 0). j/k move within the current column. The Shell router
- * drives everything over nav.action; this page only handles list/preview data.
+ * Renders entirely through `<YaziPaneRow>` (the shared parent|current|preview
+ * primitive); no bespoke 3-column flexbox JSX remains. `l`/Enter drills in
+ * (push); `h` pops a depth (noop at 0). j/k move only within the current
+ * column. The Shell router drives everything over `nav.action`; this page
+ * only handles list/preview data.
  */
 
 import { createMemo, For, Show, onMount, onCleanup } from "solid-js";
@@ -32,7 +35,7 @@ import type { KeybindActionName } from "@/context/KeybindContext";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
-import { PANE_RATIO } from "@/utils/navigation";
+import { YaziPaneRow } from "@/components/YaziPaneRow";
 
 export const FeedPaneCount = 1;
 
@@ -200,8 +203,8 @@ function FeedPage() {
 	});
 
 	// ── render ──────────────────────────────────────────────────────────────────
-	const isActive = nav.activePane() === DEPTH_CENTER_PANE;
-	const border = (active: boolean) => (active ? theme.accent : theme.border);
+	const isActive = () => nav.activePane() === DEPTH_CENTER_PANE;
+	// Row highlight within a list. `active=true` only for the current pane.
 	const focusBg = (i: number, listFocus: number, active: boolean) =>
 		i === listFocus && active
 			? theme.primary
@@ -210,7 +213,6 @@ function FeedPage() {
 				: undefined;
 	const focusFg = (i: number, listFocus: number, active: boolean) =>
 		i === listFocus && active ? theme.surface : theme.text;
-	const headerBg = theme.background;
 
 	const feedLabel = (item: FeedListItem) =>
 		item.kind === "all"
@@ -221,309 +223,264 @@ function FeedPage() {
 			? feedStore.getAllEpisodesChronological().length
 			: item.feed.episodes.length;
 
-	return (
-		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
-			{/* ── left: previous depth (empty at root) ──────────────────────────── */}
-			<box
-				flexDirection="column"
-				flexGrow={PANE_RATIO.parent}
-				flexShrink={1}
-				flexBasis={0}
-				height="100%"
-				style={{ width: depth() === 0 ? 0 : undefined }}
-				overflow="hidden"
-			>
-				<Show when={depth() >= 1}>
-					<box height={1} paddingLeft={1} backgroundColor={headerBg}>
-						<text fg={theme.textSecondary}>
-							Feeds · {feedList().length - 1}
+	const currentLabel = () =>
+		depth() === 0
+			? `Feeds · ${feedList().length - 1}`
+			: `${(() => {
+					const fi = focusedFeedItem();
+					return fi?.kind === "feed"
+						? fi.feed.customName || fi.feed.podcast.title
+						: "All Episodes";
+				})()} · ${episodes().length}`;
+
+	// ── parent pane: previous-depth list (muted/blank at depth 0) ──────────
+	// Wrap in a stable <Show> (the sibling-Show pattern) so the parent list
+	// mounts/unmounts cleanly on depth change instead of swapping roots.
+	const parentContent = () => (
+		<Show when={depth() >= 1}>
+			<For each={feedList()}>
+				{(item, index) => {
+					const lf = nav.depthFocus(0);
+					return (
+						<box
+							flexDirection="row"
+							gap={1}
+							paddingLeft={1}
+							paddingRight={1}
+							backgroundColor={focusBg(index(), lf, false)}
+						>
+							<text fg={focusFg(index(), lf, false)}>
+								{index() === lf ? "❯" : " "}
+							</text>
+							<text fg={focusFg(index(), lf, false)}>{feedLabel(item)}</text>
+							<text fg={muted()}>({feedCount(item)})</text>
+						</box>
+					);
+				}}
+			</For>
+		</Show>
+	);
+
+	// ── current pane: the current-depth list (the only focusable column) ──────
+	const currentContent = () => (
+		<>
+			{/* depth 0: feeds — stable sibling <Show> so the swap disposes cleanly */}
+			<Show when={depth() === 0}>
+				<Show
+					when={feedList().length > 1}
+				fallback={
+					<box padding={1}>
+						<text fg={muted()}>
+							No feeds. Subscribe from Discover/Search.
 						</text>
 					</box>
-					<scrollbox
-						height="100%"
-						border
-						borderColor={theme.border}
-						backgroundColor={theme.background}
-					>
-						<For each={feedList()}>
-							{(item, index) => (
-								<box
-									flexDirection="row"
-									gap={1}
-									paddingLeft={1}
-									paddingRight={1}
-									backgroundColor={focusBg(index(), nav.depthFocus(0), false)}
-								>
-									<text fg={focusFg(index(), nav.depthFocus(0), false)}>
-										{index() === nav.depthFocus(0) ? "❯" : " "}
+				}
+			>
+				<For each={feedList()}>
+					{(item, index) => {
+						const fi = focusedFeedIdx();
+						return (
+							<box
+								flexDirection="row"
+								gap={1}
+								paddingLeft={1}
+								paddingRight={1}
+								backgroundColor={focusBg(index(), fi, isActive())}
+								onMouseDown={() => {
+									nav.setActivePane(DEPTH_CENTER_PANE);
+									nav.setDepthFocus(index(), 0);
+								}}
+							>
+								<text fg={focusFg(index(), fi, isActive())}>
+									{index() === fi ? "❯" : " "}
+								</text>
+								<text fg={focusFg(index(), fi, isActive())}>
+									{feedLabel(item)}
+								</text>
+								<text fg={index() === fi ? theme.surface : muted()}>
+									({feedCount(item)})
+								</text>
+							</box>
+						);
+					}}
+				</For>
+			</Show>
+			</Show>
+			<Show when={depth() >= 1}>
+				{/* depth ≥1: episodes */}
+				<Show
+					when={episodes().length > 0}
+				fallback={
+					<box padding={1}>
+						<text fg={muted()}>No episodes. :refresh</text>
+					</box>
+				}
+			>
+				<For each={episodes()}>
+					{(item, index) => {
+						const fi = focusedEpIdx();
+						return (
+							<box
+								flexDirection="column"
+								gap={0}
+								paddingLeft={1}
+								paddingRight={1}
+								backgroundColor={focusBg(index(), fi, isActive())}
+								onMouseDown={() => {
+									nav.setActivePane(DEPTH_CENTER_PANE);
+									nav.setDepthFocus(index(), 1);
+								}}
+							>
+								<box flexDirection="row" gap={1}>
+									<text fg={focusFg(index(), fi, isActive())}>
+										{index() === fi ? "❯" : " "}
 									</text>
-									<text fg={focusFg(index(), nav.depthFocus(0), false)}>
-										{feedLabel(item)}
+									<text fg={focusFg(index(), fi, isActive())}>
+										{item.episode.episodeNumber
+											? `#${item.episode.episodeNumber} `
+											: ""}
+										{item.episode.title}
 									</text>
-									<text fg={muted()}>({feedCount(item)})</text>
 								</box>
-							)}
-						</For>
-					</scrollbox>
+								<box flexDirection="row" gap={2} paddingLeft={2}>
+									<text fg={index() === fi ? theme.surface : theme.info}>
+										{formatDate(item.episode.pubDate)}
+									</text>
+									<text fg={index() === fi ? theme.surface : muted()}>
+										{formatDuration(item.episode.duration)}
+									</text>
+									<text fg={index() === fi ? theme.surface : muted()}>
+										{item.feed.customName || item.feed.podcast.title}
+									</text>
+									<Show when={nav.isSelected(item.episode.id)}>
+										<text fg={theme.warning}>●</text>
+									</Show>
+									<Show when={downloadLabel(item.episode.id)}>
+										<text fg={downloadColor(item.episode.id)}>
+											{downloadLabel(item.episode.id)}
+										</text>
+									</Show>
+								</box>
+							</box>
+						);
+					}}
+				</For>
+				<Show when={feedStore.isLoadingFeeds()}>
+					<box paddingLeft={2} paddingTop={1}>
+						<LoadingIndicator />
+					</box>
 				</Show>
-			</box>
+			</Show>
+			</Show>
+		</>
+	);
 
-			{/* ── center: current depth ─────────────────────────────────────────── */}
-			<box
-				flexDirection="column"
-				flexGrow={PANE_RATIO.current}
-				flexShrink={1}
-				flexBasis={0}
-				height="100%"
+	// ── preview pane: hovered-item detail ──────────────────────────────────────
+	const previewContent = () =>
+		depth() === 0 ? (
+			// depth 0 preview: hovered feed
+			<Show
+				when={focusedFeedItem()}
+				fallback={
+					<box padding={1}>
+						<text fg={muted()}>No feed focused</text>
+					</box>
+				}
 			>
-				<box height={1} paddingLeft={1} backgroundColor={headerBg}>
-					<text fg={theme.textSecondary}>
-						{depth() === 0
-							? `Feeds · ${feedList().length - 1}`
-							: `${(() => {
-									const fi = focusedFeedItem();
-									return fi?.kind === "feed"
-										? fi.feed.customName || fi.feed.podcast.title
-										: "All Episodes";
-								})()} · ${episodes().length}`}
-					</text>
-				</box>
-				<scrollbox
-					height="100%"
-					focused={isActive}
-					border
-					borderColor={border(isActive)}
-					backgroundColor={theme.background}
-				>
-					{/* depth 0: feeds */}
-					<Show when={depth() === 0}>
-						<Show
-							when={feedList().length > 1}
-							fallback={
-								<box padding={1}>
-									<text fg={muted()}>
-										No feeds. Subscribe from Discover/Search.
+				{(item) => {
+					const it = item();
+					return (
+						<box flexDirection="column" gap={1} padding={1}>
+							<text fg={theme.textPrimary ?? theme.text}>
+								<strong>{feedLabel(it)}</strong>
+							</text>
+							<text fg={muted()}>
+								{it.kind === "feed"
+									? `by ${it.feed.podcast.author ?? "unknown"}`
+									: ""}
+							</text>
+							<text fg={theme.textSecondary}>
+								{it.kind === "all"
+									? `${feedCount(it)} episodes across all feeds`
+									: `${feedCount(it)} episodes`}
+							</text>
+							<text fg={muted()}>
+								{it.kind === "feed"
+									? (it.feed.podcast.description?.slice(0, 400) ??
+										"No description.")
+									: "Drill in to see episodes across every feed."}
+							</text>
+							<box height={1} />
+							<text fg={muted()}>enter/l: open · h: back</text>
+						</box>
+					);
+				}}
+			</Show>
+		) : (
+			// depth ≥1 preview: hovered episode
+			<Show
+				when={focusedItem()}
+				fallback={
+					<box padding={1}>
+						<text fg={muted()}>No episode focused</text>
+					</box>
+				}
+			>
+				{(item) => {
+					const it = item();
+					return (
+						<box flexDirection="column" gap={1} padding={1}>
+							<text fg={theme.textPrimary ?? theme.text}>
+								<strong>
+									{it.episode.episodeNumber
+										? `#${it.episode.episodeNumber} `
+										: ""}
+									{it.episode.title}
+								</strong>
+							</text>
+							<box flexDirection="row" gap={2}>
+								<text fg={theme.info}>
+									{formatDate(it.episode.pubDate)}
+								</text>
+								<text fg={muted()}>
+									{formatDuration(it.episode.duration)}
+								</text>
+								<Show when={downloadLabel(it.episode.id)}>
+									<text fg={downloadColor(it.episode.id)}>
+										{downloadLabel(it.episode.id)}
 									</text>
-								</box>
-							}
-						>
-							<For each={feedList()}>
-								{(item, index) => {
-									const fi = focusedFeedIdx();
-									return (
-										<box
-											flexDirection="row"
-											gap={1}
-											paddingLeft={1}
-											paddingRight={1}
-											backgroundColor={focusBg(index(), fi, isActive)}
-											onMouseDown={() => {
-												nav.setActivePane(DEPTH_CENTER_PANE);
-												nav.setDepthFocus(index(), 0);
-											}}
-										>
-											<text fg={focusFg(index(), fi, isActive)}>
-												{index() === fi ? "❯" : " "}
-											</text>
-											<text fg={focusFg(index(), fi, isActive)}>
-												{feedLabel(item)}
-											</text>
-											<text fg={index() === fi ? theme.surface : muted()}>
-												({feedCount(item)})
-											</text>
-										</box>
-									);
-								}}
-							</For>
-						</Show>
-					</Show>
-
-					{/* depth ≥1: episodes */}
-					<Show when={depth() >= 1}>
-						<Show
-							when={episodes().length > 0}
-							fallback={
-								<box padding={1}>
-									<text fg={muted()}>No episodes. :refresh</text>
-								</box>
-							}
-						>
-							<For each={episodes()}>
-								{(item, index) => {
-									const fi = focusedEpIdx();
-									return (
-										<box
-											flexDirection="column"
-											gap={0}
-											paddingLeft={1}
-											paddingRight={1}
-											backgroundColor={focusBg(index(), fi, isActive)}
-											onMouseDown={() => {
-												nav.setActivePane(DEPTH_CENTER_PANE);
-												nav.setDepthFocus(index(), 1);
-											}}
-										>
-											<box flexDirection="row" gap={1}>
-												<text fg={focusFg(index(), fi, isActive)}>
-													{index() === fi ? "❯" : " "}
-												</text>
-												<text fg={focusFg(index(), fi, isActive)}>
-													{item.episode.episodeNumber
-														? `#${item.episode.episodeNumber} `
-														: ""}
-													{item.episode.title}
-												</text>
-											</box>
-											<box flexDirection="row" gap={2} paddingLeft={2}>
-												<text fg={index() === fi ? theme.surface : theme.info}>
-													{formatDate(item.episode.pubDate)}
-												</text>
-												<text fg={index() === fi ? theme.surface : muted()}>
-													{formatDuration(item.episode.duration)}
-												</text>
-												<text fg={index() === fi ? theme.surface : muted()}>
-													{item.feed.customName || item.feed.podcast.title}
-												</text>
-												<Show when={nav.isSelected(item.episode.id)}>
-													<text fg={theme.warning}>●</text>
-												</Show>
-												<Show when={downloadLabel(item.episode.id)}>
-													<text fg={downloadColor(item.episode.id)}>
-														{downloadLabel(item.episode.id)}
-													</text>
-												</Show>
-											</box>
-										</box>
-									);
-								}}
-							</For>
-							<Show when={feedStore.isLoadingFeeds()}>
-								<box paddingLeft={2} paddingTop={1}>
-									<LoadingIndicator />
-								</box>
+								</Show>
+							</box>
+							<text fg={muted()}>
+								{it.feed.customName || it.feed.podcast.title}
+							</text>
+							<Show when={it.feed.podcast.author}>
+								<text fg={muted()}>by {it.feed.podcast.author}</text>
 							</Show>
-						</Show>
-					</Show>
-				</scrollbox>
-			</box>
+							<box height={1} />
+							<text fg={theme.textSecondary}>
+								{it.episode.description?.slice(0, 400) ??
+									"No description available."}
+								{(it.episode.description?.length ?? 0) > 400 ? "…" : ""}
+							</text>
+							<box height={1} />
+							<text fg={muted()}>enter: play · space: select · h: back</text>
+						</box>
+					);
+				}}
+			</Show>
+		);
 
-			{/* ── right: preview of hovered item ───────────────────────────────── */}
-			<box
-				flexDirection="column"
-				flexGrow={PANE_RATIO.preview}
-				flexShrink={1}
-				flexBasis={0}
-				height="100%"
-			>
-				<box height={1} paddingLeft={1} backgroundColor={headerBg}>
-					<text fg={theme.textSecondary}>Preview</text>
-				</box>
-				<scrollbox
-					height="100%"
-					border
-					borderColor={theme.border}
-					backgroundColor={theme.background}
-				>
-					{/* depth 0 preview: hovered feed */}
-					<Show when={depth() === 0}>
-						<Show
-							when={focusedFeedItem()}
-							fallback={
-								<box padding={1}>
-									<text fg={muted()}>No feed focused</text>
-								</box>
-							}
-						>
-							{(item) => {
-								const it = item();
-								return (
-									<box flexDirection="column" gap={1} padding={1}>
-										<text fg={theme.textPrimary ?? theme.text}>
-											<strong>{feedLabel(it)}</strong>
-										</text>
-										<text fg={muted()}>
-											{it.kind === "feed"
-												? `by ${it.feed.podcast.author ?? "unknown"}`
-												: ""}
-										</text>
-										<text fg={theme.textSecondary}>
-											{it.kind === "all"
-												? `${feedCount(it)} episodes across all feeds`
-												: `${feedCount(it)} episodes`}
-										</text>
-										<text fg={muted()}>
-											{it.kind === "feed"
-												? (it.feed.podcast.description?.slice(0, 400) ??
-													"No description.")
-												: "Drill in to see episodes across every feed."}
-										</text>
-										<box height={1} />
-										<text fg={muted()}>enter/l: open · h: back</text>
-									</box>
-								);
-							}}
-						</Show>
-					</Show>
-
-					{/* depth ≥1 preview: hovered episode */}
-					<Show when={depth() >= 1}>
-						<Show
-							when={focusedItem()}
-							fallback={
-								<box padding={1}>
-									<text fg={muted()}>No episode focused</text>
-								</box>
-							}
-						>
-							{(item) => {
-								const it = item();
-								return (
-									<box flexDirection="column" gap={1} padding={1}>
-										<text fg={theme.textPrimary ?? theme.text}>
-											<strong>
-												{it.episode.episodeNumber
-													? `#${it.episode.episodeNumber} `
-													: ""}
-												{it.episode.title}
-											</strong>
-										</text>
-										<box flexDirection="row" gap={2}>
-											<text fg={theme.info}>
-												{formatDate(it.episode.pubDate)}
-											</text>
-											<text fg={muted()}>
-												{formatDuration(it.episode.duration)}
-											</text>
-											<Show when={downloadLabel(it.episode.id)}>
-												<text fg={downloadColor(it.episode.id)}>
-													{downloadLabel(it.episode.id)}
-												</text>
-											</Show>
-										</box>
-										<text fg={muted()}>
-											{it.feed.customName || it.feed.podcast.title}
-										</text>
-										<Show when={it.feed.podcast.author}>
-											<text fg={muted()}>by {it.feed.podcast.author}</text>
-										</Show>
-										<box height={1} />
-										<text fg={theme.textSecondary}>
-											{it.episode.description?.slice(0, 400) ??
-												"No description available."}
-											{(it.episode.description?.length ?? 0) > 400 ? "…" : ""}
-										</text>
-										<box height={1} />
-										<text fg={muted()}>
-											enter: play · space: select · h: back
-										</text>
-									</box>
-								);
-							}}
-						</Show>
-					</Show>
-				</scrollbox>
-			</box>
-		</box>
+	return (
+		<YaziPaneRow
+			parent={parentContent}
+			current={currentContent}
+			preview={previewContent}
+			parentLabel={() => (depth() >= 1 ? "Feeds" : "Up")}
+			currentLabel={currentLabel}
+			previewLabel="Detail"
+			focused={isActive}
+		/>
 	);
 }
 
