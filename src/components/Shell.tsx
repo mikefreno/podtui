@@ -398,58 +398,9 @@ export function Shell() {
 			height="100%"
 			backgroundColor={t.surface}
 		>
-			{/* ── Middle row: tab sidebar (root pane) + active page ──────────────── */}
-			<box flexDirection="row" flexGrow={1} width="100%">
-				{/* ── Left tab sidebar ─────────────────────────────────────────────── */}
-				<box
-					flexDirection="column"
-					width={14}
-					height="100%"
-					backgroundColor={t.background}
-					border
-					borderColor={t.border}
-				>
-					<For
-						each={Object.values(TABS).filter(
-							(v): v is TABS => typeof v === "number",
-						)}
-					>
-						{(tab) => {
-							const active = () => nav.activeTab() === tab;
-							// The sidebar pane is gone (task 01); the tab strip stays
-							// rendered for now (removed in task 05) and highlights the
-							// active tab. Clicking just switches tabs — no pane focus.
-							return (
-								<box
-									flexDirection="row"
-									backgroundColor={
-										active() ? t.primary : t.background
-									}
-									paddingLeft={1}
-									onMouseDown={() => {
-										nav.setActiveTab(tab);
-									}}
-								>
-									<text fg={active() ? t.surface : t.textMuted}>
-										{active() ? "❯ " : "  "}
-										{tab}. {TAB_LABEL[tab]}
-									</text>
-								</box>
-							);
-						}}
-					</For>
-					<box flexGrow={1} backgroundColor={t.background} />
-					<Show when={nowPlaying()}>
-						<box paddingLeft={1} backgroundColor={t.background}>
-							<text fg={t.textMuted}>{nowPlaying()}</text>
-						</box>
-					</Show>
-				</box>
-
-				{/* ── Active page (owns its panes) ────────────────────────────────── */}
-				<box flexDirection="column" flexGrow={1} height="100%">
-					{LayerGraph[nav.activeTab()]()}
-				</box>
+			{/* ── Middle row: full-width active page ──────────────────────────────── */}
+			<box flexGrow={1} width="100%">
+				{LayerGraph[nav.activeTab()]()}
 			</box>
 
 			{/* ── Bottom status / command bar ─────────────────────────────────────── */}
@@ -477,12 +428,38 @@ export function Shell() {
 									● {nav.selectedIds().length}
 								</text>
 							</Show>
+							<Show when={nowPlaying()}>
+								<text fg={t.primary} paddingLeft={1}>
+									{nowPlaying()}
+								</text>
+							</Show>
 							<box flexGrow={1} />
 							<text fg={t.textMuted} paddingRight={1}>
 								{pendingLabel()}
 							</text>
+							{/* ── Tab strip ─────────────────────────────────────────────────── */}
+							<For
+								each={Object.values(TABS).filter(
+									(v): v is TABS => typeof v === "number",
+								)}
+							>
+								{(tab) => {
+									const active = () => nav.activeTab() === tab;
+									return (
+										<text
+											fg={active() ? t.surface : t.textMuted}
+											backgroundColor={
+												active() ? t.primary : undefined
+											}
+										>
+											{active() ? "≡" : " "}[{tab}]{" "}
+											{TAB_LABEL[tab]}{" "}
+										</text>
+									);
+								}}
+							</For>
 							<text fg={t.textMuted} paddingRight={1}>
-								:cmd ~help q quit
+								~
 							</text>
 						</>
 					}
