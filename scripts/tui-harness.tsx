@@ -36,6 +36,8 @@
  *   --size WxH      terminal size (default 100x30)
  *   --audio         enable real audio backend for the new action only
  *   --no-settle     skip the extra render-settle loops
+ *   --styles        print the distinct-styles sample block (off by default)
+ *   --verbose       restore the original multi-line pretty output
  */
 
 import { testRender } from "@opentui/solid";
@@ -191,6 +193,8 @@ function parseFlags(rest: string[]): {
 		if (a.startsWith("--")) {
 			if (a === "--audio") flags.audio = true;
 			else if (a === "--no-settle") flags["no-settle"] = true;
+			else if (a === "--styles") flags.styles = true;
+			else if (a === "--verbose") flags.verbose = true;
 			else if (a === "--size") {
 				flags.size = rest[++i];
 				const m = /(\d+)x(\d+)/.exec(String(flags.size));
@@ -471,9 +475,11 @@ async function main() {
 		const nav = navRef;
 		if (nav) {
 			state.nav = {
-				activeTab: nav.activeTab?.(),
-				activeDepth: nav.activeDepth?.(),
-				inputFocused: nav.inputFocused?.(),
+				tab: nav.activeTab?.(),
+				pane: nav.activePane?.(),
+				mode: nav.mode?.(),
+				input: nav.inputFocused?.(),
+				sel: nav.selectedIds?.()?.length ?? 0,
 				ready: nav.ready,
 			};
 		} else {
@@ -487,11 +493,11 @@ async function main() {
 			state.audio = {
 				backend: audioControls.backendName ? audioControls.backendName() : null,
 				playing: audioControls.isPlaying ? audioControls.isPlaying() : null,
-				position: audioControls.position ? audioControls.position() : null,
-				duration: audioControls.duration ? audioControls.duration() : null,
-				volume: audioControls.volume ? audioControls.volume() : null,
-				error: audioControls.error ? audioControls.error() : null,
-				currentEpisodeTitle: audioControls.currentEpisode
+				pos: audioControls.position ? audioControls.position() : null,
+				dur: audioControls.duration ? audioControls.duration() : null,
+				vol: audioControls.volume ? audioControls.volume() : null,
+				err: audioControls.error ? audioControls.error() : null,
+				ep: audioControls.currentEpisode
 					? audioControls.currentEpisode()?.title
 					: null,
 			};
@@ -505,53 +511,93 @@ async function main() {
 		const feeds = fs_.feeds ? fs_.feeds() : [];
 		state.feed = {
 			count: feeds?.length ?? 0,
-			selectedFeedId: fs_.selectedFeedId ? fs_.selectedFeedId() : null,
-			isLoadingFeeds: fs_.isLoadingFeeds ? fs_.isLoadingFeeds() : null,
+			sel: fs_.selectedFeedId ? fs_.selectedFeedId() : null,
+			loading: fs_.isLoadingFeeds ? fs_.isLoadingFeeds() : null,
 			titles: (feeds ?? []).slice(0, 8).map((f: any) => f?.podcast?.title),
 		};
 	} catch (e) {
 		state.feed = "ERR: " + String(e);
 	}
 	try {
-		writeFileSync(STATE_JSON, JSON.stringify(state, null, 2));
+		writeFileSync(STATE_JSON, JSON.stringify(state));
 	} catch {}
 
-	// ── Output ───────────────────────────────────────────────────────────────
+	// ── Output ──────────────────────────────────────────────────────────────
+	// Compact by default: trimmed frame, one-line state per section, no styles
+	// block, no boilerplate footer. Use --styles / --verbose to opt back in.
+	const verbose = !!flags.verbose;
 	const scope = cmd === "state" ? String(positional[0] || "all") : "all";
-	console.log(
-		`\n=== FRAME ${spans.cols}x${spans.rows} (cursor ${spans.cursor[0]},${spans.cursor[1]}) | actions=${actions.length} | ${cmd} ===`,
-	);
-	console.log(plainFrame);
 
-	if (scope === "all") {
+	// A line is "visually empty" if it's either fully blank OR contains only
+	// box-drawing chars + whitespace (i.e. empty-pane interior padding like
+	// "│   │"). Runs of these collapse to a single `…N` marker so an empty
+	// 24-row pane costs 1 line, not 18.
+	const BOX_CHARS = "│┌┐└─┤├┬┴┼┐┘┌└┤├┬┴┼┌┐└┘─│┤├┬┴┼";
+	const isVisuallyEmpty = (l: string): boolean =>
+		l === "" || [...l].every((ch) => ch === " " || BOX_CHARS.includes(ch));
+	const frameTrimmed = (() => {
+		const lines = plainFrame
+			.replace(/\n+$/, "")
+			.split("\n")
+			.map((l) => l.replace(/\s+$/, ""));
+		while (lines.length && isVisuallyEmpty(lines[lines.length - 1]))
+			lines.pop();
+		const out: string[] = [];
+		let blank = 0;
+		const flushBlanks = () => {
+			if (blank >= 3) out.push(`  …${blank} empty`);
+			else for (let i = 0; i < blank; i++) out.push("");
+			blank = 0;
+		};
+		for (const l of lines) {
+			if (isVisuallyEmpty(l)) {
+				blank++;
+			} else {
+				flushBlanks();
+				out.push(l);
+			}
+		}
+		flushBlanks();
+		return out.join("\n");
+	})();
+
+	console.log(
+		`FRAME ${spans.cols}x${spans.rows} cur=${spans.cursor[0]},${spans.cursor[1]} acts=${actions.length} ${cmd}`,
+	);
+	console.log(frameTrimmed);
+
+	// ── distinct styles: opt-in only (--styles OR --verbose) ──
+	if (scope === "all" && (flags.styles || verbose)) {
 		const styles = distinctStyles(spans);
 		if (styles.length) {
-			console.log("--- distinct styles (sample) ---");
-			for (const s of styles) console.log(`  ${s.tag}  ×${s.n}  “${s.sample}”`);
+			console.log("-- styles (top 20) --");
+			for (const s of styles) console.log(`  ${s.tag} ×${s.n} “${s.sample}”`);
 		}
 	}
 
-	// State subset.
+	// ── state: one compact line per requested section ──
 	const want = (k: string) => scope === "all" || scope === k;
-	if (want("nav"))
-		console.log("--- nav ---\n" + JSON.stringify(state.nav, null, 2));
-	if (want("audio"))
-		console.log("--- audio ---\n" + JSON.stringify(state.audio, null, 2));
-	if (want("feed"))
-		console.log("--- feed ---\n" + JSON.stringify(state.feed, null, 2));
-	if (want("app"))
-		console.log("--- app ---\n(src/stores/app.ts not dumped in v1)");
+	const compact = (obj: unknown): string =>
+		verbose ? JSON.stringify(obj, null, 2) : JSON.stringify(obj);
+	if (want("nav")) console.log("nav " + compact(state.nav));
+	if (want("audio")) console.log("audio " + compact(state.audio));
+	if (want("feed")) console.log("feed " + compact(state.feed));
+	if (want("app")) console.log("app (not dumped in v1)");
 
+	// ── issues: terse ──
 	if (issues.length) {
-		console.log("--- issues (" + issues.length + ") ---");
-		for (const i of issues.slice(0, 40)) console.log("  ! " + i);
+		console.log(`issues:${issues.length}`);
+		for (const i of issues.slice(0, 20)) console.log("  ! " + i);
 	} else {
-		console.log("--- issues: none ---");
+		console.log("issues:none");
 	}
 
-	console.log(
-		`\n(spans→ ${FRAME_JSON} | frame→ ${FRAME_TXT} | state→ ${STATE_JSON})`,
-	);
+	// Footer is identical every run — only print on init or --verbose.
+	if (cmd === "init" || verbose) {
+		console.log(
+			`(spans ${FRAME_JSON} | frame ${FRAME_TXT} | state ${STATE_JSON})`,
+		);
+	}
 
 	// Tear down child processes (audio backend) before exit to avoid orphans.
 	try {
