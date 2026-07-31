@@ -1,10 +1,3 @@
-import { DiscoverPage, DiscoverPaneCount } from "@/pages/Discover/DiscoverPage";
-import { FeedPage, FeedPaneCount } from "@/pages/Feed/FeedPage";
-import { MyShowsPage, MyShowsPaneCount } from "@/pages/MyShows/MyShowsPage";
-import { PlayerPage, PlayerPaneCount } from "@/pages/Player/PlayerPage";
-import { SearchPage, SearchPaneCount } from "@/pages/Search/SearchPage";
-import { SettingsPage, SettingsPaneCount } from "@/pages/Settings/SettingsPage";
-
 export enum DIRECTION {
 	Increment,
 	Decrement,
@@ -49,40 +42,31 @@ export function rootFrameFor(
 	}
 }
 
-export const LayerGraph = {
-	[TABS.FEED]: FeedPage,
-	[TABS.MYSHOWS]: MyShowsPage,
-	[TABS.DISCOVER]: DiscoverPage,
-	[TABS.SEARCH]: SearchPage,
-	[TABS.PLAYER]: PlayerPage,
-	[TABS.SETTINGS]: SettingsPage,
-};
-export const LayerDepths = {
-	[TABS.FEED]: FeedPaneCount,
-	[TABS.MYSHOWS]: MyShowsPaneCount,
-	[TABS.DISCOVER]: DiscoverPaneCount,
-	[TABS.SEARCH]: SearchPaneCount,
-	[TABS.PLAYER]: PlayerPaneCount,
-	[TABS.SETTINGS]: SettingsPaneCount,
-};
+// The per-tab page components + pane counts live in `src/utils/layer-graph.ts`,
+// split out so this module stays free of `.tsx`/JSX imports (unit-testable).
 
-// Yazi-style pane grow ratios (parent : current : preview) = [1, 3, 3].
-// Panes use flexGrow (Yoga) so columns always sum to the row width regardless
-// of terminal size — more robust than fixed percentages and exactly mirrors
+// Yazi-style pane grow ratios (parent : current : preview). Panes use
+// flexGrow (Yoga) so columns always sum to the row width regardless of
+// terminal size — more robust than fixed percentages and exactly mirrors
 // yazi's `mgr.ratio` config. Set a slot's ratio to 0 to hide it (2-pane tabs).
+//
+// NOTE (task 01 leave-behind): the nav-model task intentionally does NOT
+// touch these values. Task 02 re-tunes them to the remake target ratios
+// (parent : current : preview = 1 : 3 : 3 i.e. 1/7 : 3/7 : 3/7). Do it there.
 export const PANE_RATIO = {
 	parent: 1,
 	current: 3,
 	preview: 3,
 } as const;
 
-// Number of interactive panes per tab. Depth-tabs (Feed/MyShows/Discover/
-// Settings) now have a single focusable content pane (the center/current
-// column at depth 0..N); prev and preview are derived, not focusable. Search
-// keeps its 3 fixed panes; Player is single-pane. The Shell's h/l dispatch
-// routes depth-tabs to push/pop instead of pane swipe. Defined here (after
-// TABS) to avoid re-introducing the old NavigationContext top-level-init
-// circular deadlock.
+// Number of *focusable* content panes per tab. The three visible columns
+// (parent | current | preview) are a *render* concern, NOT three panes — for
+// depth-tabs only the current column (index 0) is focusable, so this is 1.
+// Depth-tabs (Feed/MyShows/Discover/Settings) drill with `l` (push) and pop
+// with `h` (noop at depth 0) via the Shell dispatch — they never call swipe.
+// Search keeps its 3 fixed focusable panes; Player is single-pane. Defined
+// here (after TABS) to avoid re-introducing the old NavigationContext
+// top-level-init circular deadlock.
 export const TabPaneCount: Record<TABS, number> = {
 	[TABS.FEED]: 1, // depth: feeds → episodes → preview
 	[TABS.MYSHOWS]: 1, // depth: shows → episodes → preview
