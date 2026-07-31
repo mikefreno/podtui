@@ -17,7 +17,6 @@ import { useKeybinds, type KeybindActionName } from "@/context/KeybindContext";
 import {
 	useNavigation,
 	NavMode,
-	SIDEBAR_PANE,
 	DEPTH_CENTER_PANE,
 } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
@@ -26,7 +25,8 @@ import { useFeedStore } from "@/stores/feed";
 import type { Episode } from "@/types/episode";
 import { useToast } from "@/ui/toast";
 import { emit } from "@/utils/event-bus";
-import { TABS, TabsCount, TabPaneCount, LayerGraph } from "@/utils/navigation";
+import { LayerGraph } from "@/utils/layer-graph";
+import { TABS, TabsCount, TabPaneCount } from "@/utils/navigation";
 
 const TAB_LABEL: Record<TABS, string> = {
 	[TABS.FEED]: "Feed",
@@ -64,8 +64,11 @@ const PAGE_ACTIONS: ReadonlySet<KeybindActionName> = new Set<KeybindActionName>(
 	],
 );
 
-/** Movement actions the sidebar pane handles itself (its list = the tabs,
- *  length TabsCount). Routed through the standard move/gotoIndex API. */
+/** Movement actions the sidebar pane handled itself when the tab-list pane
+ *  still existed (its list = the tabs, length TabsCount). The sidebar pane was
+ *  removed in the yazi remake nav rework (task 01); these now fall through
+ *  to the active page's PAGE_ACTIONS dispatch. Retained here and fully
+ *  removed in task 06's keybind rewrite. */
 const SIDEBAR_ACTIONS: ReadonlySet<KeybindActionName> = new Set([
 	"move-down",
 	"move-up",
@@ -282,30 +285,11 @@ export function Shell() {
 					nav.setActiveTab(dt);
 					break;
 				}
-				// ── sidebar pane: j/k/jump/goto move through the tab list via the
-				//    standard move/gotoIndex API (list length = TabsCount). No
-				//    special-cased nextTab/prevTab — the sidebar is a normal pane.
-				if (nav.activePane() === SIDEBAR_PANE && SIDEBAR_ACTIONS.has(action)) {
-					evt.preventDefault();
-					if (action === "goto-top") nav.gotoIndex(0, TabsCount);
-					else if (action === "goto-bottom")
-						nav.gotoIndex(TabsCount - 1, TabsCount);
-					else {
-						const dir = action.endsWith("down") ? 1 : -1;
-						const step = action.startsWith("jump")
-							? 5
-							: action.startsWith("page")
-								? 10
-								: 1;
-						nav.move(dir, TabsCount, step);
-					}
-					break;
-				}
 				// ── pane swipe / depth nav ──
-				// h/l always uses the unified swipe() (clamped to the sidebar on
-				// the left). Depth-tabs additionally: l at the center drills in
-				// (open), h at the center pops a depth (or swipes to sidebar at
-				// root). Fixed-pane tabs just swipe between their panes.
+				// h/l use swipe() on fixed-pane tabs (clamped to [0,
+				// paneCount-1] — there is no sidebar pane). Depth-tabs: l
+				// at the center drills in (open); h at the center pops a
+				// depth (noop at depth 0).
 				if (action === "swipe-prev") {
 					evt.preventDefault();
 					if (
@@ -432,22 +416,22 @@ export function Shell() {
 					>
 						{(tab) => {
 							const active = () => nav.activeTab() === tab;
-							const focused = () =>
-								active() && nav.activePane() === SIDEBAR_PANE;
+							// The sidebar pane is gone (task 01); the tab strip stays
+							// rendered for now (removed in task 05) and highlights the
+							// active tab. Clicking just switches tabs — no pane focus.
 							return (
 								<box
 									flexDirection="row"
 									backgroundColor={
-										focused() ? t.accent : active() ? t.primary : t.background
+										active() ? t.primary : t.background
 									}
 									paddingLeft={1}
 									onMouseDown={() => {
-										nav.setActivePane(SIDEBAR_PANE);
 										nav.setActiveTab(tab);
 									}}
 								>
-									<text fg={focused() || active() ? t.surface : t.textMuted}>
-										{focused() ? "❯ " : "  "}
+									<text fg={active() ? t.surface : t.textMuted}>
+										{active() ? "❯ " : "  "}
 										{tab}. {TAB_LABEL[tab]}
 									</text>
 								</box>
@@ -484,11 +468,9 @@ export function Shell() {
 							</text>
 							<text fg={t.textMuted} paddingLeft={1}>
 								{TAB_LABEL[nav.activeTab()]} ·{" "}
-								{nav.activePane() === SIDEBAR_PANE
-									? "tabs"
-									: nav.isDepthTab()
-										? `depth ${nav.currentDepth()}`
-										: `pane ${nav.activePane() + 1}/${TabPaneCount[nav.activeTab()]}`}
+								{nav.isDepthTab()
+									? `depth ${nav.currentDepth()}`
+									: `pane ${nav.activePane() + 1}/${TabPaneCount[nav.activeTab()]}`}
 							</text>
 							<Show when={nav.selectedIds().length > 0}>
 								<text fg={t.warning} paddingLeft={1}>
