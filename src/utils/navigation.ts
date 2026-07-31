@@ -66,13 +66,13 @@ export const LayerDepths = {
 	[TABS.SETTINGS]: SettingsPaneCount,
 };
 
-// Yazi-style pane grow ratios (parent : current : preview) ≈ [1, 4, 3].
+// Yazi-style pane grow ratios (parent : current : preview) = [1, 3, 3].
 // Panes use flexGrow (Yoga) so columns always sum to the row width regardless
 // of terminal size — more robust than fixed percentages and exactly mirrors
 // yazi's `mgr.ratio` config. Set a slot's ratio to 0 to hide it (2-pane tabs).
 export const PANE_RATIO = {
 	parent: 1,
-	current: 4,
+	current: 3,
 	preview: 3,
 } as const;
 
