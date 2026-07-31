@@ -1,17 +1,25 @@
 import { createEffect, createSignal, on, batch, createMemo } from "solid-js";
 import { createSimpleContext } from "./helper";
-import { TABS, TabsCount } from "@/utils/navigation";
+import { TABS, TabsCount, DEPTH_TABS, rootFrameFor } from "@/utils/navigation";
 
 // ── Yazi-style navigation state ──────────────────────────────────────────────
-// PodTui's interaction model after the yazi redesign. A single source of truth
-// for: which tab is active, which pane within a tab is focused (parent |
-// current | preview), the current mode (normal/visual/command/input), the
-// count register (for `5j` style motions), and the command-bar buffer.
+// Two pane models coexist:
 //
-// Panes are addressed by index 0..N-1 within the active tab. Each tab declares
-// how many panes it has via the PaneSystem registry (see navigation.ts). h/l
-// (swipe-prev / swipe-next) move pane focus; j/k move within the focused pane's
-// list (handled per-pane via the focusedIndex accessors below).
+//  • Depth-stack tabs (Feed, MyShows, Discover, Settings) use a yazi-style
+//    depth stack. The three content columns render as:
+//        left   = the previous depth's list  (empty at depth 0)
+//        center = the current depth's list   (always where focus lives)
+//        right  = preview of the hovered item in center
+//    `l`/Enter drills in (push); `h` pops back (or yields to the sidebar at
+//    depth 0). Depth is unbounded — each page decides per-item whether an
+//    item is drillable and what child list kind to push.
+//
+//  • Fixed-pane tabs (Search = input/results/detail, Player = single) keep the
+//    old indexed pane model (`focusedIndex(pane)` + `swipe`).
+//
+// The Shell's left tab sidebar is a special pane that sits *before* the
+// content area. It uses SIDEBAR_PANE (-1) so the h/l chain naturally lands on
+// it as the leftmost/root pane.
 
 export enum NavMode {
 	NORMAL = "NORMAL",
@@ -20,15 +28,36 @@ export enum NavMode {
 	INPUT = "INPUT",
 }
 
-/** Slot semantics mirror yazi's three columns. Slots beyond 2 exist for
- *  tabs that need more panes (e.g. search = query/results/detail). */
+/** The tab sidebar (chrome) pane. Always the leftmost focus target. */
+export const SIDEBAR_PANE = -1 as PaneId;
+
+/** For depth-tabs, the current-depth (center) pane is the only focusable
+ *  content pane — index 0. The prev/preview columns are derived, not focused. */
+export const DEPTH_CENTER_PANE = 0 as PaneId;
+
+/** The sidebar pane's "list" is the tab list itself: its focus cursor is the
+ *  active tab (1-based) minus 1, and moving/setting it switches tabs via the
+ *  standard focusedIndex/move/gotoIndex API — no special-cased nextTab. */
+
+/** Legacy pane-slot enums — still used by the fixed-pane Search tab. */
 export enum PaneSlot {
-	PARENT = 0, // left  — the container list (e.g. shows)
-	CURRENT = 1, // middle — the items (e.g. episodes)
-	PREVIEW = 2, // right — detail of the hovered item
+	PARENT = 0, // depth-tabs: center/current; Search: input
+	CURRENT = 1, // Search: results
+	PREVIEW = 2, // Search: detail
 }
 
 export type PaneId = number; // 0-based index into the active tab's pane list
+
+// ── Depth stack ──────────────────────────────────────────────────────────────
+/** One frame in a tab's depth stack. `kind` identifies the list (page-defined,
+ *  e.g. "feeds", "episodes:feedId", "settings:sections"); `focus` is the
+ *  focused row index within that list. `ctx` optionally carries an id or
+ *  payload the page needs to derive the list (e.g. a feed id). */
+export type DepthFrame = {
+	kind: string;
+	ctx?: string;
+	focus: number;
+};
 
 // ── Selection store ───────────────────────────────────────────────────────────
 // A Set per (tab, paneKey). `paneKey` is a string each pane uses to namespace
@@ -44,14 +73,21 @@ export const { use: useNavigation, provider: NavigationProvider } =
 		name: "Navigation",
 		init: () => {
 			const [activeTab, setActiveTab] = createSignal<TABS>(TABS.FEED);
-			const [activePane, setActivePane] = createSignal<PaneId>(
-				PaneSlot.CURRENT,
-			);
+			// App focus starts on the left tab sidebar (root pane); tab switches
+			// also return focus there.
+			const [activePane, setActivePane] = createSignal<PaneId>(SIDEBAR_PANE);
 			const [mode, setMode] = createSignal<NavMode>(NavMode.NORMAL);
 			const [count, setCount] = createSignal<number | null>(null);
 			const [inputFocused, setInputFocused] = createSignal(false);
 
-			// per-pane focused index (for j/k movement). Keyed by `${tab}:${pane}`.
+			// per-tab depth stack. Depth-tabs get a root frame on first visit.
+			const [stacks, setStacks] = createSignal<
+				Partial<Record<TABS, DepthFrame[]>>
+			>({ [TABS.FEED]: [rootFrameFor(TABS.FEED)] });
+
+			// per-pane focused index (for j/k movement in fixed-pane tabs). Keyed
+			// by `${tab}:${pane}`. Depth-tabs read/write the top frame's `focus`
+			// for pane 0 (DEPTH_CENTER_PANE) instead.
 			const [paneIndices, setPaneIndices] = createSignal<
 				Record<string, number>
 			>({});
@@ -64,11 +100,22 @@ export const { use: useNavigation, provider: NavigationProvider } =
 			const [commandBuffer, setCommandBuffer] = createSignal("");
 			const [commandError, setCommandError] = createSignal<string | null>(null);
 
-			// Reset depth/pane/mode on tab change.
+			/** Depth stack for a tab (empty for fixed-pane tabs). */
+			const depthStackFor = (tab: TABS = activeTab()) => stacks()[tab] ?? [];
+
+			const ensureStack = (tab: TABS) => {
+				if (DEPTH_TABS.has(tab) && depthStackFor(tab).length === 0) {
+					setStacks((s) => ({ ...s, [tab]: [rootFrameFor(tab)] }));
+				}
+			};
+
+			// On tab change: ensure a root frame exists (depth-tabs) + reset
+			// focus to the sidebar, clear modes/command/visual state.
 			createEffect(
-				on(activeTab, () => {
+				on(activeTab, (tab) => {
+					ensureStack(tab);
 					batch(() => {
-						setActivePane(PaneSlot.CURRENT);
+						setActivePane(SIDEBAR_PANE);
 						setMode(NavMode.NORMAL);
 						setCount(null);
 						setCommandBuffer("");
@@ -77,6 +124,51 @@ export const { use: useNavigation, provider: NavigationProvider } =
 					});
 				}),
 			);
+
+			// ── depth stack accessors ──────────────────────────────────────────────
+			const depthStack = createMemo<DepthFrame[]>(() =>
+				depthStackFor(activeTab()),
+			);
+			const currentDepth = createMemo(() =>
+				Math.max(0, depthStack().length - 1),
+			);
+			const topFrame = createMemo<DepthFrame | undefined>(
+				() => depthStack()[depthStack().length - 1],
+			);
+			const isDepthTab = () => DEPTH_TABS.has(activeTab());
+
+			/** Focus within a given depth's frame (default = current/top). */
+			const depthFocus = (d: number = currentDepth()) =>
+				depthStack()[d]?.focus ?? 0;
+
+			const setDepthFocus = (i: number, d: number = currentDepth()) =>
+				setStacks((s) => {
+					const st = s[activeTab()];
+					if (!st || d < 0 || d >= st.length) return s;
+					const next = st.slice();
+					next[d] = { ...next[d], focus: i };
+					return { ...s, [activeTab()]: next };
+				});
+
+			/** Push a child frame (drill in). */
+			const pushDepth = (frame: DepthFrame) =>
+				setStacks((s) => {
+					const st = s[activeTab()] ?? [];
+					return { ...s, [activeTab()]: [...st, frame] };
+				});
+
+			/** Pop the top frame (go back up a depth). No-op at root. Returns
+			 *  true if a frame was popped. */
+			const popDepth = (): boolean => {
+				let popped = false;
+				setStacks((s) => {
+					const st = s[activeTab()] ?? [];
+					if (st.length <= 1) return s;
+					popped = true;
+					return { ...s, [activeTab()]: st.slice(0, -1) };
+				});
+				return popped;
+			};
 
 			// ── tab switching ──────────────────────────────────────────────────────
 			const gotoTab = (tab: TABS) => {
@@ -91,12 +183,12 @@ export const { use: useNavigation, provider: NavigationProvider } =
 			// ── pane focus ──────────────────────────────────────────────────────────
 			const setPane = (pane: PaneId) => setActivePane(pane);
 
-			/** Move focus to the adjacent pane. `dir` = -1 (left/parent) or +1
-			 *  (right/preview). Clamped to [0, paneCount-1]. */
+			/** Move focus to the adjacent pane (fixed-pane tabs only). `dir` =
+			 *  -1 (left, toward sidebar) or +1 (right, toward preview). Clamped to
+			 *  [SIDEBAR_PANE, paneCount-1]. */
 			const swipe = (dir: -1 | 1, paneCount: number) => {
-				if (paneCount <= 1) return;
 				setActivePane((p) => {
-					const n = Math.max(0, Math.min(paneCount - 1, p + dir));
+					const n = Math.max(SIDEBAR_PANE, Math.min(paneCount - 1, p + dir));
 					return n;
 				});
 			};
@@ -104,11 +196,31 @@ export const { use: useNavigation, provider: NavigationProvider } =
 			// ── per-pane focus index ────────────────────────────────────────────────
 			const paneKey = (pane: PaneId = activePane()) => `${activeTab()}:${pane}`;
 
-			const focusedIndex = (pane: PaneId = activePane()) =>
-				paneIndices()[paneKey(pane)] ?? 0;
+			/** For depth-tabs, pane 0 (center) reads/writes the top frame's
+			 *  focus. The sidebar pane's focus IS the active tab. Other panes
+			 *  (and fixed-pane tabs) use the per-pane map. */
+			const focusedIndex = (pane: PaneId = activePane()): number => {
+				if (pane === SIDEBAR_PANE) return activeTab() - 1;
+				if (isDepthTab() && pane === DEPTH_CENTER_PANE) {
+					return topFrame()?.focus ?? 0;
+				}
+				return paneIndices()[paneKey(pane)] ?? 0;
+			};
 
-			const setFocusedIndex = (pane: PaneId, index: number) =>
-				setPaneIndices((m) => ({ ...m, [`${activeTab()}:${pane}`]: index }));
+			const setFocusedIndex = (pane: PaneId, index: number) => {
+				if (pane === SIDEBAR_PANE) {
+					gotoTab(((index + TabsCount) % TabsCount) + 1);
+					return;
+				}
+				if (isDepthTab() && pane === DEPTH_CENTER_PANE) {
+					setDepthFocus(index);
+					return;
+				}
+				setPaneIndices((m) => ({
+					...m,
+					[`${activeTab()}:${pane}`]: index,
+				}));
+			};
 
 			/** Apply a clamped relative motion to the active pane's focus. Returns
 			 *  the new index so callers can update their own scroll state. */
@@ -259,6 +371,15 @@ export const { use: useNavigation, provider: NavigationProvider } =
 				visualAnchor,
 				selections,
 				selectedIds,
+				// depth stack
+				depthStack,
+				currentDepth,
+				topFrame,
+				depthFocus,
+				setDepthFocus,
+				pushDepth,
+				popDepth,
+				isDepthTab,
 				// tab
 				setActiveTab: gotoTab,
 				nextTab,

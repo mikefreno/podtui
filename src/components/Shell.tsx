@@ -1,19 +1,25 @@
 /**
  * Shell — yazi-style application chrome.
  *
- * Replaces the old left sidebar (vertical TabNavigation) with a horizontal
- * top tab bar, renders the active page (which owns its own panes), and adds a
- * bottom status/command bar. A single `useKeyboard` router translates keystrokes
- * (via the sequence-aware keybind matcher) into actions: global ones (tabs,
- * modes, audio, quit, help, command) are handled here; pane/list ones are
- * dispatched to the active page over the `nav.action` event bus.
+ * Renders the tabs as a vertical sidebar on the left (the root pane), the
+ * active page (which owns its own panes) to the right of it, and a bottom
+ * status/command bar spanning the full width. A single `useKeyboard` router
+ * translates keystrokes (via the sequence-aware keybind matcher) into actions:
+ * global ones (tabs, modes, audio, quit, help, command) are handled here;
+ * pane/list ones are dispatched to the active page over the `nav.action`
+ * event bus.
  */
 
 import { createSignal, Show, For } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import { useTheme } from "@/context/ThemeContext";
 import { useKeybinds, type KeybindActionName } from "@/context/KeybindContext";
-import { useNavigation, NavMode } from "@/context/NavigationContext";
+import {
+	useNavigation,
+	NavMode,
+	SIDEBAR_PANE,
+	DEPTH_CENTER_PANE,
+} from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 import { useFeedStore } from "@/stores/feed";
@@ -57,6 +63,19 @@ const PAGE_ACTIONS: ReadonlySet<KeybindActionName> = new Set<KeybindActionName>(
 		"refresh",
 	],
 );
+
+/** Movement actions the sidebar pane handles itself (its list = the tabs,
+ *  length TabsCount). Routed through the standard move/gotoIndex API. */
+const SIDEBAR_ACTIONS: ReadonlySet<KeybindActionName> = new Set([
+	"move-down",
+	"move-up",
+	"jump-down",
+	"jump-up",
+	"page-down",
+	"page-up",
+	"goto-top",
+	"goto-bottom",
+]);
 
 function tabByDigit(action: KeybindActionName): TABS | null {
 	if (action.startsWith("tab-goto-")) {
@@ -263,15 +282,55 @@ export function Shell() {
 					nav.setActiveTab(dt);
 					break;
 				}
-				// ── pane swipe ──
+				// ── sidebar pane: j/k/jump/goto move through the tab list via the
+				//    standard move/gotoIndex API (list length = TabsCount). No
+				//    special-cased nextTab/prevTab — the sidebar is a normal pane.
+				if (nav.activePane() === SIDEBAR_PANE && SIDEBAR_ACTIONS.has(action)) {
+					evt.preventDefault();
+					if (action === "goto-top") nav.gotoIndex(0, TabsCount);
+					else if (action === "goto-bottom")
+						nav.gotoIndex(TabsCount - 1, TabsCount);
+					else {
+						const dir = action.endsWith("down") ? 1 : -1;
+						const step = action.startsWith("jump")
+							? 5
+							: action.startsWith("page")
+								? 10
+								: 1;
+						nav.move(dir, TabsCount, step);
+					}
+					break;
+				}
+				// ── pane swipe / depth nav ──
+				// h/l always uses the unified swipe() (clamped to the sidebar on
+				// the left). Depth-tabs additionally: l at the center drills in
+				// (open), h at the center pops a depth (or swipes to sidebar at
+				// root). Fixed-pane tabs just swipe between their panes.
 				if (action === "swipe-prev") {
 					evt.preventDefault();
-					nav.swipe(-1, TabPaneCount[tab]);
+					if (
+						nav.isDepthTab() &&
+						nav.activePane() === DEPTH_CENTER_PANE &&
+						nav.currentDepth() > 0
+					) {
+						nav.popDepth();
+					} else {
+						nav.swipe(-1, TabPaneCount[tab]);
+					}
 					break;
 				}
 				if (action === "swipe-next") {
 					evt.preventDefault();
-					nav.swipe(1, TabPaneCount[tab]);
+					if (nav.isDepthTab() && nav.activePane() === DEPTH_CENTER_PANE) {
+						emit("nav.action", {
+							action: "open",
+							tab,
+							pane: DEPTH_CENTER_PANE,
+							mode: nav.mode(),
+						});
+					} else {
+						nav.swipe(1, TabPaneCount[tab]);
+					}
 					break;
 				}
 				// ── audio transport (global) ──
@@ -355,43 +414,58 @@ export function Shell() {
 			height="100%"
 			backgroundColor={t.surface}
 		>
-			{/* ── Top tab bar ─────────────────────────────────────────────────────── */}
-			<box
-				flexDirection="row"
-				height={1}
-				width="100%"
-				backgroundColor={t.background}
-			>
-				<For
-					each={Object.values(TABS).filter(
-						(v): v is TABS => typeof v === "number",
-					)}
+			{/* ── Middle row: tab sidebar (root pane) + active page ──────────────── */}
+			<box flexDirection="row" flexGrow={1} width="100%">
+				{/* ── Left tab sidebar ─────────────────────────────────────────────── */}
+				<box
+					flexDirection="column"
+					width={14}
+					height="100%"
+					backgroundColor={t.background}
+					border
+					borderColor={t.border}
 				>
-					{(tab) => {
-						const active = () => nav.activeTab() === tab;
-						return (
-							<box
-								backgroundColor={active() ? t.primary : t.background}
-								paddingRight={1}
-								paddingLeft={1}
-								onMouseDown={() => nav.setActiveTab(tab)}
-							>
-								<text fg={active() ? t.surface : t.textMuted}>
-									{tab}. {TAB_LABEL[tab]}
-								</text>
-							</box>
-						);
-					}}
-				</For>
-				<box flexGrow={1} backgroundColor={t.background} />
-				<text fg={t.textMuted} paddingRight={1}>
-					{nowPlaying() ?? ""}
-				</text>
-			</box>
+					<For
+						each={Object.values(TABS).filter(
+							(v): v is TABS => typeof v === "number",
+						)}
+					>
+						{(tab) => {
+							const active = () => nav.activeTab() === tab;
+							const focused = () =>
+								active() && nav.activePane() === SIDEBAR_PANE;
+							return (
+								<box
+									flexDirection="row"
+									backgroundColor={
+										focused() ? t.accent : active() ? t.primary : t.background
+									}
+									paddingLeft={1}
+									onMouseDown={() => {
+										nav.setActivePane(SIDEBAR_PANE);
+										nav.setActiveTab(tab);
+									}}
+								>
+									<text fg={focused() || active() ? t.surface : t.textMuted}>
+										{focused() ? "❯ " : "  "}
+										{tab}. {TAB_LABEL[tab]}
+									</text>
+								</box>
+							);
+						}}
+					</For>
+					<box flexGrow={1} backgroundColor={t.background} />
+					<Show when={nowPlaying()}>
+						<box paddingLeft={1} backgroundColor={t.background}>
+							<text fg={t.textMuted}>{nowPlaying()}</text>
+						</box>
+					</Show>
+				</box>
 
-			{/* ── Active page (owns its panes) ────────────────────────────────────── */}
-			<box flexDirection="column" flexGrow={1} width="100%">
-				{LayerGraph[nav.activeTab()]()}
+				{/* ── Active page (owns its panes) ────────────────────────────────── */}
+				<box flexDirection="column" flexGrow={1} height="100%">
+					{LayerGraph[nav.activeTab()]()}
+				</box>
 			</box>
 
 			{/* ── Bottom status / command bar ─────────────────────────────────────── */}
@@ -409,8 +483,12 @@ export function Shell() {
 								{modeLabel()}
 							</text>
 							<text fg={t.textMuted} paddingLeft={1}>
-								{TAB_LABEL[nav.activeTab()]} · pane {nav.activePane() + 1}/
-								{TabPaneCount[nav.activeTab()]}
+								{TAB_LABEL[nav.activeTab()]} ·{" "}
+								{nav.activePane() === SIDEBAR_PANE
+									? "tabs"
+									: nav.isDepthTab()
+										? `depth ${nav.currentDepth()}`
+										: `pane ${nav.activePane() + 1}/${TabPaneCount[nav.activeTab()]}`}
 							</text>
 							<Show when={nav.selectedIds().length > 0}>
 								<text fg={t.warning} paddingLeft={1}>

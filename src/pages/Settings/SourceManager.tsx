@@ -1,317 +1,141 @@
 /**
- * Source management component for PodTUI
- * Add, remove, and configure podcast sources
+ * SourceManager — exposes podcast sources as SettingItems for the depth-stack.
+ *
+ *   • "Add Source" — an editor item; drilling in shows a name/URL add form.
+ *   • Each source — a toggle item (Space toggles enabled) whose display shows
+ *     the source type and on/off state.
+ *
+ * Advanced per-API-source options (country/language/explicit) are flattened to
+ * simple toggles/cycles reachable by drilling into the source's editor.
+ * Movement flows through nav.action — no own useKeyboard (avoids the old
+ * right-pane key conflicts).
  */
 
-import { createSignal, For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { SourceType } from "@/types/source";
 import type { PodcastSource } from "@/types/source";
-import { SelectableBox, SelectableText } from "@/components/Selectable";
+import type { SettingItem } from "./types";
 
-interface SourceManagerProps {
-  focused?: boolean;
-  onClose?: () => void;
+export function useSourceItems(): SettingItem[] {
+	const feedStore = useFeedStore();
+
+	const typeBadge = (s: PodcastSource) =>
+		s.type === SourceType.API
+			? "[API]"
+			: s.type === SourceType.RSS
+				? "[RSS]"
+				: "[?]";
+
+	const items: SettingItem[] = [
+		{
+			id: "add",
+			label: "Add Source",
+			kind: "editor",
+			display: () => "+",
+			help: () =>
+				`Add a custom RSS feed by URL.\nDrill in (Enter/l) to open the add-source form.\nType: editor`,
+			renderEditor: () => <AddSourceForm />,
+		},
+	];
+
+	for (const s of feedStore.sources()) {
+		items.push({
+			id: `src:${s.id}`,
+			label: s.name,
+			kind: "toggle",
+			display: () => `${typeBadge(s)} ${s.enabled ? "on" : "off"}`,
+			help: () =>
+				`Source: ${s.name}\nType: ${s.type}\nEnabled: ${s.enabled}\nURL: ${s.baseUrl ?? "(none)"}\nSpace/Enter to toggle.`,
+			toggle: () => feedStore.toggleSource(s.id),
+		});
+	}
+
+	return items;
 }
 
-type FocusArea = "list" | "add" | "url" | "country" | "explicit" | "language";
+function AddSourceForm() {
+	const feedStore = useFeedStore();
+	const { theme } = useTheme();
+	const [name, setName] = createSignal("");
+	const [url, setUrl] = createSignal("");
+	const [error, setError] = createSignal<string | null>(null);
 
-export function SourceManager(props: SourceManagerProps) {
-  const feedStore = useFeedStore();
-  const { theme } = useTheme();
-  const [selectedIndex, setSelectedIndex] = createSignal(0);
-  const [focusArea, setFocusArea] = createSignal<FocusArea>("list");
-  const [newSourceUrl, setNewSourceUrl] = createSignal("");
-  const [newSourceName, setNewSourceName] = createSignal("");
-  const [error, setError] = createSignal<string | null>(null);
+	const submit = () => {
+		const u = url().trim();
+		if (!u) {
+			setError("URL is required");
+			return;
+		}
+		try {
+			new URL(u);
+		} catch {
+			setError("Invalid URL format");
+			return;
+		}
+		feedStore.addSource({
+			name: name().trim() || "Custom Source",
+			type: SourceType.RSS,
+			baseUrl: u,
+			enabled: true,
+			description: `Custom RSS feed: ${u}`,
+		});
+		setName("");
+		setUrl("");
+		setError(null);
+	};
 
-  const sources = () => feedStore.sources();
-
-  const handleKeyPress = (key: { name: string; shift?: boolean }) => {
-    if (key.name === "escape") {
-      if (focusArea() !== "list") {
-        setFocusArea("list");
-        setError(null);
-      } else if (props.onClose) {
-        props.onClose();
-      }
-      return;
-    }
-
-    if (key.name === "tab") {
-      const areas: FocusArea[] = [
-        "list",
-        "country",
-        "language",
-        "explicit",
-        "add",
-        "url",
-      ];
-      const idx = areas.indexOf(focusArea());
-      const nextIdx = key.shift
-        ? (idx - 1 + areas.length) % areas.length
-        : (idx + 1) % areas.length;
-      setFocusArea(areas[nextIdx]);
-      return;
-    }
-
-    if (focusArea() === "list") {
-      if (key.name === "up" || key.name === "k") {
-        setSelectedIndex((i) => Math.max(0, i - 1));
-      } else if (key.name === "down" || key.name === "j") {
-        setSelectedIndex((i) => Math.min(sources().length - 1, i + 1));
-      } else if (
-        key.name === "return" ||
-        key.name === "space"
-      ) {
-        const source = sources()[selectedIndex()];
-        if (source) {
-          feedStore.toggleSource(source.id);
-        }
-      } else if (key.name === "d" || key.name === "delete") {
-        const source = sources()[selectedIndex()];
-        if (source) {
-          const removed = feedStore.removeSource(source.id);
-          if (!removed) {
-            setError("Cannot remove default sources");
-          }
-        }
-      } else if (key.name === "a") {
-        setFocusArea("add");
-      }
-    }
-
-    if (focusArea() === "country") {
-      if (
-        key.name === "enter" ||
-        key.name === "return" ||
-        key.name === "space"
-      ) {
-        const source = sources()[selectedIndex()];
-        if (source && source.type === SourceType.API) {
-          const next = source.country === "US" ? "GB" : "US";
-          feedStore.updateSource(source.id, { country: next });
-        }
-      }
-    }
-
-    if (focusArea() === "explicit") {
-      if (
-        key.name === "return" ||
-        key.name === "space"
-      ) {
-        const source = sources()[selectedIndex()];
-        if (source && source.type === SourceType.API) {
-          feedStore.updateSource(source.id, {
-            allowExplicit: !source.allowExplicit,
-          });
-        }
-      }
-    }
-
-    if (focusArea() === "language") {
-      if (
-        key.name === "return" ||
-        key.name === "space"
-      ) {
-        const source = sources()[selectedIndex()];
-        if (source && source.type === SourceType.API) {
-          const next = source.language === "ja_jp" ? "en_us" : "ja_jp";
-          feedStore.updateSource(source.id, { language: next });
-        }
-      }
-    }
-  };
-
-  const handleAddSource = () => {
-    const url = newSourceUrl().trim();
-    const name = newSourceName().trim() || `Custom Source`;
-
-    if (!url) {
-      setError("URL is required");
-      return;
-    }
-
-    try {
-      new URL(url);
-    } catch {
-      setError("Invalid URL format");
-      return;
-    }
-
-    feedStore.addSource({
-      name,
-      type: "rss" as SourceType,
-      baseUrl: url,
-      enabled: true,
-      description: `Custom RSS feed: ${url}`,
-    });
-
-    setNewSourceUrl("");
-    setNewSourceName("");
-    setFocusArea("list");
-    setError(null);
-  };
-
-  const getSourceIcon = (source: PodcastSource) => {
-    if (source.type === SourceType.API) return "[API]";
-    if (source.type === SourceType.RSS) return "[RSS]";
-    return "[?]";
-  };
-
-  const selectedSource = () => sources()[selectedIndex()];
-  const isApiSource = () => selectedSource()?.type === SourceType.API;
-  const sourceCountry = () => selectedSource()?.country || "US";
-  const sourceExplicit = () => selectedSource()?.allowExplicit !== false;
-  const sourceLanguage = () => selectedSource()?.language || "en_us";
-
-  return (
-    <box flexDirection="column" border borderColor={theme.border} padding={1} gap={1}>
-      <box flexDirection="row" justifyContent="space-between">
-        <text fg={theme.text}>
-          <strong>Podcast Sources</strong>
-        </text>
-        <box border borderColor={theme.border} padding={0} onMouseDown={props.onClose}>
-          <text fg={theme.primary}>[Esc] Close</text>
-        </box>
-      </box>
-
-      <text fg={theme.textMuted}>Manage where to search for podcasts</text>
-
-      {/* Source list */}
-      <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
-        <text fg={focusArea() === "list" ? theme.primary : theme.textMuted}>
-          Sources:
-        </text>
-          <scrollbox height={6}>
-            <For each={sources()}>
-              {(source, index) => (
-                <SelectableBox
-                  selected={() => focusArea() === "list" && index() === selectedIndex()}
-                  flexDirection="row"
-                  gap={1}
-                  padding={0}
-                  onMouseDown={() => {
-                    setSelectedIndex(index());
-                    setFocusArea("list");
-                    feedStore.toggleSource(source.id);
-                  }}
-                >
-                 <SelectableText
-                   selected={() => focusArea() === "list" && index() === selectedIndex()}
-                   primary
-                 >
-                   {focusArea() === "list" && index() === selectedIndex()
-                     ? ">"
-                     : " "}
-                 </SelectableText>
-                 <SelectableText
-                   selected={() => focusArea() === "list" && index() === selectedIndex()}
-                   primary
-                 >
-                   {source.name}
-                 </SelectableText>
-              </SelectableBox>
-            )}
-          </For>
-        </scrollbox>
-        <text fg={theme.textMuted}>
-          Space/Enter to toggle, d to delete, a to add
-        </text>
-
-         {/* API settings */}
-         <box flexDirection="column" gap={1}>
-           <SelectableText selected={() => false} primary={isApiSource()}>
-             {isApiSource()
-               ? "API Settings"
-               : "API Settings (select an API source)"}
-           </SelectableText>
-           <box flexDirection="row" gap={2}>
-             <box
-               border
-               borderColor={theme.border}
-               padding={0}
-               backgroundColor={
-                 focusArea() === "country" ? theme.primary : undefined
-               }
-             >
-               <SelectableText selected={() => false} primary={focusArea() === "country"}>
-                 Country: {sourceCountry()}
-               </SelectableText>
-             </box>
-             <box
-               border
-               borderColor={theme.border}
-               padding={0}
-               backgroundColor={
-                 focusArea() === "language" ? theme.primary : undefined
-               }
-             >
-               <SelectableText selected={() => false} primary={focusArea() === "language"}>
-                 Language:{" "}
-                 {sourceLanguage() === "ja_jp" ? "Japanese" : "English"}
-               </SelectableText>
-             </box>
-             <box
-               border
-               borderColor={theme.border}
-               padding={0}
-               backgroundColor={
-                 focusArea() === "explicit" ? theme.primary : undefined
-               }
-             >
-               <SelectableText selected={() => false} primary={focusArea() === "explicit"}>
-                 Explicit: {sourceExplicit() ? "Yes" : "No"}
-               </SelectableText>
-             </box>
-           </box>
-           <SelectableText selected={() => false} tertiary>
-             Enter/Space to toggle focused setting
-           </SelectableText>
-         </box>
-      </box>
-
-         {/* Add new source form */}
-         <box border borderColor={theme.border} padding={1} flexDirection="column" gap={1}>
-           <SelectableText selected={() => false} primary={focusArea() === "add" || focusArea() === "url"}>
-             Add New Source:
-           </SelectableText>
-
-           <box flexDirection="row" gap={1}>
-             <SelectableText selected={() => false} tertiary>Name:</SelectableText>
-             <input
-               value={newSourceName()}
-               onInput={setNewSourceName}
-               placeholder="My Custom Feed"
-               focused={props.focused && focusArea() === "add"}
-               width={25}
-             />
-           </box>
-
-           <box flexDirection="row" gap={1}>
-             <SelectableText selected={() => false} tertiary>URL:</SelectableText>
-             <input
-               value={newSourceUrl()}
-               onInput={(v) => {
-                 setNewSourceUrl(v);
-                 setError(null);
-               }}
-               placeholder="https://example.com/feed.rss"
-               focused={props.focused && focusArea() === "url"}
-               width={35}
-             />
-           </box>
-
-           <box border borderColor={theme.border} padding={0} width={15} onMouseDown={handleAddSource}>
-             <SelectableText selected={() => false} primary>[+] Add Source</SelectableText>
-           </box>
-         </box>
-
-         {/* Error message */}
-         {error() && <SelectableText selected={() => false} tertiary>{error()}</SelectableText>}
-
-         <SelectableText selected={() => false} tertiary>Tab to switch sections, Esc to close</SelectableText>
-    </box>
-  );
+	return (
+		<box flexDirection="column" padding={1} gap={1}>
+			<text fg={theme.text}>
+				<strong>Add Source</strong>
+			</text>
+			<box flexDirection="row" gap={1}>
+				<text fg={theme.textMuted}>Name:</text>
+				<input
+					value={name()}
+					onInput={setName}
+					placeholder="My Custom Feed"
+					width={25}
+				/>
+			</box>
+			<box flexDirection="row" gap={1}>
+				<text fg={theme.textMuted}>URL:</text>
+				<input
+					value={url()}
+					onInput={(v) => {
+						setUrl(v);
+						setError(null);
+					}}
+					placeholder="https://example.com/feed.rss"
+					width={35}
+				/>
+			</box>
+			<box
+				border
+				borderColor={theme.border}
+				padding={0}
+				width={15}
+				onMouseDown={submit}
+			>
+				<text fg={theme.primary}>[+] Add</text>
+			</box>
+			<Show when={error()}>{(e) => <text fg={theme.error}>{e()}</text>}</Show>
+			<Show when={feedStore.sources().length > 0}>
+				<box flexDirection="column" marginTop={1}>
+					<text fg={theme.textMuted}>
+						Current sources ({feedStore.sources().length}):
+					</text>
+					<For each={feedStore.sources()}>
+						{(s) => (
+							<text fg={theme.textMuted}>
+								{s.enabled ? "●" : "○"} {s.name}
+							</text>
+						)}
+					</For>
+				</box>
+			</Show>
+		</box>
+	);
 }

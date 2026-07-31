@@ -20,6 +20,35 @@ export enum TABS {
 }
 export const TabsCount = 6;
 
+/** Tabs that use the yazi depth-stack model (prev | current | preview
+ *  columns, infinite drill via push/pop). Search and Player keep the legacy
+ *  fixed-pane model. */
+export const DEPTH_TABS: ReadonlySet<TABS> = new Set([
+	TABS.FEED,
+	TABS.MYSHOWS,
+	TABS.DISCOVER,
+	TABS.SETTINGS,
+]);
+
+/** Root (depth-0) frame for a depth-tab — identifies the top-level list each
+ *  page renders at root. Pages interpret the `kind` to derive their list. */
+export function rootFrameFor(
+	tab: TABS,
+): import("@/context/NavigationContext").DepthFrame {
+	switch (tab) {
+		case TABS.FEED:
+			return { kind: "feeds", focus: 0 };
+		case TABS.MYSHOWS:
+			return { kind: "shows", focus: 0 };
+		case TABS.DISCOVER:
+			return { kind: "discover:categories", focus: 0 };
+		case TABS.SETTINGS:
+			return { kind: "settings:sections", focus: 0 };
+		default:
+			return { kind: "root", focus: 0 };
+	}
+}
+
 export const LayerGraph = {
 	[TABS.FEED]: FeedPage,
 	[TABS.MYSHOWS]: MyShowsPage,
@@ -47,14 +76,18 @@ export const PANE_RATIO = {
 	preview: 3,
 } as const;
 
-// Number of interactive panes per tab (for the yazi h/l swipe). Slots beyond
-// a tab's count are not focusable. Defined here (after TABS) to avoid re-introducing
-// the old NavigationContext top-level-init circular deadlock.
+// Number of interactive panes per tab. Depth-tabs (Feed/MyShows/Discover/
+// Settings) now have a single focusable content pane (the center/current
+// column at depth 0..N); prev and preview are derived, not focusable. Search
+// keeps its 3 fixed panes; Player is single-pane. The Shell's h/l dispatch
+// routes depth-tabs to push/pop instead of pane swipe. Defined here (after
+// TABS) to avoid re-introducing the old NavigationContext top-level-init
+// circular deadlock.
 export const TabPaneCount: Record<TABS, number> = {
-	[TABS.FEED]: 3, // feeds | episodes | preview
-	[TABS.MYSHOWS]: 3, // shows | episodes | preview
-	[TABS.DISCOVER]: 3, // categories | results | detail
-	[TABS.SEARCH]: 3, // query | results | detail
+	[TABS.FEED]: 1, // depth: feeds → episodes → preview
+	[TABS.MYSHOWS]: 1, // depth: shows → episodes → preview
+	[TABS.DISCOVER]: 1, // depth: categories → results → preview
+	[TABS.SEARCH]: 3, // fixed: query | results | detail
 	[TABS.PLAYER]: 1, // single pane
-	[TABS.SETTINGS]: 2, // sections | panel
+	[TABS.SETTINGS]: 1, // depth: sections → items → editor
 };
