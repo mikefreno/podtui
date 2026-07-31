@@ -36,13 +36,7 @@
  * strip. There is NO sidebar pane: `activePane` is plain tab pane state and is
  * never a chrome/tab-list pane.
  */
-import {
-	createEffect,
-	createSignal,
-	on,
-	batch,
-	createMemo,
-} from "solid-js";
+import { createSignal, batch } from "solid-js";
 import { TABS, TabsCount, DEPTH_TABS, rootFrameFor } from "@/utils/navigation";
 
 export enum NavMode {
@@ -131,32 +125,39 @@ export function createNavigation() {
 		}
 	};
 
-	// On tab change: ensure a root frame exists (depth-tabs) + reset
-	// focus to the current/center pane, clear modes/command/visual.
-	createEffect(
-		on(activeTab, (tab) => {
-			ensureStack(tab);
-			batch(() => {
-				setActivePane(DEPTH_CENTER_PANE);
-				setMode(NavMode.NORMAL);
-				setCount(null);
-				setCommandBuffer("");
-				setCommandError(null);
-				setVisualAnchor(null);
-			});
-		}),
-	);
+	/** Apply all tab-switch side effects synchronously. Done here in the
+	 *  imperative `switchTab` path rather than a reactive `createEffect`
+	 *  because this module is exercised by unit tests without the OpenTUI
+	 *  JSX runtime, and in that environment Solid's `createEffect` is a
+	 *  no-op (server build). Routing every tab change through this helper
+	 *  keeps the behavior identical under both runtimes.
+	 *
+	 *  - seed a root frame for fresh depth-tabs
+	 *  - reset focus to the current/center pane (no sidebar pane)
+	 *  - clear mode/command/visual/count state */
+	const applyTabSwitch = (tab: TABS) => {
+		ensureStack(tab);
+		batch(() => {
+			setActivePane(DEPTH_CENTER_PANE);
+			setMode(NavMode.NORMAL);
+			setCount(null);
+			setCommandBuffer("");
+			setCommandError(null);
+			setVisualAnchor(null);
+		});
+	};
 
 	// ── depth stack accessors ──────────────────────────────────────────────
-	const depthStack = createMemo<DepthFrame[]>(() =>
-		depthStackFor(activeTab()),
-	);
-	const currentDepth = createMemo(() =>
-		Math.max(0, depthStack().length - 1),
-	);
-	const topFrame = createMemo<DepthFrame | undefined>(
-		() => depthStack()[depthStack().length - 1],
-	);
+	// Plain functions (not createMemo) so they recompute on every read.
+	// On the client build these are read inside reactive JSX contexts so
+	// their underlying signal reads are still tracked; on the server build
+	// (used by unit tests) createMemo is a no-op that freezes at creation,
+	// so a plain function is the only option that stays correct in tests.
+	const depthStack = (): DepthFrame[] => depthStackFor(activeTab());
+	const currentDepth = (): number =>
+		Math.max(0, depthStack().length - 1);
+	const topFrame = (): DepthFrame | undefined =>
+		depthStack()[depthStack().length - 1];
 	const isDepthTab = () => DEPTH_TABS.has(activeTab());
 
 	/** Focus within a given depth's frame (default = current/top). */
@@ -193,14 +194,25 @@ export function createNavigation() {
 	};
 
 	// ── tab switching ──────────────────────────────────────────────────────
+	/** Internal: set activeTab + run all side effects (root-frame seed,
+	 *  pane/mode/command reset). Called by gotoTab/nextTab/prevTab so every
+	 *  tab change — programmatic or key-driven — goes through one path. */
+	const switchTab = (tab: TABS) => {
+		setActiveTab(tab);
+		applyTabSwitch(tab);
+	};
 	const gotoTab = (tab: TABS) => {
 		if (tab < 1 || tab > TabsCount) return;
-		setActiveTab(tab);
+		switchTab(tab);
 	};
-	const nextTab = () =>
-		setActiveTab((t) => (t >= TabsCount ? 1 : ((t + 1) as TABS)));
-	const prevTab = () =>
-		setActiveTab((t) => (t <= 1 ? TabsCount : ((t - 1) as TABS)));
+	const nextTab = () => {
+		const t = activeTab() >= TabsCount ? 1 : ((activeTab() + 1) as TABS);
+		switchTab(t);
+	};
+	const prevTab = () => {
+		const t = activeTab() <= 1 ? TabsCount : ((activeTab() - 1) as TABS);
+		switchTab(t);
+	};
 
 	// ── pane focus ──────────────────────────────────────────────────────────
 	const setPane = (pane: PaneId) => setActivePane(pane);
@@ -296,7 +308,7 @@ export function createNavigation() {
 		});
 	};
 
-	const selectedIds = createMemo(() => [...selSet(paneKey())]);
+	const selectedIds = () => [...selSet(paneKey())];
 
 	/** Enter visual mode, anchoring range selection at the current focus. */
 	const enterVisual = () => {
