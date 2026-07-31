@@ -1,13 +1,14 @@
 /**
  * Shell — yazi-style application chrome.
  *
- * Renders the tabs as a vertical sidebar on the left (the root pane), the
- * active page (which owns its own panes) to the right of it, and a bottom
- * status/command bar spanning the full width. A single `useKeyboard` router
- * translates keystrokes (via the sequence-aware keybind matcher) into actions:
- * global ones (tabs, modes, audio, quit, help, command) are handled here;
+ * Renders the active page (which owns its own three-column parent | current |
+ * preview panes) full-width, with a bottom status/command bar that also
+ * carries the tab strip. A single `useKeyboard` router translates keystrokes
+ * (via the sequence-aware keybind matcher) into actions: the unified router
+ * in `@/utils/dispatch` handles tabs (digits `1`-`6`, `[`/`]`), h/l depth
+ * drill/pop + fixed-pane swipe, modes, audio, quit, help, and command; the
  * pane/list ones are dispatched to the active page over the `nav.action`
- * event bus.
+ * event bus. There is no sidebar pane.
  */
 
 import { createSignal, Show, For } from "solid-js";
@@ -17,7 +18,6 @@ import { useKeybinds, type KeybindActionName } from "@/context/KeybindContext";
 import {
 	useNavigation,
 	NavMode,
-	DEPTH_CENTER_PANE,
 } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
@@ -26,7 +26,8 @@ import type { Episode } from "@/types/episode";
 import { useToast } from "@/ui/toast";
 import { emit } from "@/utils/event-bus";
 import { LayerGraph } from "@/utils/layer-graph";
-import { TABS, TabsCount, TabPaneCount } from "@/utils/navigation";
+import { TABS, TabPaneCount } from "@/utils/navigation";
+import { createDispatcher } from "@/utils/dispatch";
 
 const TAB_LABEL: Record<TABS, string> = {
 	[TABS.FEED]: "Feed",
@@ -36,57 +37,6 @@ const TAB_LABEL: Record<TABS, string> = {
 	[TABS.PLAYER]: "Player",
 	[TABS.SETTINGS]: "Settings",
 };
-
-/** Actions the active page is responsible for (pane/list-local). */
-const PAGE_ACTIONS: ReadonlySet<KeybindActionName> = new Set<KeybindActionName>(
-	[
-		"move-down",
-		"move-up",
-		"page-down",
-		"page-up",
-		"full-down",
-		"full-up",
-		"jump-down",
-		"jump-up",
-		"goto-top",
-		"goto-bottom",
-		"toggle-select",
-		"visual-mode",
-		"toggle-all",
-		"invert-all",
-		"open",
-		"open-interactive",
-		"search",
-		"filter",
-		"sort",
-		"toggle-hidden",
-		"refresh",
-	],
-);
-
-/** Movement actions the sidebar pane handled itself when the tab-list pane
- *  still existed (its list = the tabs, length TabsCount). The sidebar pane was
- *  removed in the yazi remake nav rework (task 01); these now fall through
- *  to the active page's PAGE_ACTIONS dispatch. Retained here and fully
- *  removed in task 06's keybind rewrite. */
-const SIDEBAR_ACTIONS: ReadonlySet<KeybindActionName> = new Set([
-	"move-down",
-	"move-up",
-	"jump-down",
-	"jump-up",
-	"page-down",
-	"page-up",
-	"goto-top",
-	"goto-bottom",
-]);
-
-function tabByDigit(action: KeybindActionName): TABS | null {
-	if (action.startsWith("tab-goto-")) {
-		const n = Number(action.slice("tab-goto-".length));
-		return (n >= 1 && n <= TabsCount ? n : null) as TABS | null;
-	}
-	return null;
-}
 
 export function Shell() {
 	const theme = useTheme();
@@ -238,129 +188,13 @@ export function Shell() {
 	}
 
 	// ── Unified router (normal + visual) ───────────────────────────────────────
-	function dispatch(action: KeybindActionName, evt: any) {
-		const tab = nav.activeTab();
-		const pane = nav.activePane();
-		switch (action) {
-			// ── modes ──
-			case "escape":
-				evt.preventDefault();
-				if (nav.mode() === NavMode.VISUAL) {
-					nav.toNormal();
-					break;
-				}
-				k.clearPending();
-				break;
-			case "command":
-				evt.preventDefault();
-				nav.enterCommand();
-				break;
-			case "visual-mode":
-				evt.preventDefault();
-				nav.enterVisual();
-				break;
-			case "toggle-select":
-				evt.preventDefault();
-				emit("nav.action", { action, tab, pane, mode: nav.mode() });
-				break;
-			case "toggle-all":
-			case "invert-all":
-				evt.preventDefault();
-				emit("nav.action", { action, tab, pane, mode: nav.mode() });
-				break;
-
-			// ── tabs ──
-			case "tab-next":
-				evt.preventDefault();
-				nav.nextTab();
-				break;
-			case "tab-prev":
-				evt.preventDefault();
-				nav.prevTab();
-				break;
-			default: {
-				const dt = tabByDigit(action);
-				if (dt) {
-					evt.preventDefault();
-					nav.setActiveTab(dt);
-					break;
-				}
-				// ── pane swipe / depth nav ──
-				// h/l use swipe() on fixed-pane tabs (clamped to [0,
-				// paneCount-1] — there is no sidebar pane). Depth-tabs: l
-				// at the center drills in (open); h at the center pops a
-				// depth (noop at depth 0).
-				if (action === "swipe-prev") {
-					evt.preventDefault();
-					if (
-						nav.isDepthTab() &&
-						nav.activePane() === DEPTH_CENTER_PANE &&
-						nav.currentDepth() > 0
-					) {
-						nav.popDepth();
-					} else {
-						nav.swipe(-1, TabPaneCount[tab]);
-					}
-					break;
-				}
-				if (action === "swipe-next") {
-					evt.preventDefault();
-					if (nav.isDepthTab() && nav.activePane() === DEPTH_CENTER_PANE) {
-						emit("nav.action", {
-							action: "open",
-							tab,
-							pane: DEPTH_CENTER_PANE,
-							mode: nav.mode(),
-						});
-					} else {
-						nav.swipe(1, TabPaneCount[tab]);
-					}
-					break;
-				}
-				// ── audio transport (global) ──
-				if (action === "audio-toggle") {
-					evt.preventDefault();
-					audio.togglePlayback().catch(() => {});
-					break;
-				}
-				if (action === "audio-seek-forward") {
-					evt.preventDefault();
-					audio.seekRelative(10).catch(() => {});
-					break;
-				}
-				if (action === "audio-seek-backward") {
-					evt.preventDefault();
-					audio.seekRelative(-10).catch(() => {});
-					break;
-				}
-				if (action === "audio-next") {
-					evt.preventDefault();
-					advanceEpisode(1);
-					break;
-				}
-				if (action === "audio-prev") {
-					evt.preventDefault();
-					advanceEpisode(-1);
-					break;
-				}
-				// ── global app ──
-				if (action === "quit") {
-					evt.preventDefault();
-					process.exit(0);
-				}
-				if (action === "help") {
-					evt.preventDefault();
-					setShowHelp((v) => !v);
-				}
-
-				// ── page-local list/pane actions ──
-				if (PAGE_ACTIONS.has(action)) {
-					evt.preventDefault();
-					emit("nav.action", { action, tab, pane, mode: nav.mode() });
-				}
-			}
-		}
-	}
+	const { dispatch } = createDispatcher({
+		nav,
+		audio: { togglePlayback: audio.togglePlayback, seekRelative: audio.seekRelative },
+		k,
+		setShowHelp,
+		advanceEpisode,
+	});
 
 	useKeyboard(
 		(evt: any) => {
