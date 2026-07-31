@@ -31,7 +31,7 @@
  *   />
  */
 
-import { children as solidChildren, createMemo, Show } from "solid-js";
+import { createMemo } from "solid-js";
 import type { JSX } from "solid-js";
 import type { RGBA } from "@opentui/core";
 import { useTheme } from "@/context/ThemeContext";
@@ -62,6 +62,24 @@ export type YaziPaneRowProps = {
 function resolveLabel(v: PaneLabel | undefined): string {
 	if (v == null) return "";
 	return typeof v === "function" ? v() : v;
+}
+
+/** Normalize a PaneContent (static JSX or accessor) into a reactive accessor.
+ *  We deliberately do NOT use Solid's `children()` helper here: that helper
+ *  flattens accessor children into a stable resolved-nodes array and is the
+ *  wrong tool for content whose ROOT swaps at runtime (e.g. the current pane
+ *  switching between a depth-1 list fragment and a depth-2 editor — both
+ *  truthy JSX roots). `children()` would not re-resolve on a truthy<@->truthy
+ *  root swap, freezing the previous subtree in place. Instead we hand the
+ *  raw accessor to a reactive `{ expr ?? <Placeholder/> }` expression below,
+ *  which Solid compiles into a tracked `insert` effect that disposes the old
+ *  subtree and mounts the new whenever the accessor returns a different
+ *  element identity. */
+function normalizeContent(
+	v: PaneContent | undefined,
+): () => JSX.Element | undefined {
+	if (v == null) return () => undefined;
+	return typeof v === "function" ? (v as () => JSX.Element) : () => v;
 }
 
 function Placeholder(props: { color: () => RGBA }) {
@@ -102,12 +120,20 @@ function YaziPane(props: {
 				borderColor={borderColor()}
 				backgroundColor={theme.background}
 			>
-				<Show
-					when={props.content()}
-					fallback={<Placeholder color={muted} />}
-				>
-					{props.content()}
-				</Show>
+				{/*
+				 * Render the content accessor directly via a reactive expression.
+				 * `{ accessor() ?? <Placeholder/> }` compiles to a Solid `insert`
+				 * effect that re-runs whenever the accessor's tracked signals
+				 * change (e.g. `depth()` swapping the root from a list fragment to
+				 * an editor). Solid disposes the previously-rendered subtree and
+				 * mounts the new element identity. `null`/`undefined` falls back
+				 * to the muted placeholder so the parent pane keeps its 1/7 slot
+				 * visibly blank at depth 0. This is the correct tool for root
+				 * swapping — unlike Solid's `children()` / `<Show>`-children,
+				 * which only react to truthiness flips, not truthy<@->truthy root
+				 * identity changes.
+				 */}
+				{props.content() ?? <Placeholder color={muted} />}
 			</scrollbox>
 		</box>
 	);
@@ -123,10 +149,11 @@ export function YaziPaneRow(props: YaziPaneRowProps) {
 		return typeof f === "function" ? f() : f ?? true;
 	});
 
-	// Normalize static JSX and accessor children into reactive accessors.
-	const parentContent = solidChildren(() => props.parent);
-	const currentContent = solidChildren(() => props.current);
-	const previewContent = solidChildren(() => props.preview);
+	// Normalize static JSX and accessor children into reactive accessors
+	// (see normalizeContent for why we avoid Solid's `children()` helper).
+	const parentContent = normalizeContent(props.parent);
+	const currentContent = normalizeContent(props.current);
+	const previewContent = normalizeContent(props.preview);
 
 	const parentLabel = createMemo(() => resolveLabel(props.parentLabel));
 	const currentLabel = createMemo(() => resolveLabel(props.currentLabel));

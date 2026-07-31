@@ -5,9 +5,12 @@
  *   depth 1 — the focused section's items as a navigable list
  *   depth 2 — per-item editor (for editor-kind items) or value adjuster
  *
- * Columns render as yazi's prev | current | preview:
- *   left  = previous depth's list (empty at depth 0)
- *   right = preview/help text for the hovered item in center
+ * Renders entirely through `<YaziPaneRow>` (parent | current | preview):
+ *   parent  = previous depth's list (sections at depth 1, items at depth 2);
+ *             blank placeholder at depth 0 (1/7 slot kept).
+ *   current = the current-depth list (or editor at depth 2); the only
+ *             focusable column.
+ *   preview = help/preview text for the hovered item in current.
  *
  * All movement comes from the Shell router over `nav.action` (j/k move,
  * Enter/l drill, h back). Panels no longer register their own useKeyboard —
@@ -24,12 +27,12 @@ import {
 } from "@/context/NavigationContext";
 import { on, off } from "@/utils/event-bus";
 import type { KeybindActionName } from "@/context/KeybindContext";
-import { PANE_RATIO } from "@/utils/navigation";
 import type { SettingItem, SettingsSectionDef } from "./types";
 import { usePreferencesItems } from "./PreferencesPanel";
 import { useVisualizerItems } from "./VisualizerSettings";
 import { useSyncItems, closeSyncEditor } from "./SyncPanel";
 import { useSourceItems } from "./SourceManager";
+import { YaziPaneRow } from "@/components/YaziPaneRow";
 
 export const SettingsPaneCount = 1;
 
@@ -224,9 +227,7 @@ export function SettingsPage() {
 	onCleanup(() => closeSyncEditor());
 
 	// ── render helpers ───────────────────────────────────────────────────────
-	const isActive = nav.activePane() === DEPTH_CENTER_PANE;
-	const border = (active: boolean) => (active ? theme.accent : theme.border);
-	const headerBg = theme.background;
+	const isActive = () => nav.activePane() === DEPTH_CENTER_PANE;
 
 	// preview text for the right column
 	const previewText = createMemo<string>(() => {
@@ -245,120 +246,82 @@ export function SettingsPage() {
 			: "No editor.";
 	});
 
-	// ── column content builders ──────────────────────────────────────────────
-	// left = previous depth (read-only list), or empty at depth 0
-	const LeftCol = () => (
-		<box
-			flexDirection="column"
-			flexGrow={PANE_RATIO.parent}
-			flexShrink={1}
-			flexBasis={0}
-			height="100%"
-			style={{ width: depth() === 0 ? 0 : undefined }}
-			overflow="hidden"
-		>
-			<box height={1} paddingLeft={1} backgroundColor={headerBg}>
-				<text fg={theme.textSecondary}>
-					<Show when={depth() >= 1} fallback=" ">
-						{depth() === 1 ? "Sections" : (sectionForDepth1()?.label ?? "")}
-					</Show>
-				</text>
-			</box>
+	// ── column label ───────────────────────────────────────────────────────────
+	const currentLabel = () => {
+		const d = depth();
+		if (d === 0) return "Settings";
+		if (d === 1) return sectionForDepth1()?.label ?? "Items";
+		return editorItem()?.label ?? "Editor";
+	};
+	const parentLabel = () => {
+		const d = depth();
+		if (d === 1) return "Sections";
+		if (d === 2) return sectionForDepth1()?.label ?? "";
+		return "Up";
+	};
+
+	// ── parent pane: previous-depth list (blank at depth 0) ────────────────
+	// Sibling <Show> blocks per depth (mirrors the preview pane) so Solid
+	// mounts every branch once and toggles children on depth change — the
+	// known-good opentui disposal pattern. A ternary returning different
+	// roots leaves subtree orphaned on swap; the trick is a STABLE fragment
+	// root whose inner <Show> children swap instead.
+	const parentContent = () => (
+		<>
 			<Show when={depth() === 1}>
-				<scrollbox
-					height="100%"
-					border
-					borderColor={theme.border}
-					backgroundColor={theme.background}
-				>
-					<For each={SECTIONS}>
-						{(section, index) => (
-							<Row
-								label={`${section.id + 1}. ${section.label}`}
-								focused={index() === focusedSectionIdx()}
-								active={false}
-							/>
-						)}
-					</For>
-				</scrollbox>
+				{/* previous depth = sections list (read-only) */}
+				<For each={SECTIONS}>
+					{(section, index) => (
+						<Row
+							label={`${section.id + 1}. ${section.label}`}
+							focused={index() === focusedSectionIdx()}
+							active={false}
+						/>
+					)}
+				</For>
 			</Show>
 			<Show when={depth() === 2}>
-				<scrollbox
-					height="100%"
-					border
-					borderColor={theme.border}
-					backgroundColor={theme.background}
-				>
-					<For each={items()}>
-						{(it, index) => (
-							<Row
-								label={`${it.label}  ${it.display()}`}
-								focused={index() === focusedItemIdx()}
-								active={false}
-							/>
-						)}
-					</For>
-				</scrollbox>
+				{/* previous depth = items list (read-only) */}
+				<For each={items()}>
+					{(it, index) => (
+						<Row
+							label={`${it.label}  ${it.display()}`}
+							focused={index() === focusedItemIdx()}
+							active={false}
+						/>
+					)}
+				</For>
 			</Show>
-		</box>
+		</>
 	);
 
-	// center = current depth
-	const CenterCol = () => (
-		<box
-			flexDirection="column"
-			flexGrow={PANE_RATIO.current}
-			flexShrink={1}
-			flexBasis={0}
-			height="100%"
-		>
-			<box height={1} paddingLeft={1} backgroundColor={headerBg}>
-				<text fg={theme.textSecondary}>
-					<Show
-						when={depth() === 0}
-						fallback={
-							<Show
-								when={depth() === 1}
-								fallback={editorItem()?.label ?? "Editor"}
-							>
-								{sectionForDepth1()?.label ?? "Items"}
-							</Show>
-						}
-					>
-						Settings
-					</Show>
-				</text>
-			</box>
-			<scrollbox
-				height="100%"
-				focused={isActive}
-				border
-				borderColor={border(isActive)}
-				backgroundColor={theme.background}
-			>
-				<Show when={depth() === 0}>
-					<For each={SECTIONS}>
-						{(section, index) => (
-							<Row
-								label={`${section.id + 1}. ${section.label}`}
-								focused={index() === focusedSectionIdx()}
-								active={isActive}
-								onMouseDown={() => {
-									nav.setActivePane(DEPTH_CENTER_PANE);
-									nav.setDepthFocus(index(), 0);
-								}}
-							/>
-						)}
-					</For>
-				</Show>
-				<Show when={depth() === 1}>
+	// ── current pane: current-depth list (or editor at depth 2) ───────────────
+	const currentContent = () => (
+		<>
+			<Show when={depth() === 0}>
+				<For each={SECTIONS}>
+					{(section, index) => (
+						<Row
+							label={`${section.id + 1}. ${section.label}`}
+							focused={index() === focusedSectionIdx()}
+							active={isActive()}
+							onMouseDown={() => {
+								nav.setActivePane(DEPTH_CENTER_PANE);
+								nav.setDepthFocus(index(), 0);
+							}}
+						/>
+					)}
+				</For>
+			</Show>
+			<Show when={depth() === 1}>
+				<box flexDirection="column">
 					<For each={items()}>
 						{(it, index) => (
 							<Row
 								label={`${it.label}`}
 								value={it.display()}
 								focused={index() === focusedItemIdx()}
-								active={isActive}
+								active={isActive()}
 								hint={hintFor(it)}
 								onMouseDown={() => {
 									nav.setActivePane(DEPTH_CENTER_PANE);
@@ -372,50 +335,37 @@ export function SettingsPage() {
 							<text fg={theme.muted ?? theme.textMuted}>(No items.)</text>
 						</box>
 					</Show>
+				</box>
+			</Show>
+			<Show when={depth() === 2}>
+				{/* depth 2: editor */}
+				<Show
+					when={editorItem()?.renderEditor}
+					fallback={<GenericEditor item={editorItem()!} />}
+				>
+					{editorItem()!.renderEditor!()}
 				</Show>
-				<Show when={depth() === 2}>
-					<Show
-						when={editorItem()?.renderEditor}
-						fallback={<GenericEditor item={editorItem()!} />}
-					>
-						{editorItem()!.renderEditor!()}
-					</Show>
-				</Show>
-			</scrollbox>
-		</box>
+			</Show>
+		</>
 	);
 
-	// right = preview / help
-	const RightCol = () => (
-		<box
-			flexDirection="column"
-			flexGrow={PANE_RATIO.preview}
-			flexShrink={1}
-			flexBasis={0}
-			height="100%"
-		>
-			<box height={1} paddingLeft={1} backgroundColor={headerBg}>
-				<text fg={theme.textSecondary}>Preview</text>
-			</box>
-			<scrollbox
-				height="100%"
-				border
-				borderColor={theme.border}
-				backgroundColor={theme.background}
-			>
-				<box padding={1}>
-					<MultiLine text={previewText()} />
-				</box>
-			</scrollbox>
+	// ── preview pane ──────────────────────────────────────────────────────────
+	const previewContent = () => (
+		<box padding={1}>
+			<MultiLine text={previewText()} />
 		</box>
 	);
 
 	return (
-		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
-			{LeftCol()}
-			{CenterCol()}
-			{RightCol()}
-		</box>
+		<YaziPaneRow
+			parent={parentContent}
+			current={currentContent}
+			preview={previewContent}
+			parentLabel={parentLabel}
+			currentLabel={currentLabel}
+			previewLabel="Detail"
+			focused={isActive}
+		/>
 	);
 }
 
