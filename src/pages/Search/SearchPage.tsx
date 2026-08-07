@@ -60,16 +60,22 @@ function SearchPage() {
 	// `inputFocused` is true while the query input is being typed in. The Shell
 	// router yields keys to the <input> while this is true; Escape (in Shell)
 	// sets it false so navigation resumes; `s` (search action) sets it true.
-	// Depth transitions also drive it: typing is the default on the query depth.
-	let prevDepth = depth();
-	onMount(() => nav.setInputFocused(true));
+	//
+	// Typing is the default only on the query depth (0); the results depth
+	// (1) is always list-navigation. Drive `inputFocused` straight off
+	// `depth()` rather than seeding it `true` on mount and patching on change:
+	// the depth stack persists across tab switches, so re-mounting this page
+	// at depth 1 (e.g. after searching, leaving, and returning to the tab)
+	// must NOT leave `inputFocused` stuck on — otherwise the Shell swallows
+	// j/k (yielding to a non-existent input) and only the scrollbox's native
+	// scroll responds.
+	//
+	// The effect only re-runs on a depth transition, so Escape (defocus) and
+	// `s` (refocus) at the same depth are not clobbered.
+	onMount(() => nav.setInputFocused(depth() === 0));
 	onCleanup(() => nav.setInputFocused(false));
 	createEffect(() => {
-		const d = depth();
-		if (d !== prevDepth) {
-			nav.setInputFocused(d === 0);
-			prevDepth = d;
-		}
+		nav.setInputFocused(depth() === 0);
 	});
 
 	// ── results (depth 1) ─────────────────────────────────────────────────────
@@ -312,7 +318,9 @@ function SearchPage() {
 											{result.podcast.title}
 										</text>
 										<Show when={result.podcast.isSubscribed}>
-											<text fg={index() === fi() ? theme.surface : theme.success}>
+											<text
+												fg={index() === fi() ? theme.surface : theme.success}
+											>
 												[+]
 											</text>
 										</Show>
