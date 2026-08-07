@@ -88,7 +88,7 @@ function ensureBackend(): AudioBackend {
 // ── Process-exit teardown ─────────────────────────────────────────────
 // `q` (the quit action) calls `process.exit(0)`, which bypasses Solid's
 // onCleanup — where `backend.dispose()` would otherwise kill the spawned
-// player (mpv/ffplay/afplay). Without this hook those child processes
+// player (mpv). Without this hook those child processes
 // survive the host and keep playing audio after the TUI has quit. The
 // `exit` event fires synchronously on `process.exit(N)`; the signal
 // handlers cover Ctrl-C / kill, which otherwise terminate without running

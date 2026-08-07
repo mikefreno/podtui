@@ -16,9 +16,6 @@ type PlaybackControlsProps = {
 
 const BACKEND_LABELS: Record<BackendName, string> = {
 	mpv: "mpv",
-	ffplay: "ffplay",
-	afplay: "afplay",
-	system: "system",
 	none: "none",
 };
 
@@ -60,10 +57,12 @@ export function PlaybackControls(props: PlaybackControlsProps) {
 			<box flexDirection="row" gap={1} marginLeft={2}>
 				<text fg={theme.textMuted}>Vol</text>
 				<text fg={theme.text}>{Math.round(props.volume * 100)}%</text>
+				<text fg={theme.textMuted}>↑↓</text>
 			</box>
 			<box flexDirection="row" gap={1} marginLeft={2}>
 				<text fg={theme.textMuted}>Speed</text>
 				<text fg={theme.text}>{props.speed}x</text>
+				<text fg={theme.textMuted}>s</text>
 			</box>
 			{props.backendName && props.backendName !== "none" && (
 				<box flexDirection="row" gap={1} marginLeft={2}>

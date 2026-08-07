@@ -82,8 +82,9 @@ export function PlayerPage() {
 						<RealtimeWaveform
 							visualizerConfig={(() => {
 								const viz = useAppStore().state().settings.visualizer;
+								// bars is width-derived in RealtimeWaveform; pass only the
+								// audio-processing params here.
 								return {
-									bars: viz.bars,
 									noiseReduction: viz.noiseReduction,
 									lowCutOff: viz.lowCutOff,
 									highCutOff: viz.highCutOff,
@@ -109,7 +110,7 @@ export function PlayerPage() {
 
 			<box height={1} />
 			<text fg={muted()}>
-				{"P play/pause  N next  B prev  </ seek · h back"}
+				{"P play/pause  N next  B prev  ◀▶ seek  h back"}
 			</text>
 		</box>
 	);

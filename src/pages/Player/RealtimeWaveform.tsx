@@ -8,6 +8,7 @@
  */
 
 import { createSignal, createEffect, onCleanup, on, untrack } from "solid-js";
+import { useTerminalDimensions } from "@opentui/solid";
 import {
 	loadCavaCore,
 	type CavaCore,
@@ -16,6 +17,7 @@ import {
 import { AudioStreamReader } from "@/utils/audio-stream-reader";
 import { useAudio } from "@/hooks/useAudio";
 import { useTheme } from "@/context/ThemeContext";
+import { PANE_RATIO } from "@/utils/navigation";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -51,17 +53,27 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 	// Frequency bar values (0.0–1.0 per bar)
 	const [barData, setBarData] = createSignal<number[]>([]);
 
-	// Track whether cavacore is available
-	const [available, setAvailable] = createSignal(false);
-
 	let cava: CavaCore | null = null;
 	let reader: AudioStreamReader | null = null;
 	let frameTimer: ReturnType<typeof setInterval> | null = null;
 	let sampleBuffer: Float64Array | null = null;
 
-	// Bar count comes from the visualizer config (set in Settings); default 64.
-	// Single source of truth used for cavacore init, rendering, and seek clicks.
-	const numBars = () => props.visualizerConfig?.bars ?? 64;
+	// Bar count scales with terminal width so the waveform fills its pane.
+	// The player is a 2-pane row: current column = (current+preview) of
+	// (parent+current+preview) of the terminal width. Subtract ~8 chars of
+	// chrome (scrollbox border + box padding + waveform border + padding).
+	// Falls back to 64 before the renderer reports a real size.
+	const dimensions = useTerminalDimensions();
+	const numBars = () => {
+		const total = PANE_RATIO.parent + PANE_RATIO.current + PANE_RATIO.preview;
+		const current = PANE_RATIO.current + PANE_RATIO.preview; // 2-pane grows current
+		const width = dimensions().width;
+		if (!width) return 64;
+		return Math.max(
+			8,
+			Math.min(256, Math.floor((width * current) / total) - 8),
+		);
+	};
 
 	// ── Lifecycle: init cavacore once ──────────────────────────────────
 
@@ -70,11 +82,9 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 
 		cava = loadCavaCore();
 		if (!cava) {
-			setAvailable(false);
 			return false;
 		}
 
-		setAvailable(true);
 		return true;
 	};
 
@@ -85,7 +95,9 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 
 		if (!url || !initCava() || !cava) return;
 
-		// Initialize cavacore with current resolution + any overrides
+		// Initialize cavacore with current resolution + any overrides.
+		// bars is width-derived (see numBars); visualizerConfig supplies the
+		// audio-processing params (noise reduction, cutoffs, etc.).
 		const config: CavaCoreConfig = {
 			bars: numBars(),
 			sampleRate: 44100,
@@ -140,7 +152,7 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		const output = cava.execute(input);
 
 		// Copy bar values to a new array for the signal
-		setBarData(Array.from(output));
+		setBarData(Array.from(output as Float64Array));
 	};
 
 	createEffect(

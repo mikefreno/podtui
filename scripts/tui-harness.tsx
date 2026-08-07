@@ -436,16 +436,9 @@ async function main() {
 	}
 	if (newAction) {
 		if (flags.audio && audioControls?.switchBackend) {
-			// Re-detect: clear env so detection picks the best real backend.
-			delete process.env.PODTUI_AUDIO_BACKEND;
 			// Force (re)creation of a real backend; useAudio caches, switchBackend resets.
+			delete process.env.PODTUI_AUDIO_BACKEND;
 			await audioControls.switchBackend("mpv").catch(() => {});
-			if (
-				!audioControls.backendName() ||
-				audioControls.backendName() === "none"
-			) {
-				await audioControls.switchBackend("afplay").catch(() => {});
-			}
 		}
 		actions.push(newAction);
 		saveActions(actions);
