@@ -23,8 +23,8 @@ make native               # build libcavacore.dylib from the vendored C source
 bun run dev               # launch with hot reload (alias: make dev)
 ```
 
-The app is a TUI — it expects a real terminal (kitty, iTerm2, WezTerm, tmux,
-…). It will not render in a plain captured `bash` session.
+The app is a TUI — it expects a real terminal (Ghostty, kitty, iTerm2,
+      WezTerm, tmux, …). It will not render in a plain captured `bash` session.
 
 ## What each command does
 
@@ -35,13 +35,10 @@ The app is a TUI — it expects a real terminal (kitty, iTerm2, WezTerm, tmux,
 | `bun run dev`      | Run with hot reload                                                       |
 | `bun run start`    | Run once (no watch)                                                       |
 | `bun test`         | Run the test suite (see [Testing](#testing))                              |
-| `make lint`        | Type-check with `bun tsc --noEmit`                                        |
+| `bun run lint`        | Type-check                                         |
 | `bun run build`    | Bundle JS into `dist/` + copy native libs (the `podtui` npm script path)  |
 | `make dist`        | Compile the standalone binary + make the current platform's tarball       |
 | `make clean`       | Remove `dist/`                                                             |
-
-> Note: `package.json` also has a `lint` script that points at a
-> `lint.ts` file that doesn't exist. Use `make lint` (real type-checking).
 
 ## Repository layout
 
@@ -112,10 +109,6 @@ Cavacore smoke test: `bun tests/cavacore-smoke.ts`
    `-headerpad`” for a prebuilt dylib. The app dlopens the libs by path, so
    the warning is cosmetic; installs complete and the app boots.
 
-4. **`make lint` is the truth, not the `package.json` scripts.**
-   The repo's ESLint wiring is stale; `make lint` runs the real
-   type-check and is what CI treats as the clean bar.
-
 ## Testing
 
 ```bash
@@ -135,7 +128,7 @@ Audio is a no-op during those snapshots. The last frame lands in
 
 ## Releasing
 
-Releases are built and published from **tags**; CI does the heavy lifting.
+Releases are built and published from **tags**
 
 ### Steps
 

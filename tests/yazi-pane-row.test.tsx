@@ -106,7 +106,12 @@ async function renderPaneRow(props: TestPaneProps): Promise<{
 		await new Promise((r) => setTimeout(r, 40));
 	}
 	const spans = setup.captureSpans() as unknown as Frame;
-	return { spans, destroy: () => setup.renderer.destroy() };
+	return {
+		spans,
+		destroy: async () => {
+			setup.renderer.destroy();
+		},
+	};
 }
 
 const cleanups: (() => void | Promise<void>)[] = [];

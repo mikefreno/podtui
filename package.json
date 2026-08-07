@@ -14,7 +14,7 @@
     "build": "bun run build.ts",
     "dist": "bun dist/index.js",
     "test": "bun test",
-    "lint": "bun run lint.ts"
+    "lint": "bun tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",
