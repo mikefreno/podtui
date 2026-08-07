@@ -70,6 +70,11 @@ sudo install -m755 podtui /usr/local/bin/podtui
 > The tarball contains `podtui` plus `libopentui.<ext>` and
 > `libcavacore.<ext>` **beside it** — keep them together (don't move just the
 > binary alone), or the native FFI libraries won't load.
+>
+> One caveat: the embedded runtime reads a `bunfig.toml` from the directory
+> you launch from. If that file has a `preload` entry (as Bun project
+> directories often do), startup fails with `preload not found`. Launching
+> from a normal directory (home, `~/bin`, …) works fine.
 
 ### 3. Arch Linux (AUR)
 
@@ -187,9 +192,10 @@ make dist-mac    # (run on macOS)    → podtui-darwin-<arch>.tar.gz
 make dist-linux  # (run on Linux)    → podtui-linux-<arch>.tar.gz
 ```
 
-`make dist` compiles against `bunfig.standalone.toml` (a preload-free Bun
-config) so the emitted binary doesn't bake in the dev-only `@opentui/solid`
-preload. The solid JSX transform is registered in `build.ts` itself.
+`make dist` emits a config-independent binary: Bun does not bake bunfig
+settings into `--compile` output, and the solid JSX transform is registered in
+`build.ts` itself. The binary then embeds the `preload`-free runtime, so launch
+it from any normal directory.
 
 ## Packaging model
 

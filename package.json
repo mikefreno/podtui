@@ -8,8 +8,8 @@
     "podtui": "./dist/index.js"
   },
   "scripts": {
-    "start": "bun src/index.tsx",
-    "dev": "bun --watch src/index.tsx",
+    "start": "bun --preload @opentui/solid/preload src/index.tsx",
+    "dev": "bun --preload @opentui/solid/preload --watch src/index.tsx",
     "build:native": "bash scripts/build-cavacore.sh",
     "build": "bun run build.ts",
     "dist": "bun dist/index.js",

@@ -1,4 +1,9 @@
-preload = ["@opentui/solid/preload"]
+# NO top-level `preload` here — intentional. A compiled PodTUI binary's
+# embedded Bun runtime reads the launching process's CWD bunfig.toml, and a
+# top-level `preload` entry (e.g. "@opentui/solid/preload", which the
+# standalone cannot resolve) makes the binary die at startup with
+# "preload not found". Dev/test still get the solid transform via explicit
+# `--preload` flags in package.json and the [test] section below.
 
 [test]
 preload = "@opentui/solid/preload"
