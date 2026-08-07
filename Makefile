@@ -47,18 +47,19 @@ native:
 	scripts/build-cavacore.sh
 
 ## Standalone binary + native-libs tarball for the current platform.
-## Compiles against an empty bunfig so the binary does not bake the
-## @opentui/solid/preload entry (which would break the compiled executable).
+## Unaffected by bunfig.toml at build time. Note: the compiled runtime reads
+## the launching process's CWD bunfig.toml, so smoke tests must run the binary
+## from a bunfig-free dir (see release.yml).
 dist:
-	BUN_CONFIG=bunfig.standalone.toml bun run build.ts --compile
+	bun run build.ts --compile
 
 ## macOS build (run on a macOS runner / host).
 dist-mac:
-	BUN_CONFIG=bunfig.standalone.toml bun run build.ts --compile
+	bun run build.ts --compile
 
 ## Linux build (run on a Linux runner / host).
 dist-linux:
-	BUN_CONFIG=bunfig.standalone.toml bun run build.ts --compile
+	bun run build.ts --compile
 
 ## Remove build artifacts.
 clean:

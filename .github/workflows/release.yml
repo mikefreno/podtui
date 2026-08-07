@@ -29,7 +29,7 @@ jobs:
           - os: ubuntu-24.04-arm
             arch: arm64
             plat: linux
-          - os: macos-latest
+          - os: macos-15-intel
             arch: x64
             plat: darwin
           - os: macos-14
@@ -47,6 +47,15 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Install fftw (cavacore build dependency)
+        run: |
+          if uname -s | grep -qi darwin; then
+            brew install fftw
+          else
+            sudo apt-get update
+            sudo apt-get install -y libfftw3-dev
+          fi
+
       - name: Build native cavacore library
         run: scripts/build-cavacore.sh
 
@@ -57,8 +66,14 @@ jobs:
         env:
           DIST_TAR: podtui-${{ matrix.plat }}-${{ matrix.arch }}.tar.gz
         run: |
-          tar -xzf dist/$DIST_TAR -C dist
-          ./dist/podtui --version
+          # The embedded runtime reads the launching process's CWD bunfig.toml.
+          # This repo's bunfig lists a preload the standalone can't resolve
+          # ("preload not found"), so kicking the binary from the workspace root
+          # would falsely fail every build. cd into a clean dir first.
+          SMOKE_DIR=$(mktemp -d)
+          tar -xzf "dist/$DIST_TAR" -C "$SMOKE_DIR"
+          cd "$SMOKE_DIR"
+          ./podtui-*/podtui --version
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

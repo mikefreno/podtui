@@ -5,9 +5,8 @@ import { plugin } from "bun";
 
 // Register the solid transform globally (dedup'd by name). This is what makes
 // `--compile` work: compile-mode builds only apply `onLoad` transform plugins
-// that are registered via `plugin()`, not the `plugins:` array. The compiled
-// binary is then built against an empty bunfig (PODTUI_COMPILE config) so the
-// runtime bakes NO preload — the solid transform is already in the binary.
+// that are registered via `plugin()`, not the `plugins:` array. The transform
+// is fully embedded in the compiled binary.
 plugin(solidPlugin);
 
 const COMPILE =
