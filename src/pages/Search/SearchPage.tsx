@@ -25,6 +25,7 @@ import {
 	onCleanup,
 } from "solid-js";
 import { useSearchStore } from "@/stores/search";
+import { useFeedStore } from "@/stores/feed";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import {
@@ -44,6 +45,7 @@ export const SearchPaneCount = 1;
 
 function SearchPage() {
 	const searchStore = useSearchStore();
+	const feedStore = useFeedStore();
 	const [inputValue, setInputValue] = createSignal("");
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
@@ -127,6 +129,8 @@ function SearchPage() {
 	};
 
 	const handleSubscribe = (result: SearchResult) => {
+		// Actually add the feed to the feed store, then mark the result subscribed
+		feedStore.addFeed(result.podcast, result.sourceId).catch(() => {});
 		searchStore.markSubscribed(result.podcast.id);
 	};
 
