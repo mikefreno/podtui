@@ -1,6 +1,12 @@
 /**
  * Discover store for PodTUI
- * Manages trending/popular podcasts and category filtering
+ * Manages trending/popular podcasts and category filtering.
+ *
+ * The featured-shows list is fetched at runtime from a JSON file hosted in the
+ * GitHub repo (discover/featured.json on the `master` branch), so the list
+ * can be updated without shipping a new release. The feed URL, de-duped set,
+ * and version field act as the cache key — a fresh fetch only happens when the
+ * version bumps or the cache window (24h) expires.
  */
 
 import { createSignal } from "solid-js";
@@ -27,125 +33,113 @@ export const DISCOVER_CATEGORIES: DiscoverCategory[] = [
 	{ id: "arts", name: "Arts", icon: "@" },
 ];
 
-/** Mock trending podcasts */
-const TRENDING_PODCASTS: Podcast[] = [
-	{
-		id: "trend-1",
-		title: "AI Today",
-		description:
-			"The latest developments in artificial intelligence, machine learning, and their impact on society.",
-		feedUrl: "https://example.com/aitoday.rss",
-		author: "Tech Futures",
-		categories: ["Technology", "Science"],
+// ── Remote featured-shows manifest ───────────────────────────────────────────
+// The raw GitHub URL serving discover/featured.json from the master branch.
+// Update this file in the repo (no release needed) to refresh the list.
+const FEATURED_JSON_URL =
+	"https://raw.githubusercontent.com/mikefreno/PodTui/master/discover/featured.json";
+
+/** Cache window for the remote featured list (24 hours) */
+const FEATURED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Shape of a single entry in the remote JSON */
+interface FeaturedEntry {
+	id: string;
+	title: string;
+	description: string;
+	feedUrl: string;
+	author?: string;
+	categories?: string[];
+}
+
+/** Shape of the remote JSON manifest */
+interface FeaturedManifest {
+	version: number;
+	podcasts: FeaturedEntry[];
+}
+
+/** Convert a JSON entry to a runtime Podcast (adding derived fields) */
+function entryToPodcast(entry: FeaturedEntry): Podcast {
+	return {
+		id: entry.id,
+		title: entry.title,
+		description: entry.description,
+		feedUrl: entry.feedUrl,
+		author: entry.author,
+		categories: entry.categories ?? [],
 		coverUrl: undefined,
 		lastUpdated: new Date(),
 		isSubscribed: false,
-	},
-	{
-		id: "trend-2",
-		title: "The History Hour",
-		description:
-			"Fascinating stories from history that shaped our world today.",
-		feedUrl: "https://example.com/historyhour.rss",
-		author: "History Channel",
-		categories: ["Education", "History"],
-		lastUpdated: new Date(),
-		isSubscribed: false,
-	},
-	{
-		id: "trend-3",
-		title: "Comedy Gold",
-		description:
-			"Weekly stand-up comedy, sketches, and hilarious conversations.",
-		feedUrl: "https://example.com/comedygold.rss",
-		author: "Laugh Factory",
-		categories: ["Comedy", "Entertainment"],
-		lastUpdated: new Date(),
-		isSubscribed: false,
-	},
-	{
-		id: "trend-4",
-		title: "Market Watch",
-		description: "Daily financial news, stock analysis, and investing tips.",
-		feedUrl: "https://example.com/marketwatch.rss",
-		author: "Finance Daily",
-		categories: ["Business", "News"],
-		lastUpdated: new Date(),
-		isSubscribed: true,
-	},
-	{
-		id: "trend-5",
-		title: "Science Weekly",
-		description:
-			"Breaking science news and in-depth analysis of the latest research.",
-		feedUrl: "https://example.com/scienceweekly.rss",
-		author: "Science Network",
-		categories: ["Science", "Education"],
-		lastUpdated: new Date(),
-		isSubscribed: false,
-	},
-	{
-		id: "trend-6",
-		title: "True Crime Files",
-		description:
-			"Investigative journalism into real criminal cases and unsolved mysteries.",
-		feedUrl: "https://example.com/truecrime.rss",
-		author: "Crime Network",
-		categories: ["True Crime", "Documentary"],
-		lastUpdated: new Date(),
-		isSubscribed: false,
-	},
-	{
-		id: "trend-7",
-		title: "Wellness Journey",
-		description:
-			"Tips for mental and physical health, meditation, and mindful living.",
-		feedUrl: "https://example.com/wellness.rss",
-		author: "Health Media",
-		categories: ["Health", "Self-Help"],
-		lastUpdated: new Date(),
-		isSubscribed: false,
-	},
-	{
-		id: "trend-8",
-		title: "Sports Talk Live",
-		description:
-			"Live commentary, analysis, and interviews from the world of sports.",
-		feedUrl: "https://example.com/sportstalk.rss",
-		author: "Sports Network",
-		categories: ["Sports", "News"],
-		lastUpdated: new Date(),
-		isSubscribed: false,
-	},
-	{
-		id: "trend-9",
-		title: "Creative Minds",
-		description:
-			"Interviews with artists, designers, and creative professionals.",
-		feedUrl: "https://example.com/creativeminds.rss",
-		author: "Arts Weekly",
-		categories: ["Arts", "Culture"],
-		lastUpdated: new Date(),
-		isSubscribed: false,
-	},
-	{
-		id: "trend-10",
-		title: "Dev Talk",
-		description:
-			"Software development, programming tutorials, and tech career advice.",
-		feedUrl: "https://example.com/devtalk.rss",
-		author: "Code Academy",
-		categories: ["Technology", "Education"],
-		lastUpdated: new Date(),
-		isSubscribed: true,
-	},
-];
+	};
+}
+
+/** Reconcile isSubscribed state across the discover list against the feed store */
+function syncSubscriptionState(
+	podcasts: Podcast[],
+	subscribedUrls: Set<string>,
+	subscribedIds: Set<string>,
+): Podcast[] {
+	return podcasts.map((p) => ({
+		...p,
+		isSubscribed: subscribedUrls.has(p.feedUrl) || subscribedIds.has(p.id),
+	}));
+}
 
 /** Create discover store */
 export function createDiscoverStore() {
 	const [selectedCategory, setSelectedCategory] = createSignal<string>("all");
 	const [isLoading, setIsLoading] = createSignal(false);
-	const [podcasts, setPodcasts] = createSignal<Podcast[]>(TRENDING_PODCASTS);
+	const [podcasts, setPodcasts] = createSignal<Podcast[]>([]);
+
+	// In-memory cache timestamp for the remote manifest (within 24h, skip refetch)
+	let cachedAt = 0;
+
+	/** Reconcile local isSubscribed flags with the feed store */
+	const syncSubscriptions = () => {
+		const feedStore = useFeedStore();
+		const feeds = feedStore.feeds();
+		const urls = new Set(feeds.map((f) => f.podcast.feedUrl));
+		const ids = new Set(feeds.map((f) => f.podcast.id));
+		setPodcasts((prev) => syncSubscriptionState(prev, urls, ids));
+	};
+
+	/** Fetch the featured-shows manifest from GitHub if stale */
+	const refresh = async () => {
+		setIsLoading(true);
+		try {
+			// Skip if cache is still fresh
+			const now = Date.now();
+			if (now - cachedAt < FEATURED_CACHE_TTL_MS) {
+				syncSubscriptions();
+				return;
+			}
+
+			const resp = await fetch(FEATURED_JSON_URL, {
+				headers: { "User-Agent": "PodTUI/1.0" },
+			});
+			if (!resp.ok) {
+				syncSubscriptions();
+				return;
+			}
+			const manifest = (await resp.json()) as FeaturedManifest;
+			if (!manifest?.podcasts?.length) {
+				syncSubscriptions();
+				return;
+			}
+
+			// Build the podcast list from the manifest entries
+			const fetched = manifest.podcasts.map(entryToPodcast);
+			cachedAt = now;
+			setPodcasts(fetched);
+
+			// Reflect current feed-store subscriptions
+			syncSubscriptions();
+		} catch {
+			// Network failure — keep whatever we have (stale or empty)
+		} finally {
+			setIsLoading(false);
+		}
+	};
 
 	/** Get filtered podcasts by category */
 	const filteredPodcasts = () => {
@@ -196,15 +190,6 @@ export function createDiscoverStore() {
 		} else {
 			subscribe(podcastId);
 		}
-	};
-
-	/** Refresh trending podcasts (mock) */
-	const refresh = async () => {
-		setIsLoading(true);
-		// Simulate network delay
-		await new Promise((r) => setTimeout(r, 500));
-		// In real app, would fetch from API
-		setIsLoading(false);
 	};
 
 	return {

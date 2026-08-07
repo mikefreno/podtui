@@ -1,0 +1,405 @@
+{
+  "version": 1,
+  "podcasts": [
+    {
+      "id": "discover-daily",
+      "title": "The Daily",
+      "description": "This is how the news should sound. Twenty minutes a day, five days a week, hosted by Michael Barbaro and Sabrina Tavernise. Powered by New York Times journalism.",
+      "feedUrl": "http://rss.art19.com/the-daily",
+      "author": "The New York Times",
+      "categories": ["News", "Politics"]
+    },
+    {
+      "id": "discover-up-first",
+      "title": "Up First",
+      "description": "NPR's Up First covers the three biggest stories of the day, with reporting and analysis from NPR News — in 10 minutes.",
+      "feedUrl": "https://feeds.npr.org/510318/podcast.xml",
+      "author": "NPR",
+      "categories": ["News"]
+    },
+    {
+      "id": "discover-npr-politics",
+      "title": "The NPR Politics Podcast",
+      "description": "Where everyone gathers for the political conversation of the day. NPR's political reporters talk through the biggest news of the week.",
+      "feedUrl": "https://feeds.npr.org/510310/podcast.xml",
+      "author": "NPR",
+      "categories": ["News", "Politics"]
+    },
+    {
+      "id": "discover-code-switch",
+      "title": "Code Switch",
+      "description": "Race. In your face. A podcast from NPR that fearlessly explores how race impacts every part of society — from politics to pop culture.",
+      "feedUrl": "https://feeds.npr.org/510352/podcast.xml",
+      "author": "NPR",
+      "categories": ["News", "Culture", "Politics"]
+    },
+    {
+      "id": "discover-rough-translation",
+      "title": "Rough Translation",
+      "description": "How are the things we're talking about covered in the rest of the world? NPR's Rough Translation takes you to far-off places and shows you the unexpected.",
+      "feedUrl": "https://feeds.npr.org/510324/podcast.xml",
+      "author": "NPR",
+      "categories": ["News", "Culture"]
+    },
+    {
+      "id": "discover-crime-junkie",
+      "title": "Crime Junkie",
+      "description": "Crime Junkie satisfies true crime cravings with host Ashley Flowers' obsessed yet accessible approach to real-life mysteries — from unsolved murders to missing persons.",
+      "feedUrl": "https://feeds.simplecast.com/qm_9xx0g",
+      "author": "audiochuck",
+      "categories": ["True Crime"]
+    },
+    {
+      "id": "discover-serial",
+      "title": "Serial",
+      "description": "Serial Productions makes narrative podcasts that have transformed the medium. From the team that brought you the original Serial, one of the most influential podcasts of all time.",
+      "feedUrl": "https://feeds.simplecast.com/PpzWFGhg",
+      "author": "Serial Productions & The New York Times",
+      "categories": ["True Crime", "Storytelling"]
+    },
+    {
+      "id": "discover-intelligence-matters",
+      "title": "Intelligence Matters",
+      "description": "A deep dive into national security, intelligence, and foreign policy with top former officials and experts hosted by CBS News senior correspondent.",
+      "feedUrl": "https://rss.art19.com/intelligence-matters",
+      "author": "CBS News",
+      "categories": ["True Crime", "Politics", "News"]
+    },
+    {
+      "id": "discover-smartless",
+      "title": "SmartLess",
+      "description": "Jason Bateman, Sean Hayes, and Will Arnett bring you unscripted conversations with surprise celebrity guests — each episode one host reveals the guest to the others.",
+      "feedUrl": "https://rss.art19.com/smartless",
+      "author": "Jason Bateman, Sean Hayes, Will Arnett",
+      "categories": ["Comedy", "Entertainment"]
+    },
+    {
+      "id": "discover-this-past-weekend",
+      "title": "This Past Weekend w/ Theo Von",
+      "description": "Comedian Theo Von's uniquely southern perspective blends heartfelt vulnerability and offbeat humor in conversations ranging from celebrity interviews to solo musings.",
+      "feedUrl": "https://feeds.megaphone.fm/thispastweekend",
+      "author": "Theo Von",
+      "categories": ["Comedy"]
+    },
+    {
+      "id": "discover-joe-rogan",
+      "title": "The Joe Rogan Experience",
+      "description": "The official podcast of comedian Joe Rogan. Long-form conversations with guests from every corner of culture, science, comedy, and beyond.",
+      "feedUrl": "https://feeds.megaphone.fm/GLT1412515089",
+      "author": "Joe Rogan",
+      "categories": ["Comedy", "Entertainment"]
+    },
+    {
+      "id": "discover-comedy-bang-bang",
+      "title": "Comedy Bang Bang: The Podcast",
+      "description": "A weekly comedy podcast hosted by Scott Aukerman featuring improv, games, and hilarious conversations with celebrities and the world's best comedians.",
+      "feedUrl": "https://rss.art19.com/comedy-bang-bang",
+      "author": "Earwolf",
+      "categories": ["Comedy"]
+    },
+    {
+      "id": "discover-office-ladies",
+      "title": "Office Ladies",
+      "description": "The Office stars Jenna Fischer and Angela Kinsey break down each episode of The Office with behind-the-scenes stories, fun facts, and fan Q&A.",
+      "feedUrl": "https://rss.art19.com/office-ladies",
+      "author": "Earwolf",
+      "categories": ["Comedy", "Entertainment"]
+    },
+    {
+      "id": "discover-how-did-this-get-made",
+      "title": "How Did This Get Made?",
+      "description": "Comedians Paul Scheer, June Diane Raphael, and Jason Mantzoukas break down the very best of the worst films ever made — blockbuster flops, cult classics, and Nic Cage movies.",
+      "feedUrl": "https://rss.art19.com/how-did-this-get-made",
+      "author": "Earwolf",
+      "categories": ["Comedy", "Film"]
+    },
+    {
+      "id": "discover-wait-wait",
+      "title": "Wait Wait... Don't Tell Me!",
+      "description": "NPR's weekly news quiz show. Test your knowledge against the week's biggest news, with panelists and celebrity guests competing in hilarious trivia.",
+      "feedUrl": "https://feeds.npr.org/344098539/podcast.xml",
+      "author": "NPR",
+      "categories": ["Comedy", "News"]
+    },
+    {
+      "id": "discover-new-heights",
+      "title": "New Heights with Jason & Travis Kelce",
+      "description": "Football's funniest family duo — Super Bowl champions Jason and Travis Kelce — drop weekly insights about the NFL and share inside perspectives on sports headlines.",
+      "feedUrl": "https://rss.art19.com/new-heights",
+      "author": "Jason & Travis Kelce",
+      "categories": ["Sports", "Comedy"]
+    },
+    {
+      "id": "discover-bill-simmons",
+      "title": "The Bill Simmons Podcast",
+      "description": "Bill Simmons and his cadre of opinionated guests discuss sports, pop culture, and everything in between on The Ringer's flagship podcast.",
+      "feedUrl": "https://rss.art19.com/the-bill-simmons-podcast",
+      "author": "The Ringer",
+      "categories": ["Sports", "Entertainment"]
+    },
+    {
+      "id": "discover-acquired",
+      "title": "Acquired",
+      "description": "Acquired tells the stories and strategies of the world's greatest companies. Each episode is a deep dive into a single company's history and the playbooks behind its success.",
+      "feedUrl": "https://feeds.transistor.fm/acquired",
+      "author": "Ben Gilbert & David Rosenthal",
+      "categories": ["Business", "Technology"]
+    },
+    {
+      "id": "discover-all-in",
+      "title": "All-In Podcast",
+      "description": "Four tech industry veterans share their unfiltered perspectives on technology, economics, politics, and culture. Insightful, opinionated, and occasionally controversial.",
+      "feedUrl": "https://feeds.transistor.fm/all-in",
+      "author": "Chamath, Jason, Sacks & Friedberg",
+      "categories": ["Business", "Technology", "Politics"]
+    },
+    {
+      "id": "discover-planet-money",
+      "title": "Planet Money",
+      "description": "The economy explained. NPR's Planet Money breaks down the economy with creative storytelling that makes sense of a complicated, ever-changing world.",
+      "feedUrl": "https://feeds.npr.org/510289/podcast.xml",
+      "author": "NPR",
+      "categories": ["Business", "Economics"]
+    },
+    {
+      "id": "discover-how-i-built-this",
+      "title": "How I Built This with Guy Raz",
+      "description": "Guy Raz interviews the world's best-known entrepreneurs to learn how they built their iconic brands. A master-class on innovation, creativity, and leadership.",
+      "feedUrl": "https://feeds.npr.org/510313/podcast.xml",
+      "author": "NPR / Wondery",
+      "categories": ["Business", "Technology"]
+    },
+    {
+      "id": "discover-freakonomics",
+      "title": "Freakonomics Radio",
+      "description": "Discover the hidden side of everything with Stephen Dubner. Each episode explores the riddles of everyday life using the tools of economics.",
+      "feedUrl": "https://feeds.feedburner.com/freakonomicsradio",
+      "author": "Stephen J. Dubner",
+      "categories": ["Business", "Economics", "Society"]
+    },
+    {
+      "id": "discover-darknet-diaries",
+      "title": "Darknet Diaries",
+      "description": "True stories from the dark side of the Internet. Host Jack Rhysider investigates hacks, data breaches, cybercrime, and digital espionage with rigorous journalism and captivating storytelling.",
+      "feedUrl": "https://podcast.darknetdiaries.com/",
+      "author": "Jack Rhysider",
+      "categories": ["Technology", "True Crime"]
+    },
+    {
+      "id": "discover-changelog",
+      "title": "The Changelog",
+      "description": "Software's best weekly news brief, deep technical interviews, and talk show. Conversations with the hackers, leaders, and innovators of the open source and software world.",
+      "feedUrl": "https://changelog.fm/rss",
+      "author": "Changelog Media",
+      "categories": ["Technology", "Software Engineering"]
+    },
+    {
+      "id": "discover-twit",
+      "title": "This Week in Tech (TWiT)",
+      "description": "Your first podcast of the week, the last word in tech. Leo Laporte and a rotating panel of tech experts discuss the week's biggest tech news.",
+      "feedUrl": "https://feeds.twit.tv/twit.xml",
+      "author": "TWiT",
+      "categories": ["Technology"]
+    },
+    {
+      "id": "discover-radiolab",
+      "title": "Radiolab",
+      "description": "Radiolab is on a curiosity bender. Each episode weaves together science, legal history, and deeply human stories with innovative sound design. Hosted by Lulu Miller and Latif Nasser.",
+      "feedUrl": "http://feeds.wnyc.org/radiolab",
+      "author": "WNYC Studios",
+      "categories": ["Science", "Storytelling"]
+    },
+    {
+      "id": "discover-huberman-lab",
+      "title": "Huberman Lab",
+      "description": "Regularly ranked as the #1 health podcast in the world. Dr. Andrew Huberman discusses science and science-based tools for everyday life: sleep, focus, fitness, and performance.",
+      "feedUrl": "https://feeds.megaphone.fm/hubermanlab",
+      "author": "Scicomm Media",
+      "categories": ["Health", "Science"]
+    },
+    {
+      "id": "discover-skeptics-guide",
+      "title": "The Skeptics' Guide to the Universe",
+      "description": "Your guide to reality. A weekly science and critical thinking podcast that explores myths, conspiracies, pseudoscience, and the latest scientific discoveries — with a skeptical eye.",
+      "feedUrl": "https://feeds.feedburner.com/TheSkepticsGuideToTheUniverse",
+      "author": "Steven Novella",
+      "categories": ["Science", "Philosophy"]
+    },
+    {
+      "id": "discover-throughline",
+      "title": "Throughline",
+      "description": "The past is never past. NPR's Throughline travels beyond the headlines to answer the question 'How did we get here?' Each episode brings history to life from ancient civilizations to forgotten figures.",
+      "feedUrl": "https://feeds.npr.org/510333/podcast.xml",
+      "author": "NPR",
+      "categories": ["History", "Politics"]
+    },
+    {
+      "id": "discover-hardcore-history",
+      "title": "Dan Carlin's Hardcore History",
+      "description": "In Hardcore History, journalist and broadcaster Dan Carlin applies his unorthodox, 'Martian' way of thinking to the past. Multi-hour deep dives into pivotal events that blend high drama with masterful narration.",
+      "feedUrl": "https://feeds.feedburner.com/dancarlin/history",
+      "author": "Dan Carlin",
+      "categories": ["History"]
+    },
+    {
+      "id": "discover-history-of-rome",
+      "title": "The History of Rome",
+      "description": "A weekly chronological podcast tracing the entire history of Rome, from its mythical founding to the fall of the Western Empire. A masterclass in narrative history.",
+      "feedUrl": "https://feeds.feedburner.com/TheHistoryOfRome",
+      "author": "Mike Duncan",
+      "categories": ["History"]
+    },
+    {
+      "id": "discover-philosophize-this",
+      "title": "Philosophize This!",
+      "description": "Stephen West walks through the entire history of philosophy chronologically, from the pre-Socratics to contemporary thinkers. Making profound ideas accessible without dumbing them down.",
+      "feedUrl": "https://feed.podbean.com/philosophizethis/feed.xml",
+      "author": "Stephen West",
+      "categories": ["Philosophy", "Education"]
+    },
+    {
+      "id": "discover-very-bad-wizards",
+      "title": "Very Bad Wizards",
+      "description": "A philosopher (Tamler Sommers) and a psychologist (David Pizarro) discuss human nature, ethics, free will, and whatever movie they just watched. Irreverent, insightful, and intellectually honest.",
+      "feedUrl": "https://feed.podbean.com/verybadwizards/feed.xml",
+      "author": "Tamler Sommers & David Pizarro",
+      "categories": ["Philosophy", "Science"]
+    },
+    {
+      "id": "discover-big-picture",
+      "title": "The Big Picture",
+      "description": "The Ringer's Sean Fennessey and Amanda Dobbins discuss the week in movies, TV, and streaming — from box office analysis to what's worth your time.",
+      "feedUrl": "https://rss.art19.com/the-big-picture",
+      "author": "The Ringer",
+      "categories": ["Film", "Entertainment"]
+    },
+    {
+      "id": "discover-all-songs-considered",
+      "title": "All Songs Considered",
+      "description": "NPR's flagship music discovery podcast, delivering the best new releases every week across indie rock, jazz, electronic, and everything in between. Discover music you wouldn't stumble across on your own.",
+      "feedUrl": "https://feeds.npr.org/510019/podcast.xml",
+      "author": "NPR Music",
+      "categories": ["Music"]
+    },
+    {
+      "id": "discover-switched-on-pop",
+      "title": "Switched on Pop",
+      "description": "Musicologist Nate Sloan and songwriter Charlie Harding explain why pop music sounds the way it does — pulling apart chord progressions, production tricks, and cultural trends with zero snobbery.",
+      "feedUrl": "https://feeds.megaphone.fm/switchedonpop",
+      "author": "Vox Media / Panoply",
+      "categories": ["Music"]
+    },
+    {
+      "id": "discover-hit-parade",
+      "title": "Hit Parade",
+      "description": "Slate's Chris Molanphy traces how songs and genres conquered the Billboard charts, weaving chart history, cultural context, and pure trivia into each episode.",
+      "feedUrl": "https://feeds.megaphone.fm/hitparade",
+      "author": "Slate",
+      "categories": ["Music", "History"]
+    },
+    {
+      "id": "discover-song-exploder",
+      "title": "Song Exploder",
+      "description": "Musicians take apart their songs, piece by piece, and tell the story of how they were made. Past guests include Billie Eilish, Fleetwood Mac, and Lin-Manuel Miranda.",
+      "feedUrl": "https://songexploder.net/rss",
+      "author": "Hrishikesh Hirway",
+      "categories": ["Music", "Arts"]
+    },
+    {
+      "id": "discover-blank-check",
+      "title": "Blank Check with Griffin & David",
+      "description": "Reviews of directors' complete filmographies, episode by episode. Specifically, auteurs whose early successes afforded them the rare 'blank check' from Hollywood. Painstakingly hilarious detail.",
+      "feedUrl": "https://audioboom.com/channels/4278829.rss",
+      "author": "Griffin Newman & David Sims",
+      "categories": ["Film", "Comedy"]
+    },
+    {
+      "id": "discover-99-invisible",
+      "title": "99% Invisible",
+      "description": "A sound-rich, narrative podcast about all the thought that goes into the things we don't think about — the unnoticed architecture and design that shape our world. Hosted by Roman Mars.",
+      "feedUrl": "https://feeds.simplecast.com/BqbsxVfO",
+      "author": "Roman Mars",
+      "categories": ["Design", "Arts", "Culture"]
+    },
+    {
+      "id": "discover-gastropod",
+      "title": "Gastropod",
+      "description": "Food with a side of science and history. Co-hosts Cynthia Graber and Nicola Twilley explore the hidden history and surprising science behind a different food or farming topic every other week.",
+      "feedUrl": "https://gastropod.com/feed",
+      "author": "Cynthia Graber & Nicola Twilley",
+      "categories": ["Food", "Science", "History"]
+    },
+    {
+      "id": "discover-this-american-life",
+      "title": "This American Life",
+      "description": "Hosted by Ira Glass, each episode weaves together stories around a single theme. Combining investigative reporting with intimate personal narratives, it sets the gold standard for audio storytelling.",
+      "feedUrl": "https://www.thisamericanlife.org/podcast/rss.xml",
+      "author": "This American Life",
+      "categories": ["Storytelling", "Culture"]
+    },
+    {
+      "id": "discover-ted-talks-daily",
+      "title": "TED Talks Daily",
+      "description": "Thought-provoking ideas on every subject imaginable from the world's leading thinkers and creators. A new TED Talk every weekday.",
+      "feedUrl": "https://feeds.feedburner.com/TEDTalks_audio",
+      "author": "TED",
+      "categories": ["Education", "Storytelling"]
+    },
+    {
+      "id": "discover-tim-ferriss",
+      "title": "The Tim Ferriss Show",
+      "description": "Tim Ferriss deconstructs world-class performers — from billionaires to chess prodigies to athletes — to extract the tools, tactics, and routines you can apply to your own life.",
+      "feedUrl": "https://rss.art19.com/tim-ferriss-show",
+      "author": "Tim Ferriss",
+      "categories": ["Self-Improvement", "Business"]
+    },
+    {
+      "id": "discover-jordan-harbinger",
+      "title": "The Jordan Harbinger Show",
+      "description": "In-depth conversations with fascinating minds — from Ray Dalio to arms traffickers. Jordan Harbinger unpacks guests' wisdom into practical nuggets for work, life, and relationships.",
+      "feedUrl": "https://rss.art19.com/the-jordan-harbinger-show",
+      "author": "Jordan Harbinger",
+      "categories": ["Self-Improvement"]
+    },
+    {
+      "id": "discover-on-purpose",
+      "title": "On Purpose with Jay Shetty",
+      "description": "Jay Shetty hosts conversations and workshops designed to make you happier, healthier, and more healed. Interviews with experts, celebrities, and thought leaders on mindset and habit-building.",
+      "feedUrl": "https://rss.art19.com/on-purpose-with-jay-shetty",
+      "author": "Jay Shetty",
+      "categories": ["Self-Improvement", "Health"]
+    },
+    {
+      "id": "discover-10-percent-happier",
+      "title": "10% Happier with Dan Harris",
+      "description": "Self-help for the skeptical. ABC News anchor Dan Harris explores meditation and mindfulness with scientists, monks, and teachers, born from his own panic attack on live TV.",
+      "feedUrl": "https://rss.art19.com/ten-percent-happier",
+      "author": "Dan Harris",
+      "categories": ["Self-Improvement", "Health", "Philosophy"]
+    },
+    {
+      "id": "discover-school-of-greatness",
+      "title": "The School of Greatness",
+      "description": "Former pro athlete Lewis Howes interviews successful people across business, sports, science, and literature to help you unlock your inner greatness and live your best life.",
+      "feedUrl": "https://rss.art19.com/the-school-of-greatness",
+      "author": "Lewis Howes",
+      "categories": ["Self-Improvement", "Business"]
+    },
+    {
+      "id": "discover-sysk",
+      "title": "Stuff You Should Know",
+      "description": "If you've ever wanted to know about champagne, satanism, the Stonewall Uprising, chaos theory, LSD, El Nino, true crime or Roswell — Josh and Chuck have got you covered.",
+      "feedUrl": "https://rss.art19.com/stuff-you-should-know",
+      "author": "iHeartRadio",
+      "categories": ["Education", "Comedy"]
+    },
+    {
+      "id": "discover-in-our-time",
+      "title": "In Our Time",
+      "description": "Melvyn Bragg and guests on BBC Radio 4 discuss the history of ideas — from the Peloponnesian War to the science of photography. A weekly graduate seminar in audio form since 1998.",
+      "feedUrl": "https://podcasts.files.bbci.co.uk/b006qykl.rss",
+      "author": "BBC Radio 4",
+      "categories": ["History", "Education", "Philosophy"]
+    }
+  ]
+}

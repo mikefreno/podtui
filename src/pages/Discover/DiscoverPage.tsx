@@ -65,6 +65,12 @@ function DiscoverPage() {
 	};
 	onMount(ensureFocus);
 
+	// Auto-fetch the featured-shows manifest on first mount (network failure is
+	// non-fatal — the list stays empty until the user hits refresh).
+	onMount(() => {
+		discoverStore.refresh().catch(() => {});
+	});
+
 	onMount(() => {
 		nav.registerResolver(`${nav.activeTab()}:${DEPTH_CENTER_PANE}`, (i) => {
 			if (depth() === 0) return categories()[i]?.id;
@@ -243,7 +249,9 @@ function DiscoverPage() {
 											{podcast.title}
 										</text>
 										<Show when={podcast.isSubscribed}>
-											<text fg={index() === lf() ? theme.surface : theme.success}>
+											<text
+												fg={index() === lf() ? theme.surface : theme.success}
+											>
 												[+]
 											</text>
 										</Show>
