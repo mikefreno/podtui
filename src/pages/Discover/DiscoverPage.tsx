@@ -29,6 +29,7 @@ import {
 import { on, off } from "@/utils/event-bus";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { TabListPane } from "@/components/TabPanel";
 
 export const DiscoverPaneCount = 1;
 
@@ -151,7 +152,7 @@ function DiscoverPage() {
 	// Stable <Show> gate (not a ternary root swap) so the parent list
 	// mounts/unmounts cleanly on depth change.
 	const parentContent = () => (
-		<Show when={depth() >= 1}>
+		<Show when={depth() >= 1} fallback={<TabListPane muted />}>
 			<For each={categories()}>
 				{(cat, index) => (
 					<box
@@ -179,80 +180,29 @@ function DiscoverPage() {
 			{/* depth 0: categories */}
 			<Show when={depth() === 0}>
 				<For each={categories()}>
-				{(cat, index) => {
-					const lf = focusedCatIdx();
-					const selected = () => cat.id === discoverStore.selectedCategory();
-					return (
-						<box
-							flexDirection="row"
-							gap={1}
-							paddingLeft={1}
-							paddingRight={1}
-							backgroundColor={focusBg(index(), lf, isActive())}
-							onMouseDown={() => {
-								nav.setActivePane(DEPTH_CENTER_PANE);
-								nav.setDepthFocus(index(), 0);
-								discoverStore.setSelectedCategory(cat.id);
-							}}
-						>
-							<text fg={focusFg(index(), lf, isActive())}>
-								{index() === lf ? "❯" : " "}
-							</text>
-							<text fg={focusFg(index(), lf, isActive())}>{cat.name}</text>
-							<Show when={selected()}>
-								<text fg={index() === lf ? theme.surface : theme.accent}>
-									*
-								</text>
-							</Show>
-						</box>
-					);
-				}}
-			</For>
-			</Show>
-			{/* depth ≥1: results */}
-			<Show when={depth() >= 1}>
-				<Show
-					when={podcasts().length > 0}
-				fallback={
-					<box padding={1}>
-						<text fg={muted()}>No podcasts found. :refresh</text>
-					</box>
-				}
-			>
-				<For each={podcasts()}>
-					{(podcast, index) => {
-						const lf = focusedPodIdx();
+					{(cat, index) => {
+						const lf = focusedCatIdx();
+						const selected = () => cat.id === discoverStore.selectedCategory();
 						return (
 							<box
-								flexDirection="column"
-								gap={0}
+								flexDirection="row"
+								gap={1}
 								paddingLeft={1}
 								paddingRight={1}
 								backgroundColor={focusBg(index(), lf, isActive())}
 								onMouseDown={() => {
 									nav.setActivePane(DEPTH_CENTER_PANE);
-									nav.setDepthFocus(index(), 1);
+									nav.setDepthFocus(index(), 0);
+									discoverStore.setSelectedCategory(cat.id);
 								}}
 							>
-								<box flexDirection="row" gap={1}>
-									<text fg={focusFg(index(), lf, isActive())}>
-										{index() === lf ? "❯" : " "}
-									</text>
-									<text fg={focusFg(index(), lf, isActive())}>
-										{podcast.title}
-									</text>
-									<Show when={podcast.isSubscribed}>
-										<text fg={index() === lf ? theme.surface : theme.success}>
-											[+]
-										</text>
-									</Show>
-								</box>
-								<Show when={podcast.author}>
-									<text
-										fg={index() === lf ? theme.surface : muted()}
-										paddingLeft={2}
-									>
-										by {podcast.author}
+								<text fg={focusFg(index(), lf, isActive())}>
+									{index() === lf ? "❯" : " "}
+								</text>
+								<text fg={focusFg(index(), lf, isActive())}>{cat.name}</text>
+								<Show when={selected()}>
+									<text fg={index() === lf ? theme.surface : theme.accent}>
+										*
 									</text>
 								</Show>
 							</box>
@@ -260,6 +210,57 @@ function DiscoverPage() {
 					}}
 				</For>
 			</Show>
+			{/* depth ≥1: results */}
+			<Show when={depth() >= 1}>
+				<Show
+					when={podcasts().length > 0}
+					fallback={
+						<box padding={1}>
+							<text fg={muted()}>No podcasts found. :refresh</text>
+						</box>
+					}
+				>
+					<For each={podcasts()}>
+						{(podcast, index) => {
+							const lf = focusedPodIdx();
+							return (
+								<box
+									flexDirection="column"
+									gap={0}
+									paddingLeft={1}
+									paddingRight={1}
+									backgroundColor={focusBg(index(), lf, isActive())}
+									onMouseDown={() => {
+										nav.setActivePane(DEPTH_CENTER_PANE);
+										nav.setDepthFocus(index(), 1);
+									}}
+								>
+									<box flexDirection="row" gap={1}>
+										<text fg={focusFg(index(), lf, isActive())}>
+											{index() === lf ? "❯" : " "}
+										</text>
+										<text fg={focusFg(index(), lf, isActive())}>
+											{podcast.title}
+										</text>
+										<Show when={podcast.isSubscribed}>
+											<text fg={index() === lf ? theme.surface : theme.success}>
+												[+]
+											</text>
+										</Show>
+									</box>
+									<Show when={podcast.author}>
+										<text
+											fg={index() === lf ? theme.surface : muted()}
+											paddingLeft={2}
+										>
+											by {podcast.author}
+										</text>
+									</Show>
+								</box>
+							);
+						}}
+					</For>
+				</Show>
 			</Show>
 		</>
 	);
@@ -316,8 +317,7 @@ function DiscoverPage() {
 						</Show>
 						<box height={1} />
 						<text fg={theme.textSecondary}>
-							{pod().description?.slice(0, 400) ??
-								"No description available."}
+							{pod().description?.slice(0, 400) ?? "No description available."}
 							{(pod().description?.length ?? 0) > 400 ? "…" : ""}
 						</text>
 						<Show when={(pod().categories ?? []).length > 0}>

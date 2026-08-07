@@ -1,0 +1,1 @@
+- [ ] Audio play can survive quit out

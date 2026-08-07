@@ -6,13 +6,13 @@ Status legend: [ ] todo, [~] in-progress, [x] done
 
 ## Tasks
 
-- [ ] 01 — rearchitect-nav-model → `01-rearchitect-nav-model.md`
-- [ ] 02 — build-three-pane-layout-primitive → `02-build-three-pane-layout-primitive.md`
-- [ ] 03 — convert-list-tabs-to-primitive → `03-convert-list-tabs-to-primitive.md`
-- [ ] 04 — fit-search-and-player-panes → `04-fit-search-and-player-panes.md`
-- [ ] 05 — rebuild-shell-chrome → `05-rebuild-shell-chrome.md`
-- [ ] 06 — rewire-keybinds → `06-rewire-keybinds.md`
-- [ ] 07 — verify-remake → `07-verify-remake.md`
+- [x] 01 — rearchitect-nav-model → `01-rearchitect-nav-model.md`
+- [x] 02 — build-three-pane-layout-primitive → `02-build-three-pane-layout-primitive.md`
+- [x] 03 — convert-list-tabs-to-primitive → `03-convert-list-tabs-to-primitive.md`
+- [x] 04 — fit-search-and-player-panes → `04-fit-search-and-player-panes.md`
+- [x] 05 — rebuild-shell-chrome → `05-rebuild-shell-chrome.md`
+- [x] 06 — rewire-keybinds → `06-rewire-keybinds.md`
+- [x] 07 — verify-remake → `07-verify-remake.md`
 
 ## Dependencies
 

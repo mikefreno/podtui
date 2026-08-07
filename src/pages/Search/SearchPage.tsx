@@ -1,12 +1,13 @@
 /**
  * SearchPage — yazi-style 3-pane view.
  *
- *   pane 0 (parent)  — query input with recent-search history (clickable)
- *   pane 1 (current) — search results list (navigate j/k)
- *   pane 2 (preview)  — detail of the focused search result
+ *   pane 1 (parent)  — query input with recent-search history (clickable)
+ *   pane 2 (current) — search results list (navigate j/k)
+ *   pane 3 (preview)  — detail of the focused search result
  *
- * The Shell resets activePane to CURRENT(1) on tab enter so the user lands on
- * the results pane. Swipe left (h) to pane 0 to type a query — the Shell
+ * (pane 0 is the app's tab list.) The Shell resets activePane to CURRENT(2)
+ * on tab enter so the user lands on the results pane. Swipe left (h) to pane
+ * 1 to type a query — the Shell
  * router skips keys while `nav.inputFocused()` is true so the `<input>`
  * element captures typing natively. Press Enter (onSubmit) to search and
  * auto-swipe to the results pane.
@@ -44,9 +45,9 @@ function SearchPage() {
 	const muted = () => theme.muted || theme.text;
 	const nav = useNavigation();
 
-	const INPUT = PaneSlot.PARENT; // 0
-	const RESULTS = PaneSlot.CURRENT; // 1
-	const DETAIL = PaneSlot.PREVIEW; // 2
+	const INPUT = PaneSlot.PARENT; // 1 (input row)
+	const RESULTS = PaneSlot.CURRENT; // 2 (results list)
+	const DETAIL = PaneSlot.PREVIEW; // 3 (detail preview)
 
 	const results = () => searchStore.results();
 

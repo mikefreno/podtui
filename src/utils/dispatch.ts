@@ -9,23 +9,29 @@
  *
  * The Shell builds a `DispatcherDeps` from its live hooks + the audio-side
  * `advanceEpisode` helper, then forwards every matched keystroke action to
- * `dispatch`. Behavioural rules (task 06):
+ * `dispatch`. Behavioural rules (tab root + task 06):
  *
- *   • digit keys `1`-`6` / `tab-goto-*`, `tab-next` (`]`), `tab-prev` (`[`) are
- *     the SOLE tab switchers; focus always lands on `DEPTH_CENTER_PANE`.
- *   • `h`/`l` are `swipe-prev`/`swipe-next`:
+ *   • The tab list is the app's ROOT. At the root (`nav.atRootTab()`) it is
+ *     the CURRENT pane with nothing above it:
+ *     `k`/`j` (`move-down`/`move-up`) move a cursor through the tabs
+ *     (highlight follows `tabCursor`; the active tab is untouched),
+ *     `l`/Enter (`swipe-next`/`open`) open the hovered tab (`activateTabCursor`)
+ *     — the tab slides into UP and its content becomes CURRENT; `h`
+ *     (`swipe-prev`) at the root stays (out of the panes); `1-6` / `[`/`]`
+ *     switch tabs directly (re-syncing the cursor).
+ *   • digit keys `1`-`6` / `tab-goto-*`, `tab-next` (`]`), `tab-prev` (`[`)
+ *     switch tabs; focus keeps its context (root iff already at the root,
+ *     otherwise the content `DEPTH_CENTER_PANE`).
+ *   • `h`/`l` are `swipe-prev`/`swipe-next` in content:
  *       - depth-tabs, current pane: `l` drills (`open` emit), `h` pops a depth
- *         (noop + inert at depth 0 — no error, no pane change, like yazi at root)
- *       - fixed-pane tabs: `swipe(∓1, count)` clamped to [0, paneCount-1]
+ *         when depth > 0; at depth 0 `h` returns to the tab root (`backToTabRoot`),
+ *         where the tab becomes CURRENT again.
+ *       - fixed-pane tabs (Search/Player, special): `swipe(±1, count)` clamped to
+ *         [1, paneCount]; `h` on the first content pane stays (no tab overflow).
  *   • list/pane actions (`j`/`k`, `gg`/`G`, page-up/down, …) flow to
- *     `PAGE_ACTIONS` → `emit("nav.action")` for the current pane only.
+ *     `PAGE_ACTIONS` → `emit("nav.action")` for the current active content pane.
  *   • `escape`/`command`/`visual-mode`/`toggle-select`/audio/global branches
- *     are unchanged from the pre-rewrite Shell.
- *
- * There is NO sidebar pane and NO `SIDEBAR_ACTIONS` set here (removed in task
- * 06): the sidebar's special-cased j/k branch is gone; every list movement
- * goes straight to the active page via `nav.action`.
- */
+ *     are unchanged from the pre-rewrite Shell. */
 
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { NavigationState, DepthFrame } from "@/context/navigation-store";
@@ -48,29 +54,30 @@ export type NavActionEvent = {
 /** Actions the active page is responsible for (pane/list-local). These flow
  *  to the current pane only via `emit("nav.action", …)`. There is no
  *  SIDEBAR_ACTIONS set — the sidebar pane was removed in the nav rework. */
-export const PAGE_ACTIONS: ReadonlySet<KeybindActionName> = new Set<KeybindActionName>([
-	"move-down",
-	"move-up",
-	"page-down",
-	"page-up",
-	"full-down",
-	"full-up",
-	"jump-down",
-	"jump-up",
-	"goto-top",
-	"goto-bottom",
-	"toggle-select",
-	"visual-mode",
-	"toggle-all",
-	"invert-all",
-	"open",
-	"open-interactive",
-	"search",
-	"filter",
-	"sort",
-	"toggle-hidden",
-	"refresh",
-]);
+export const PAGE_ACTIONS: ReadonlySet<KeybindActionName> =
+	new Set<KeybindActionName>([
+		"move-down",
+		"move-up",
+		"page-down",
+		"page-up",
+		"full-down",
+		"full-up",
+		"jump-down",
+		"jump-up",
+		"goto-top",
+		"goto-bottom",
+		"toggle-select",
+		"visual-mode",
+		"toggle-all",
+		"invert-all",
+		"open",
+		"open-interactive",
+		"search",
+		"filter",
+		"sort",
+		"toggle-hidden",
+		"refresh",
+	]);
 
 /** Resolve a `tab-goto-N` digit action (1..TabsCount) to a TABS value, or null. */
 export function tabByDigit(action: KeybindActionName): TABS | null {
@@ -100,7 +107,10 @@ export type DispatcherDeps = {
 export function createDispatcher(deps: DispatcherDeps) {
 	const { nav, audio, k, setShowHelp, advanceEpisode } = deps;
 
-	function dispatch(action: KeybindActionName, evt: { preventDefault: () => void }) {
+	function dispatch(
+		action: KeybindActionName,
+		evt: { preventDefault: () => void },
+	) {
 		const tab = nav.activeTab();
 		const pane = nav.activePane();
 		switch (action) {
@@ -147,22 +157,44 @@ export function createDispatcher(deps: DispatcherDeps) {
 					nav.setActiveTab(dt);
 					break;
 				}
+				// ── tab root focus ──
+				// At the app root the tab list is the CURRENT pane: j/k move the tab
+				// cursor (active tab untouched), l/Enter open the hovered tab (switch
+				// to it + enter its content), h stays inert (out of the panes).
+				if (nav.atRootTab()) {
+					evt.preventDefault();
+					if (action === "move-down") {
+						nav.moveTabCursor(1);
+						break;
+					}
+					if (action === "move-up") {
+						nav.moveTabCursor(-1);
+						break;
+					}
+					if (action === "open") {
+						nav.activateTabCursor();
+						break;
+					}
+					if (action === "swipe-next") {
+						nav.activateTabCursor();
+						break;
+					}
+					if (action === "swipe-prev") break;
+				}
 				// ── pane swipe / depth nav ──
-				// h/l swipe() on fixed-pane tabs (clamped to [0, paneCount-1] —
-				// there is no sidebar pane). Depth-tabs: l at the center drills
-				// in (emits `open`); h at the center pops a depth, noop at depth 0
-				// (inert — like yazi at root: no pane change, no error).
+				// Depth-tabs: l at the center drills in (emits `open`); h at the
+				// center pops a depth; at depth 0 h returns to the tab root (the tab
+				// becomes CURRENT again). Fixed-pane tabs (Search/Player, special):
+				// h/l swipe across [1, paneCount]; h on the first pane stays.
 				if (action === "swipe-prev") {
 					evt.preventDefault();
-					if (
-						nav.isDepthTab() &&
-						nav.activePane() === DEPTH_CENTER_PANE
-					) {
+					if (nav.isDepthTab() && nav.activePane() === DEPTH_CENTER_PANE) {
 						if (nav.currentDepth() > 0) nav.popDepth();
-						// else: noop at depth 0 (inert)
-					} else {
-						nav.swipe(-1, TabPaneCount[tab]);
+						else nav.backToTabRoot(); // depth 0 → tab root
+					} else if (nav.activePane() > DEPTH_CENTER_PANE) {
+						nav.swipe(-1, TabPaneCount[tab]); // content 1..n
 					}
+					// fixed first content pane (1): no-op, stays (special tabs)
 					break;
 				}
 				if (action === "swipe-next") {

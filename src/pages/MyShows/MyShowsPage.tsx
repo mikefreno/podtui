@@ -32,6 +32,7 @@ import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { TabListPane } from "@/components/TabPanel";
 
 export const MyShowsPaneCount = 1;
 
@@ -200,7 +201,7 @@ export function MyShowsPage() {
 	// Stable <Show> gate (not a ternary root swap) so the parent list
 	// mounts/unmounts cleanly on depth change.
 	const parentContent = () => (
-		<Show when={depth() >= 1}>
+		<Show when={depth() >= 1} fallback={<TabListPane muted />}>
 			<For each={shows()}>
 				{(feed, index) => {
 					const lf = nav.depthFocus(0);
@@ -231,104 +232,104 @@ export function MyShowsPage() {
 			<Show when={depth() === 0}>
 				<Show
 					when={shows().length > 0}
-				fallback={
-					<box padding={1}>
-						<text fg={muted()}>
-							No shows. Subscribe from Discover/Search.
-						</text>
-					</box>
-				}
-			>
-				<For each={shows()}>
-					{(feed, index) => {
-						const lf = focusedShowIdx();
-						return (
-							<box
-								flexDirection="row"
-								gap={1}
-								paddingLeft={1}
-								paddingRight={1}
-								backgroundColor={focusBg(index(), lf, isActive())}
-								onMouseDown={() => {
-									nav.setActivePane(DEPTH_CENTER_PANE);
-									nav.setDepthFocus(index(), 0);
-								}}
-							>
-								<text fg={focusFg(index(), lf, isActive())}>
-									{index() === lf ? "❯" : " "}
-								</text>
-								<text fg={focusFg(index(), lf, isActive())}>
-									{showTitle(feed)}
-								</text>
-								<text fg={index() === lf ? theme.surface : muted()}>
-									({feed.episodes.length})
-								</text>
-							</box>
-						);
-					}}
-				</For>
-			</Show>
+					fallback={
+						<box padding={1}>
+							<text fg={muted()}>
+								No shows. Subscribe from Discover/Search.
+							</text>
+						</box>
+					}
+				>
+					<For each={shows()}>
+						{(feed, index) => {
+							const lf = focusedShowIdx();
+							return (
+								<box
+									flexDirection="row"
+									gap={1}
+									paddingLeft={1}
+									paddingRight={1}
+									backgroundColor={focusBg(index(), lf, isActive())}
+									onMouseDown={() => {
+										nav.setActivePane(DEPTH_CENTER_PANE);
+										nav.setDepthFocus(index(), 0);
+									}}
+								>
+									<text fg={focusFg(index(), lf, isActive())}>
+										{index() === lf ? "❯" : " "}
+									</text>
+									<text fg={focusFg(index(), lf, isActive())}>
+										{showTitle(feed)}
+									</text>
+									<text fg={index() === lf ? theme.surface : muted()}>
+										({feed.episodes.length})
+									</text>
+								</box>
+							);
+						}}
+					</For>
+				</Show>
 			</Show>
 			{/* depth ≥1: episodes */}
 			<Show when={depth() >= 1}>
 				<Show
 					when={episodes().length > 0}
-				fallback={
-					<box padding={1}>
-						<text fg={muted()}>No episodes. :refresh</text>
-					</box>
-				}
-			>
-				<For each={episodes()}>
-					{(ep, index) => {
-						const lf = focusedEpIdx();
-						return (
-							<box
-								flexDirection="column"
-								gap={0}
-								paddingLeft={1}
-								paddingRight={1}
-								backgroundColor={focusBg(index(), lf, isActive())}
-								onMouseDown={() => {
-									nav.setActivePane(DEPTH_CENTER_PANE);
-									nav.setDepthFocus(index(), 1);
-								}}
-							>
-								<box flexDirection="row" gap={1}>
-									<text fg={focusFg(index(), lf, isActive())}>
-										{index() === lf ? "❯" : " "}
-									</text>
-									<text fg={focusFg(index(), lf, isActive())}>
-										{ep.episodeNumber ? `#${ep.episodeNumber} ` : ""}
-										{ep.title}
-									</text>
-								</box>
-								<box flexDirection="row" gap={2} paddingLeft={2}>
-									<text fg={index() === lf ? theme.surface : theme.info}>
-										{formatDate(ep.pubDate)}
-									</text>
-									<text fg={index() === lf ? theme.surface : muted()}>
-										{formatDuration(ep.duration)}
-									</text>
-									<Show when={nav.isSelected(ep.id)}>
-										<text fg={theme.warning}>●</text>
-									</Show>
-									<Show when={downloadLabel(ep.id)}>
-										<text fg={downloadColor(ep.id)}>
-											{downloadLabel(ep.id)}
+					fallback={
+						<box padding={1}>
+							<text fg={muted()}>No episodes. :refresh</text>
+						</box>
+					}
+				>
+					<For each={episodes()}>
+						{(ep, index) => {
+							const lf = focusedEpIdx();
+							return (
+								<box
+									flexDirection="column"
+									gap={0}
+									paddingLeft={1}
+									paddingRight={1}
+									backgroundColor={focusBg(index(), lf, isActive())}
+									onMouseDown={() => {
+										nav.setActivePane(DEPTH_CENTER_PANE);
+										nav.setDepthFocus(index(), 1);
+									}}
+								>
+									<box flexDirection="row" gap={1}>
+										<text fg={focusFg(index(), lf, isActive())}>
+											{index() === lf ? "❯" : " "}
 										</text>
-									</Show>
+										<text fg={focusFg(index(), lf, isActive())}>
+											{ep.episodeNumber ? `#${ep.episodeNumber} ` : ""}
+											{ep.title}
+										</text>
+									</box>
+									<box flexDirection="row" gap={2} paddingLeft={2}>
+										<text fg={index() === lf ? theme.surface : theme.info}>
+											{formatDate(ep.pubDate)}
+										</text>
+										<text fg={index() === lf ? theme.surface : muted()}>
+											{formatDuration(ep.duration)}
+										</text>
+										<Show when={nav.isSelected(ep.id)}>
+											<text fg={theme.warning}>●</text>
+										</Show>
+										<Show when={downloadLabel(ep.id)}>
+											<text fg={downloadColor(ep.id)}>
+												{downloadLabel(ep.id)}
+											</text>
+										</Show>
+									</box>
 								</box>
-							</box>
-						);
-					}}
-				</For>
-				<Show when={feedStore.isLoadingMore()}>
-					<box paddingLeft={2} paddingTop={1}>
-						<LoadingIndicator />
-					</box>
+							);
+						}}
+					</For>
+					<Show when={feedStore.isLoadingMore()}>
+						<box paddingLeft={2} paddingTop={1}>
+							<LoadingIndicator />
+						</box>
+					</Show>
 				</Show>
-			</Show>
 			</Show>
 		</>
 	);
@@ -357,8 +358,7 @@ export function MyShowsPage() {
 							{show().episodes.length} episodes
 						</text>
 						<text fg={muted()}>
-							{show().podcast.description?.slice(0, 400) ??
-								"No description."}
+							{show().podcast.description?.slice(0, 400) ?? "No description."}
 						</text>
 						<box height={1} />
 						<text fg={muted()}>enter/l: open · h: back</text>
@@ -397,8 +397,7 @@ export function MyShowsPage() {
 						</Show>
 						<box height={1} />
 						<text fg={theme.textSecondary}>
-							{ep().description?.slice(0, 400) ??
-								"No description available."}
+							{ep().description?.slice(0, 400) ?? "No description available."}
 							{(ep().description?.length ?? 0) > 400 ? "…" : ""}
 						</text>
 						<box height={1} />

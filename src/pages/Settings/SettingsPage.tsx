@@ -33,6 +33,7 @@ import { useVisualizerItems } from "./VisualizerSettings";
 import { useSyncItems, closeSyncEditor } from "./SyncPanel";
 import { useSourceItems } from "./SourceManager";
 import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { TabListPane } from "@/components/TabPanel";
 
 export const SettingsPaneCount = 1;
 
@@ -268,6 +269,10 @@ export function SettingsPage() {
 	// root whose inner <Show> children swap instead.
 	const parentContent = () => (
 		<>
+			<Show when={depth() === 0}>
+				{/* app root: the tab list as the parent (muted) at the lowest depth */}
+				<TabListPane muted />
+			</Show>
 			<Show when={depth() === 1}>
 				{/* previous depth = sections list (read-only) */}
 				<For each={SECTIONS}>

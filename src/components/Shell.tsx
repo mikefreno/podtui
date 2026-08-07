@@ -15,10 +15,7 @@ import { createSignal, Show, For } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import { useTheme } from "@/context/ThemeContext";
 import { useKeybinds, type KeybindActionName } from "@/context/KeybindContext";
-import {
-	useNavigation,
-	NavMode,
-} from "@/context/NavigationContext";
+import { useNavigation, NavMode } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 import { useFeedStore } from "@/stores/feed";
@@ -28,6 +25,8 @@ import { emit } from "@/utils/event-bus";
 import { LayerGraph } from "@/utils/layer-graph";
 import { TABS, TabPaneCount } from "@/utils/navigation";
 import { createDispatcher } from "@/utils/dispatch";
+import { TabListPane } from "@/components/TabPanel";
+import { YaziPaneRow } from "@/components/YaziPaneRow";
 
 const TAB_LABEL: Record<TABS, string> = {
 	[TABS.FEED]: "Feed",
@@ -94,7 +93,7 @@ export function Shell() {
 			case "q":
 			case "quit":
 			case "exit":
-				process.exit(0);
+				return process.exit(0);
 			case "refresh":
 			case "r":
 				emit("nav.action", {
@@ -190,7 +189,10 @@ export function Shell() {
 	// ── Unified router (normal + visual) ───────────────────────────────────────
 	const { dispatch } = createDispatcher({
 		nav,
-		audio: { togglePlayback: audio.togglePlayback, seekRelative: audio.seekRelative },
+		audio: {
+			togglePlayback: audio.togglePlayback,
+			seekRelative: audio.seekRelative,
+		},
 		k,
 		setShowHelp,
 		advanceEpisode,
@@ -232,11 +234,36 @@ export function Shell() {
 			height="100%"
 			backgroundColor={t.surface}
 		>
-			{/* ── Middle row: full-width active page ──────────────────────────────── */}
-			<box flexGrow={1} width="100%">
-				{LayerGraph[nav.activeTab()]()}
+			{/* ── Middle row: tab list (pane 0) + active tab content (panes 1..n) ─ */}
+			<box flexDirection="row" flexGrow={1} width="100%">
+				<Show
+					when={nav.atRootTab()}
+					fallback={
+						<box flexGrow={1} width="100%">
+							{LayerGraph[nav.activeTab()]()}
+						</box>
+					}
+				>
+					{/* app root: the tab list is the CURRENT pane, nothing in UP */}
+					<YaziPaneRow
+						parent={
+							<box padding={1}>
+								<text fg={t.textMuted}>—</text>
+							</box>
+						}
+						current={<TabListPane />}
+						preview={
+							<box padding={1}>
+								<text fg={t.textMuted}>j/k move · l/Enter open a tab</text>
+							</box>
+						}
+						parentLabel="Up"
+						currentLabel="Tabs"
+						previewLabel=""
+						focused
+					/>
+				</Show>
 			</box>
-
 			{/* ── Bottom status / command bar ─────────────────────────────────────── */}
 			<box
 				flexDirection="row"
@@ -252,10 +279,13 @@ export function Shell() {
 								{modeLabel()}
 							</text>
 							<text fg={t.textMuted} paddingLeft={1}>
-								{TAB_LABEL[nav.activeTab()]} ·{" "}
-								{nav.isDepthTab()
-									? `depth ${nav.currentDepth()}`
-									: `pane ${nav.activePane() + 1}/${TabPaneCount[nav.activeTab()]}`}
+								{nav.atRootTab()
+									? "Tabs · root"
+									: `${TAB_LABEL[nav.activeTab()]} · ${
+											nav.isDepthTab()
+												? `depth ${nav.currentDepth()}`
+												: `pane ${nav.activePane()}/${TabPaneCount[nav.activeTab()]}`
+										}`}
 							</text>
 							<Show when={nav.selectedIds().length > 0}>
 								<text fg={t.warning} paddingLeft={1}>
@@ -271,27 +301,6 @@ export function Shell() {
 							<text fg={t.textMuted} paddingRight={1}>
 								{pendingLabel()}
 							</text>
-							{/* ── Tab strip ─────────────────────────────────────────────────── */}
-							<For
-								each={Object.values(TABS).filter(
-									(v): v is TABS => typeof v === "number",
-								)}
-							>
-								{(tab) => {
-									const active = () => nav.activeTab() === tab;
-									return (
-										<text
-											fg={active() ? t.surface : t.textMuted}
-											backgroundColor={
-												active() ? t.primary : undefined
-											}
-										>
-											{active() ? "≡" : " "}[{tab}]{" "}
-											{TAB_LABEL[tab]}{" "}
-										</text>
-									);
-								}}
-							</For>
 							<text fg={t.textMuted} paddingRight={1}>
 								~
 							</text>
@@ -310,7 +319,6 @@ export function Shell() {
 					</Show>
 				</Show>
 			</box>
-
 			{/* ── Help overlay ─────────────────────────────────────────────────────── */}
 			<Show when={showHelp()}>
 				<HelpOverlay
@@ -338,7 +346,9 @@ function helpSections(k: ReturnType<typeof useKeybinds>) {
 		{
 			group: "Panes",
 			items: [
-				["h/l", "swipe pane"],
+				["j/k", "switch tab (tab panel)"],
+				["l/enter", "enter tab content"],
+				["h", "back to tab panel"],
 				["1-6 / [ ]", "switch tabs"],
 				[":", "command"],
 				["~", "help"],
