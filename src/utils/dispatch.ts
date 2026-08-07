@@ -22,12 +22,10 @@
  *   • digit keys `1`-`6` / `tab-goto-*`, `tab-next` (`]`), `tab-prev` (`[`)
  *     switch tabs; focus keeps its context (root iff already at the root,
  *     otherwise the content `DEPTH_CENTER_PANE`).
- *   • `h`/`l` are `swipe-prev`/`swipe-next` in content:
- *       - depth-tabs, current pane: `l` drills (`open` emit), `h` pops a depth
- *         when depth > 0; at depth 0 `h` returns to the tab root (`backToTabRoot`),
- *         where the tab becomes CURRENT again.
- *       - fixed-pane tabs (Search/Player, special): `swipe(±1, count)` clamped to
- *         [1, paneCount]; `h` on the first content pane stays (no tab overflow).
+ *   • `h`/`l` are `swipe-prev`/`swipe-next` in content (every tab is a
+ *     depth-tab): `l` at the current pane drills in (emits `open`); `h` pops
+ *     a depth when depth > 0; at depth 0 `h` returns to the tab root
+ *     (`backToTabRoot`), where the tab becomes CURRENT again.
  *   • list/pane actions (`j`/`k`, `gg`/`G`, page-up/down, …) flow to
  *     `PAGE_ACTIONS` → `emit("nav.action")` for the current active content pane.
  *   • `escape`/`command`/`visual-mode`/`toggle-select`/audio/global branches
@@ -36,7 +34,7 @@
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { NavigationState, DepthFrame } from "@/context/navigation-store";
 import { NavMode, DEPTH_CENTER_PANE } from "@/context/navigation-store";
-import { TABS, TabsCount, TabPaneCount } from "@/utils/navigation";
+import { TABS, TabsCount } from "@/utils/navigation";
 import { emit } from "@/utils/event-bus";
 
 // Re-export NavMode + DEPTH_CENTER_PANE so Shell keeps importing them from here.
@@ -182,33 +180,23 @@ export function createDispatcher(deps: DispatcherDeps) {
 					if (action === "swipe-prev") break;
 				}
 				// ── pane swipe / depth nav ──
-				// Depth-tabs: l at the center drills in (emits `open`); h at the
-				// center pops a depth; at depth 0 h returns to the tab root (the tab
-				// becomes CURRENT again). Fixed-pane tabs (Search/Player, special):
-				// h/l swipe across [1, paneCount]; h on the first pane stays.
+				// Every tab is a depth-tab: `l` at the center drills in (emits `open`);
+				// `h` at the center pops a depth when depth > 0, and at depth 0 returns
+				// to the tab root (the tab becomes CURRENT again).
 				if (action === "swipe-prev") {
 					evt.preventDefault();
-					if (nav.isDepthTab() && nav.activePane() === DEPTH_CENTER_PANE) {
-						if (nav.currentDepth() > 0) nav.popDepth();
-						else nav.backToTabRoot(); // depth 0 → tab root
-					} else if (nav.activePane() > DEPTH_CENTER_PANE) {
-						nav.swipe(-1, TabPaneCount[tab]); // content 1..n
-					}
-					// fixed first content pane (1): no-op, stays (special tabs)
+					if (nav.currentDepth() > 0) nav.popDepth();
+					else nav.backToTabRoot(); // depth 0 → tab root
 					break;
 				}
 				if (action === "swipe-next") {
 					evt.preventDefault();
-					if (nav.isDepthTab() && nav.activePane() === DEPTH_CENTER_PANE) {
-						emit("nav.action", {
-							action: "open",
-							tab,
-							pane: DEPTH_CENTER_PANE,
-							mode: nav.mode(),
-						});
-					} else {
-						nav.swipe(1, TabPaneCount[tab]);
-					}
+					emit("nav.action", {
+						action: "open",
+						tab,
+						pane: DEPTH_CENTER_PANE,
+						mode: nav.mode(),
+					});
 					break;
 				}
 				// ── audio transport (global) ──

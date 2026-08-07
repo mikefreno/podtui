@@ -11,8 +11,9 @@
  *     enter its content; `swipe-prev` (h) stays inert (out of the panes).
  *   • Depth-tab content: `swipe-next` (l) at depth 0 emits `open` (drill);
  *     `swipe-prev` (h) pops depth 1→0 and, at depth 0, returns to the tab root.
- *   • Fixed-pane tabs (Search/Player, special): `h`/`l` swipe [1, paneCount];
- *     `h` on the first pane stays — never overflows to the tab root.
+ *   • Every tab is a depth-tab: `swipe-next` (l) at depth 0 emits `open`
+ *     (drill); `swipe-prev` (h) pops depth 1→0 and, at depth 0, returns to the
+ *     tab root. Player has no deeper drill (single now-playing pane).
  *   • Digit keys (`tab-goto-N`), `tab-next` (`]`), `tab-prev` (`[`) switch
  *     tabs and preserve focus context (root stays root for depth-tabs, content
  *     stays content).
@@ -218,33 +219,50 @@ test("dispatch('swipe-prev') at depth 0 returns focus to the tab root", () => {
 	});
 });
 
-test("dispatch('swipe-prev') on a fixed-pane tab at pane 1 stays (no tab overflow)", () => {
+test("dispatch('swipe-prev') on Search at depth 0 returns to the tab root", () => {
 	withHarness(({ nav, dispatch }) => {
-		nav.setActiveTab(TABS.SEARCH); // fixed-pane
+		nav.setActiveTab(TABS.SEARCH); // depth-tab, query root
 		nav.enterTabContent();
 		expect(nav.activePane()).toBe(DEPTH_CENTER_PANE);
+		expect(nav.atRootTab()).toBe(false);
 
 		dispatch("swipe-prev");
-		// special tab: h on the first content pane does not return to the root.
-		expect(nav.atRootTab()).toBe(false);
+		// h at depth 0 returns to the tab root — so Search isn't a dead end.
+		expect(nav.atRootTab()).toBe(true);
 		expect(nav.activePane()).toBe(DEPTH_CENTER_PANE);
+		// a second h at the root is inert (out of the panes).
+		dispatch("swipe-prev");
+		expect(nav.atRootTab()).toBe(true);
 	});
 });
 
-test("dispatch('swipe-prev') on a fixed-pane tab at pane > 1 swipes leftwards", () => {
+test("dispatch('swipe-prev') on the single-pane Player tab returns to the tab root", () => {
 	withHarness(({ nav, dispatch }) => {
-		nav.setActiveTab(TABS.SEARCH); // 3 panes
+		nav.setActiveTab(TABS.PLAYER); // depth-tab, single now-playing pane
 		nav.enterTabContent();
-		nav.swipe(1, 3);
-		nav.swipe(1, 3);
-		expect(nav.activePane()).toBe(3);
+		expect(nav.activePane()).toBe(DEPTH_CENTER_PANE);
+		expect(nav.atRootTab()).toBe(false);
+
 		dispatch("swipe-prev");
-		expect(nav.activePane()).toBe(2);
+		expect(nav.atRootTab()).toBe(true);
+	});
+});
+
+test("dispatch('swipe-prev') at depth 1 (results) pops to depth 0 (query)", () => {
+	withHarness(({ nav, dispatch }) => {
+		nav.setActiveTab(TABS.SEARCH); // depth-tab: query(0) → results(1)
+		nav.enterTabContent();
+		nav.pushDepth({ kind: "search:results", ctx: "podcast", focus: 0 });
+		expect(nav.currentDepth()).toBe(1);
+
+		dispatch("swipe-prev");
+		expect(nav.currentDepth()).toBe(0);
+		expect(nav.atRootTab()).toBe(false); // h at depth>0 stays in content
 	});
 });
 
 // ── Acceptance: digit keys switch tabs and keep focus context ────────────────
-test("tab-goto-N from the root keeps depth-tabs at the root; special tabs open", () => {
+test("tab-goto-N from the root keeps depth-tabs at the root", () => {
 	withHarness(({ nav, dispatch }) => {
 		// focus starts on the tab root.
 		expect(nav.atRootTab()).toBe(true);
@@ -259,11 +277,12 @@ test("tab-goto-N from the root keeps depth-tabs at the root; special tabs open",
 		expect(nav.tabCursor()).toBe(TABS.MYSHOWS);
 		expect(nav.atRootTab()).toBe(true);
 
-		// fixed-pane tab is special: switching from the root opens its content.
+		// every tab is a depth-tab now: switching to Search from the root
+		// keeps the root too (Enter/l opens content).
 		dispatch("tab-goto-4"); // → Search
 		expect(nav.activeTab()).toBe(TABS.SEARCH);
 		expect(nav.tabCursor()).toBe(TABS.SEARCH);
-		expect(nav.atRootTab()).toBe(false);
+		expect(nav.atRootTab()).toBe(true);
 	});
 });
 
@@ -276,7 +295,7 @@ test("tab-goto-N from content keeps focus in the active tab's content", () => {
 		expect(nav.activeTab()).toBe(TABS.DISCOVER);
 		expect(nav.activePane()).toBe(DEPTH_CENTER_PANE);
 
-		dispatch("tab-goto-4"); // → Search (fixed-pane) lands its current pane
+		dispatch("tab-goto-4"); // → Search (depth-tab) lands its current pane
 		expect(nav.activeTab()).toBe(TABS.SEARCH);
 		expect(nav.activePane()).toBe(DEPTH_CENTER_PANE);
 		expect(nav.atRootTab()).toBe(false);

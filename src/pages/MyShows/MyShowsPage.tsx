@@ -204,19 +204,19 @@ export function MyShowsPage() {
 		<Show when={depth() >= 1} fallback={<TabListPane muted />}>
 			<For each={shows()}>
 				{(feed, index) => {
-					const lf = nav.depthFocus(0);
+					const lf = () => nav.depthFocus(0);
 					return (
 						<box
 							flexDirection="row"
 							gap={1}
 							paddingLeft={1}
 							paddingRight={1}
-							backgroundColor={focusBg(index(), lf, false)}
+							backgroundColor={focusBg(index(), lf(), false)}
 						>
-							<text fg={focusFg(index(), lf, false)}>
-								{index() === lf ? "❯" : " "}
+							<text fg={focusFg(index(), lf(), false)}>
+								{index() === lf() ? "❯" : " "}
 							</text>
-							<text fg={focusFg(index(), lf, false)}>{showTitle(feed)}</text>
+							<text fg={focusFg(index(), lf(), false)}>{showTitle(feed)}</text>
 							<text fg={muted()}>({feed.episodes.length})</text>
 						</box>
 					);
@@ -242,26 +242,26 @@ export function MyShowsPage() {
 				>
 					<For each={shows()}>
 						{(feed, index) => {
-							const lf = focusedShowIdx();
+							const lf = () => focusedShowIdx();
 							return (
 								<box
 									flexDirection="row"
 									gap={1}
 									paddingLeft={1}
 									paddingRight={1}
-									backgroundColor={focusBg(index(), lf, isActive())}
+									backgroundColor={focusBg(index(), lf(), isActive())}
 									onMouseDown={() => {
 										nav.setActivePane(DEPTH_CENTER_PANE);
 										nav.setDepthFocus(index(), 0);
 									}}
 								>
-									<text fg={focusFg(index(), lf, isActive())}>
-										{index() === lf ? "❯" : " "}
+									<text fg={focusFg(index(), lf(), isActive())}>
+										{index() === lf() ? "❯" : " "}
 									</text>
-									<text fg={focusFg(index(), lf, isActive())}>
+									<text fg={focusFg(index(), lf(), isActive())}>
 										{showTitle(feed)}
 									</text>
-									<text fg={index() === lf ? theme.surface : muted()}>
+									<text fg={index() === lf() ? theme.surface : muted()}>
 										({feed.episodes.length})
 									</text>
 								</box>
@@ -282,33 +282,33 @@ export function MyShowsPage() {
 				>
 					<For each={episodes()}>
 						{(ep, index) => {
-							const lf = focusedEpIdx();
+							const lf = () => focusedEpIdx();
 							return (
 								<box
 									flexDirection="column"
 									gap={0}
 									paddingLeft={1}
 									paddingRight={1}
-									backgroundColor={focusBg(index(), lf, isActive())}
+									backgroundColor={focusBg(index(), lf(), isActive())}
 									onMouseDown={() => {
 										nav.setActivePane(DEPTH_CENTER_PANE);
 										nav.setDepthFocus(index(), 1);
 									}}
 								>
 									<box flexDirection="row" gap={1}>
-										<text fg={focusFg(index(), lf, isActive())}>
-											{index() === lf ? "❯" : " "}
+										<text fg={focusFg(index(), lf(), isActive())}>
+											{index() === lf() ? "❯" : " "}
 										</text>
-										<text fg={focusFg(index(), lf, isActive())}>
+										<text fg={focusFg(index(), lf(), isActive())}>
 											{ep.episodeNumber ? `#${ep.episodeNumber} ` : ""}
 											{ep.title}
 										</text>
 									</box>
 									<box flexDirection="row" gap={2} paddingLeft={2}>
-										<text fg={index() === lf ? theme.surface : theme.info}>
+										<text fg={index() === lf() ? theme.surface : theme.info}>
 											{formatDate(ep.pubDate)}
 										</text>
-										<text fg={index() === lf ? theme.surface : muted()}>
+										<text fg={index() === lf() ? theme.surface : muted()}>
 											{formatDuration(ep.duration)}
 										</text>
 										<Show when={nav.isSelected(ep.id)}>

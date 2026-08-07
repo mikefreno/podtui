@@ -181,7 +181,7 @@ function DiscoverPage() {
 			<Show when={depth() === 0}>
 				<For each={categories()}>
 					{(cat, index) => {
-						const lf = focusedCatIdx();
+						const lf = () => focusedCatIdx();
 						const selected = () => cat.id === discoverStore.selectedCategory();
 						return (
 							<box
@@ -189,19 +189,19 @@ function DiscoverPage() {
 								gap={1}
 								paddingLeft={1}
 								paddingRight={1}
-								backgroundColor={focusBg(index(), lf, isActive())}
+								backgroundColor={focusBg(index(), lf(), isActive())}
 								onMouseDown={() => {
 									nav.setActivePane(DEPTH_CENTER_PANE);
 									nav.setDepthFocus(index(), 0);
 									discoverStore.setSelectedCategory(cat.id);
 								}}
 							>
-								<text fg={focusFg(index(), lf, isActive())}>
-									{index() === lf ? "❯" : " "}
+								<text fg={focusFg(index(), lf(), isActive())}>
+									{index() === lf() ? "❯" : " "}
 								</text>
-								<text fg={focusFg(index(), lf, isActive())}>{cat.name}</text>
+								<text fg={focusFg(index(), lf(), isActive())}>{cat.name}</text>
 								<Show when={selected()}>
-									<text fg={index() === lf ? theme.surface : theme.accent}>
+									<text fg={index() === lf() ? theme.surface : theme.accent}>
 										*
 									</text>
 								</Show>
@@ -222,35 +222,35 @@ function DiscoverPage() {
 				>
 					<For each={podcasts()}>
 						{(podcast, index) => {
-							const lf = focusedPodIdx();
+							const lf = () => focusedPodIdx();
 							return (
 								<box
 									flexDirection="column"
 									gap={0}
 									paddingLeft={1}
 									paddingRight={1}
-									backgroundColor={focusBg(index(), lf, isActive())}
+									backgroundColor={focusBg(index(), lf(), isActive())}
 									onMouseDown={() => {
 										nav.setActivePane(DEPTH_CENTER_PANE);
 										nav.setDepthFocus(index(), 1);
 									}}
 								>
 									<box flexDirection="row" gap={1}>
-										<text fg={focusFg(index(), lf, isActive())}>
-											{index() === lf ? "❯" : " "}
+										<text fg={focusFg(index(), lf(), isActive())}>
+											{index() === lf() ? "❯" : " "}
 										</text>
-										<text fg={focusFg(index(), lf, isActive())}>
+										<text fg={focusFg(index(), lf(), isActive())}>
 											{podcast.title}
 										</text>
 										<Show when={podcast.isSubscribed}>
-											<text fg={index() === lf ? theme.surface : theme.success}>
+											<text fg={index() === lf() ? theme.surface : theme.success}>
 												[+]
 											</text>
 										</Show>
 									</box>
 									<Show when={podcast.author}>
 										<text
-											fg={index() === lf ? theme.surface : muted()}
+											fg={index() === lf() ? theme.surface : muted()}
 											paddingLeft={2}
 										>
 											by {podcast.author}

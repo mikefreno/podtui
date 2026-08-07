@@ -19,7 +19,6 @@ import { useNavigation, NavMode } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 import { useFeedStore } from "@/stores/feed";
-import type { Episode } from "@/types/episode";
 import { useToast } from "@/ui/toast";
 import { emit } from "@/utils/event-bus";
 import { LayerGraph } from "@/utils/layer-graph";
@@ -200,8 +199,16 @@ export function Shell() {
 
 	useKeyboard(
 		(evt: any) => {
-			// Input fields (search boxes, dialogs) own their keys.
-			if (nav.inputFocused() && nav.mode() !== NavMode.COMMAND) return;
+			// Input fields (search boxes, dialogs) own their keys — except Escape,
+			// which defocuses the input so j/k/h navigation resumes (search: h back
+			// to the tab root, j/k to move the recent-searches list).
+			if (nav.inputFocused() && nav.mode() !== NavMode.COMMAND) {
+				if (evt.name === "escape") {
+					evt.preventDefault();
+					nav.setInputFocused(false);
+				}
+				return;
+			}
 			if (nav.mode() === NavMode.COMMAND) {
 				handleCommandKey(evt);
 				return;
@@ -460,8 +467,9 @@ export function playEpisodeAndSwitch(
 ) {
 	audio.play(episode);
 	nav.setActiveTab(TABS.PLAYER);
+	nav.enterTabContent(); // PLAYER is a depth-tab — drop into its content pane.
 	useAudioNavStore().setSource(AudioSource.FEED);
 }
 
 // Re-export Episode type for callers building pane trees.
-export type { Episode };
+export type { Episode } from "@/types/episode";

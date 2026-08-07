@@ -18,31 +18,28 @@
  * nav model — which column is focused and where its list cursor lives. The
  * parent/preview columns are always derived, never focused.
  *
- * Two pane models coexist under a single TAB list:
+ * The tab list is the app's ROOT and participates in the same pane flow as
+ * any other pane. View renders at most three panes, `UP | CURRENT | PREVIEW`:
  *
- *  • The tab list is the flow's leading pane (TAB_PANE = 0) — a normal,
- *    focusable pane at the left of every tab's content, just like in yazi.
- *    Starting focus lives here; tab switches made from here keep focus here.
- *    When it is focused, j/k moves the tab cursor (`tabCursor`) and
- *    `l`/Enter opens the hovered tab into its content. Swiping left past
- *    it goes out of the panes (inert — there is no pane beyond it).
+ *  • At launch the tab list is the CURRENT pane, with nothing in UP (`atRootTab`).
+ *  • Opening a tab (j/k to hover, `l`/Enter) slides it into the UP/parent pane;
+ *    that tab's content becomes CURRENT and its hovered item PREVIEW
+ *    (`enterTabContent`).
+ *  • Drilling deeper (`l`/Enter in content) pushes frames; once past the tab's
+ *    own root the UP/CURRENT/PREVIEW columns are all content, and the tab drops
+ *    OUT of the 3-pane view.
+ *  • `popDepth`/`h` walks back up: at content depth 0 `h` returns to the tab
+ *    root (`backToTabRoot`, the tab becomes CURRENT again); `h` at the root
+ *    stays (out of the panes — no-op).
  *
- *  • Depth-stack tabs (Feed, MyShows, Discover, Settings) expose exactly ONE
- *    focusable content pane — the current column (DEPTH_CENTER_PANE = 1). The
- *    parent column renders the previous depth's list (blank at depth 0); the
- *    preview column renders the hovered item. `l`/Enter drills in (push a
- *    frame); `h` pops a depth. Depth is unbounded. At depth 0 `h` moves focus
- *    to the tab list (TAB_PANE).
+ * Depth-stack tabs (Feed, MyShows, Discover, Search, Player, Settings):
+ * ONE focusable content pane — the current column (DEPTH_CENTER_PANE = 1);
+ * the parent/preview are derived. Search drills query→results; Player is a
+ * single now-playing pane under the tab list (2-pane, no preview). Every
+ * tab returns to the root via `h` at depth 0 (`backToTabRoot`).
  *
- *  • Fixed-pane tabs (Search = input/results/detail, Player = single) keep the
- *    indexed pane model — `focusedIndex(pane)` + `swipe` — moving between the
- *    parent/current/preview columns with `h`/`l`, clamped to
- *    [1, paneCount]; `h` on the first content pane (1) moves focus to the tab
- *    list; `h` on the tab list stays out-of-panear (inert).
- *
- * Tabs switch via the tab list (j/k), digit keys `1`-`6`, and `[`/`]`.
- * Focus on the tab list persists across a tab switch; from there `l`/Enter
- * drops into the active tab's content (panes 1..N).
+ * Tabs switch via the tab list (j/k + l/Enter), digit keys `1`-`6`, and
+ * `[`/`]`, each re-syncing the tab cursor (`tabCursor`).
  */
 import { createSignal, batch } from "solid-js";
 import { TABS, TabsCount, DEPTH_TABS, rootFrameFor } from "@/utils/navigation";
@@ -55,10 +52,9 @@ export enum NavMode {
 }
 
 /** The current content pane of the active tab, i.e. the focusable column
- *  (index 1) for depth-tabs, and the default landing pane for fixed-pane
- *  tabs. Content panes occupy 1..n; the tab list is pane 0. A tab switch made
- *  while focused on content resets `activePane` to this pane (unless already
- *  on the tab list). */
+ *  (index 1) for every depth-tab. Content panes occupy 1..n; the tab list is
+ *  pane 0. A tab switch made while focused on content resets `activePane` to
+ *  this pane (unless already on the tab list). */
 export const DEPTH_CENTER_PANE = 1 as PaneId;
 
 /** The tab list — the leading pane (pane 0) of the tab flow, rendered to the
@@ -67,13 +63,6 @@ export const DEPTH_CENTER_PANE = 1 as PaneId;
  *  swiping left past the first content pane returns to it. Swiping left again
  *  — beyond it — goes out of the panes (no-op). While it is focused, j/k
  *  moves the tab cursor and `l`/Enter opens the hovered tab's content. */
-/** Content pane slots for fixed-pane tabs (Search). Values are the global
- *  pane indices (content starts at 1). */
-export enum PaneSlot {
-	PARENT = 1, // Search: input
-	CURRENT = 2, // Search: results
-	PREVIEW = 3, // Search: detail
-}
 
 export type PaneId = number; // 0 = tab list; 1..n = the active tab's content panes
 
@@ -110,11 +99,11 @@ export function createNavigation() {
 	// or a direct tab switch (digits / [ ]) re-syncs it. So the panel behaves
 	// just like any other yazi list: j/k move the cursor, Enter/l open.
 	const [tabCursorSignal, setTabCursor] = createSignal<TABS>(TABS.FEED);
-	// App focus starts on the tab list (the app root). `activePane` drives the
-	// fixed-pane pages (Search/Player) and each page's content focus ring;
-	// depth-tab focus is instead described by the per-tab depth stack plus the
-	// `atRootTab` flag (the tab sits as the CURRENT pane when at the root, and
-	// slides into the UP/parent pane once content is opened).
+	// App focus starts on the tab list (the app root). `activePane` is always
+	// DEPTH_CENTER_PANE for the active depth-tab; the per-tab depth stack plus
+	// the `atRootTab` flag describe where focus sits (the tab is the CURRENT
+	// pane when at the root, and slides into the UP/parent pane once content is
+	// opened).
 	const [activePane, setActivePane] = createSignal<PaneId>(DEPTH_CENTER_PANE);
 	// Whether focus is on the tab-list root view — the tab is the CURRENT pane
 	// with nothing above it. Opening a tab moves it to UP; deeper goes back out.
@@ -128,9 +117,9 @@ export function createNavigation() {
 		{ [TABS.FEED]: [rootFrameFor(TABS.FEED)] },
 	);
 
-	// per-pane focused index (for j/k movement in fixed-pane tabs). Keyed
-	// by `${tab}:${pane}`. Depth-tabs read/write the top frame's `focus`
-	// for pane 0 (DEPTH_CENTER_PANE) instead.
+	// per-pane focused index map (unused by depth-tabs, which read/write the
+	// top frame's focus for DEPTH_CENTER_PANE; kept for any future fixed-pane
+	// pages). Keyed by `${tab}:${pane}`.
 	const [paneIndices, setPaneIndices] = createSignal<Record<string, number>>(
 		{},
 	);
@@ -143,7 +132,7 @@ export function createNavigation() {
 	const [commandBuffer, setCommandBuffer] = createSignal("");
 	const [commandError, setCommandError] = createSignal<string | null>(null);
 
-	/** Depth stack for a tab (empty for fixed-pane tabs). */
+	/** Depth stack for a tab (always non-empty — every tab is a depth-tab). */
 	const depthStackFor = (tab: TABS = activeTab()) => stacks()[tab] ?? [];
 
 	const ensureStack = (tab: TABS) => {
@@ -159,21 +148,17 @@ export function createNavigation() {
 	 *  no-op (server build). Routing every tab change through this helper
 	 *  keeps the behavior identical under both runtimes.
 	 *
-	 *  - when switching to a special (fixed-pane) tab from the tab root, leave the
-	 *    root — those tabs render only their content, never the tab-list view.
-	 *  - keep focus on the tab root if it is focused (depth-tab switch),
-	 *    otherwise recenter on the active tab's current/center pane
+	 *  - a depth-tab switch from the root keeps the root (the tab list stays
+	 *    CURRENT); switches made from inside content drop into the new tab's
+	 *    current/center pane.
 	 *  - clear mode/command/visual/count state */
 	const applyTabSwitch = (tab: TABS) => {
 		ensureStack(tab);
 		batch(() => {
-			// A depth-tab switch from the root keeps the root; switching to a
-			// special (fixed-pane) tab always leaves it. Switches made from
-			// inside content drop into the new tab's content pane.
-			if (atRootTabSignal() && !DEPTH_TABS.has(tab)) {
-				setAtTabRoot(false);
-			}
-			if (!atRootTabSignal()) {
+			if (atRootTabSignal()) {
+				// a depth-tab switch from the root keeps the root (focus stays on
+				// the tab list); only entering content (enterTabContent) leaves it.
+			} else {
 				setActivePane(DEPTH_CENTER_PANE);
 			}
 			setMode(NavMode.NORMAL);
@@ -256,23 +241,14 @@ export function createNavigation() {
 	// ── pane focus ──────────────────────────────────────────────────────────
 	const setPane = (pane: PaneId) => setActivePane(pane);
 
-	/** Move focus to the adjacent content pane (fixed-pane tabs only). `dir` =
-	 *  -1 (left, toward parent) or +1 (right, toward preview). Clamped to
-	 *  [0, paneCount-1]. The root panel transition (from content pane 0 to
-	 *  (1..TabPaneCount) is handled by the dispatcher, not here. */
-	const swipe = (dir: -1 | 1, paneCount: number) => {
-		setActivePane((p) => {
-			const n = Math.max(1, Math.min(paneCount, p + dir));
-			return n;
-		});
-	};
+	// (no fixed-pane swipe — every tab is a depth-tab; h/l drill/pop instead.)
 
 	// ── tab root (the app's outermost pane) ──────────────────────────────────
 	/** True while focus is on the tab list as the CURRENT pane — the app root,
-	 *  with nothing above it. Only depth-tabs (Feed/MyShows/Discover/Settings)
-	 *  participate; Search & Player are special and always show their content. */
-	const atRootTab = (): boolean =>
-		atRootTabSignal() && DEPTH_TABS.has(activeTab());
+	 *  with nothing above it. Applies to every tab: a depth-tab switch from
+	 *  the root keeps it; entering content (`enterTabContent`) clears it; `h`
+	 *  at content depth 0 regains it via `backToTabRoot`. */
+	const atRootTab = (): boolean => atRootTabSignal();
 
 	/** Open the active tab's content: the tab slides from CURRENT into the
 	 *  UP/parent pane and focus lands on the content's current pane. */
@@ -306,9 +282,9 @@ export function createNavigation() {
 	// ── per-pane focus index ────────────────────────────────────────────────
 	const paneKey = (pane: PaneId = activePane()) => `${activeTab()}:${pane}`;
 
-	/** For depth-tabs, pane 0 (the center/current pane) reads/writes
-	 *  the top frame's focus. Other panes and fixed-pane tabs use the
-	 *  per-pane index map. */
+	/** For depth-tabs (every tab), pane 1 (DEPTH_CENTER_PANE) reads/writes
+	 *  the top frame's focus. Other panes fall back to the per-pane index
+	 *  map (unused by current pages). */
 	const focusedIndex = (pane: PaneId = activePane()): number => {
 		if (isDepthTab() && pane === DEPTH_CENTER_PANE) {
 			return topFrame()?.focus ?? 0;
@@ -497,7 +473,6 @@ export function createNavigation() {
 		activateTabCursor,
 		// pane focus
 		setActivePane: setPane,
-		swipe,
 		// focus index
 		focusedIndex,
 		setFocusedIndex,

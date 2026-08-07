@@ -8,7 +8,8 @@
  *     the tab list is the CURRENT pane (nothing above it). `enterTabContent()`
  *     slides the tab into UP and puts focus on the content; `backToTabRoot()`
  *     returns to the root. Only depth-tabs participate (`atRootTab()` is false
- *     for the fixed-pane Search/Player tabs).
+ *     for the fixed-pane Search/Player tabs (they clear `atRootTab` on switch
+ *     and regain it via `backToTabRoot`, the `h`-back-up path).
  *   • the root tab list is a normal list: `tabCursor` is independent of
  *     `activeTab`; moveTabCursor moves it (clamped), activateTabCursor opens
  *     the hovered tab + enters content, and direct tab switches re-sync it.
@@ -23,7 +24,7 @@ import {
 	DEPTH_CENTER_PANE,
 	NavMode,
 } from "../src/context/navigation-store";
-import { TABS, TabPaneCount } from "../src/utils/navigation";
+import { TABS } from "../src/utils/navigation";
 
 /** Build a fresh nav graph inside a reactive root and run `fn` against it.
  *  Disposes the root afterwards so effects/signals don't leak between tests. */
@@ -115,14 +116,21 @@ test("tab switch keeps focus context: in content it stays in content", () => {
 	});
 });
 
-test("switching to a Search/Player tab leaves the root (special content)", () => {
+test("switching to a Search/Player tab keeps the root (depth-tab)", () => {
 	withNav((nav) => {
-		// at root, opening Search is special: atRootTab() reports false because
-		// Search has its own content and never renders the tab-list root view.
+		// at root, opening Search keeps the root: every tab is a depth-tab now,
+		// so Enter/l is required to drop into content. `h`-back-up still works.
 		nav.setActiveTab(TABS.SEARCH);
-		expect(nav.atRootTab()).toBe(false);
+		expect(nav.atRootTab()).toBe(true);
 		nav.enterTabContent();
 		expect(nav.activePane()).toBe(DEPTH_CENTER_PANE);
+		expect(nav.atRootTab()).toBe(false);
+		nav.backToTabRoot();
+		expect(nav.atRootTab()).toBe(true);
+		// Player is also a depth-tab now.
+		nav.setActiveTab(TABS.PLAYER);
+		expect(nav.atRootTab()).toBe(true);
+		nav.enterTabContent();
 		expect(nav.atRootTab()).toBe(false);
 	});
 });
@@ -217,43 +225,30 @@ test("tab-switch resets mode/visual/command state", () => {
 });
 
 // ── swipe clamps to [1, paneCount] (no pane-0 tab slot) ──────────────────────
-test("swipe on a fixed-pane tab stays within [1, paneCount]", () => {
+test("Search is a depth-tab: query root drills to results and back", () => {
 	withNav((nav) => {
-		nav.setActiveTab(TABS.SEARCH); // fixed-pane, TabPaneCount = 3
-		expect(TabPaneCount[TABS.SEARCH]).toBe(3);
+		nav.setActiveTab(TABS.SEARCH);
+		expect(nav.isDepthTab()).toBe(true);
+		expect(nav.topFrame()?.kind).toBe("search:query");
 		nav.enterTabContent();
-		expect(nav.activePane()).toBe(1);
-		// swipe left stays at 1 (no pane 0).
-		nav.swipe(-1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(1);
-		nav.swipe(-1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(1);
-		// swipe right up through the columns, then hold the upper bound.
-		nav.swipe(1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(2);
-		nav.swipe(1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(3);
-		nav.swipe(1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(3); // never exceeds paneCount
-		nav.swipe(-1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(2);
-		nav.swipe(-1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(1);
-		nav.swipe(-1, TabPaneCount[TABS.SEARCH]);
-		expect(nav.activePane()).toBe(1);
+		expect(nav.currentDepth()).toBe(0);
+		// Enter on the query submits → push a results frame.
+		nav.pushDepth({ kind: "search:results", ctx: "podcast", focus: 0 });
+		expect(nav.currentDepth()).toBe(1);
+		// h at depth 1 pops back to the query.
+		expect(nav.popDepth()).toBe(true);
+		expect(nav.currentDepth()).toBe(0);
 	});
 });
 
-test("swipe on a single-pane fixed tab stays at its one content pane", () => {
+test("Player is a single-depth depth-tab (now-playing only)", () => {
 	withNav((nav) => {
-		nav.setActiveTab(TABS.PLAYER); // single-pane
-		expect(TabPaneCount[TABS.PLAYER]).toBe(1);
-		nav.enterTabContent(); // lands on its one content pane (1)
-		expect(nav.activePane()).toBe(1);
-		nav.swipe(1, TabPaneCount[TABS.PLAYER]);
-		expect(nav.activePane()).toBe(1); // upper bound
-		nav.swipe(-1, TabPaneCount[TABS.PLAYER]);
-		expect(nav.activePane()).toBe(1); // lower bound — never drops to a tab 0
+		nav.setActiveTab(TABS.PLAYER);
+		expect(nav.isDepthTab()).toBe(true);
+		expect(nav.topFrame()?.kind).toBe("player:nowplaying");
+		nav.enterTabContent();
+		expect(nav.currentDepth()).toBe(0); // no deeper drill
+		expect(nav.popDepth()).toBe(false); // noop at depth 0
 	});
 });
 

@@ -2,12 +2,17 @@
  * TabListPane — the tab list as a pane you can drop into the UP | CURRENT |
  * PREVIEW flow (replaces the old fixed chrome tab column).
  *
- * Renders one row per tab (digit + label): the ACTIVE tab gets a ● marker and
- * accent fg; the CURSOR row (the one j/k hovers) gets the primary highlight.
- * `focused` only matters to the surrounding frame (the CURRENT column draws
- * its own accent ring in YaziPaneRow); when rendered as the muted UP/parent
- * column (`muted`), the cursor highlight is suppressed and only the active ●
- * shows, so it reads as the read-only parent listing.
+ * Renders one row per tab (digit + label) using the same selection UI every
+ * other yazi pane uses: the CURSOR row (the one j/k hovers) gets a `❯` marker
+ * and the focus background (`theme.primary` when this pane is the CURRENT
+ * column, `theme.border` when it is the muted UP/parent column). The ACTIVE
+ * tab (the one whose content is open) always carries a `●` marker in accent so
+ * it stays readable in both positions.
+ *
+ * `muted` marks the parent-column rendering: the highlight is dimmed (border
+ * bg, text fg) rather than suppressed, so the Up pane still shows the cursor
+ * and active tab — matching how every other pane's parent column renders its
+ * focused row.
  */
 
 import { For } from "solid-js";
@@ -34,18 +39,32 @@ export function TabListPane(props: { muted?: boolean }) {
 	const nav = useNavigation();
 
 	const cursor = () => nav.tabCursor();
-	const active = () => nav.activeTab();
-	const muted = () => props.muted ?? false;
+	const activeTab = () => nav.activeTab();
+	/** `active=true` when this pane is the CURRENT column (Shell root);
+	 *  `false` when it is the muted UP/parent column (pages' parent pane). */
+	const active = () => !props.muted;
+
+	// Same focus-bg / focus-fg contract every other pane uses.
+	const focusBg = (t: TABS) =>
+		t === cursor() && active()
+			? theme.primary
+			: t === cursor()
+				? theme.border
+				: undefined;
+	const focusFg = (t: TABS) =>
+		t === cursor() && active() ? theme.surface : theme.text;
 
 	return (
 		<For each={TAB_ORDER}>
 			{(tab) => {
-				const isCursor = () => cursor() === tab && !muted();
-				const isActive = () => active() === tab;
-				const fg = () =>
+				const isCursor = () => cursor() === tab;
+				const isActive = () => activeTab() === tab;
+				// The active tab is only accented in the Up/parent position — when this
+				// pane is CURRENT, the cursor highlight is the only highlight.
+				const labelFg = () =>
 					isCursor()
-						? theme.textSelectedPrimary
-						: isActive()
+						? focusFg(tab)
+						: isActive() && !active()
 							? theme.accent
 							: theme.text;
 				return (
@@ -53,21 +72,13 @@ export function TabListPane(props: { muted?: boolean }) {
 						width="100%"
 						height={1}
 						flexDirection="row"
-						backgroundColor={isCursor() ? theme.primary : "transparent"}
+						paddingRight={1}
+						backgroundColor={focusBg(tab)}
 					>
-						<text
-							width={2}
-							fg={isCursor() ? theme.textSelectedPrimary : "transparent"}
-						>
-							{isActive() ? "●" : " "}
-						</text>
-						<text
-							width={2}
-							fg={isCursor() ? theme.textSelectedPrimary : theme.textMuted}
-						>
-							{tab}
-						</text>
-						<text fg={fg()} paddingLeft={1}>
+						{/* ── selection marker (j/k cursor) ─────────────────────────── */}
+						<text fg={focusFg(tab)}>{isCursor() ? "❯" : " "}</text>
+						<text fg={isCursor() ? focusFg(tab) : theme.textMuted}>{tab}</text>
+						<text fg={labelFg()} paddingLeft={1}>
 							{TAB_LABEL[tab]}
 						</text>
 					</box>

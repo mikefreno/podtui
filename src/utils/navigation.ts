@@ -14,12 +14,15 @@ export enum TABS {
 export const TabsCount = 6;
 
 /** Tabs that use the yazi depth-stack model (prev | current | preview
- *  columns, infinite drill via push/pop). Search and Player keep the legacy
- *  fixed-pane model. */
+ *  columns, infinite drill via push/pop). Search drills query→results, and
+ *  Player drills into its single now-playing pane under the tab list (the
+ *  parent=/tabs, current=player, preview hidden). */
 export const DEPTH_TABS: ReadonlySet<TABS> = new Set([
 	TABS.FEED,
 	TABS.MYSHOWS,
 	TABS.DISCOVER,
+	TABS.SEARCH,
+	TABS.PLAYER,
 	TABS.SETTINGS,
 ]);
 
@@ -35,6 +38,10 @@ export function rootFrameFor(
 			return { kind: "shows", focus: 0 };
 		case TABS.DISCOVER:
 			return { kind: "discover:categories", focus: 0 };
+		case TABS.SEARCH:
+			return { kind: "search:query", focus: 0 };
+		case TABS.PLAYER:
+			return { kind: "player:nowplaying", focus: 0 };
 		case TABS.SETTINGS:
 			return { kind: "settings:sections", focus: 0 };
 		default:
@@ -62,16 +69,15 @@ export const PANE_RATIO = {
 // Number of *focusable* content panes per tab. The three visible columns
 // (parent | current | preview) are a *render* concern, NOT three panes — for
 // depth-tabs only the current column (index 0) is focusable, so this is 1.
-// Depth-tabs (Feed/MyShows/Discover/Settings) drill with `l` (push) and pop
-// with `h` (noop at depth 0) via the Shell dispatch — they never call swipe.
-// Search keeps its 3 fixed focusable panes; Player is single-pane. Defined
-// here (after TABS) to avoid re-introducing the old NavigationContext
-// top-level-init circular deadlock.
+// Every tab is now a depth-tab: each drills with `l` (push) and pops with `h`
+// (returns to the tab root at depth 0) via the Shell dispatch. Defined here
+// (after TABS) to avoid re-introducing the old NavigationContext top-level-
+// init circular deadlock.
 export const TabPaneCount: Record<TABS, number> = {
 	[TABS.FEED]: 1, // depth: feeds → episodes → preview
 	[TABS.MYSHOWS]: 1, // depth: shows → episodes → preview
 	[TABS.DISCOVER]: 1, // depth: categories → results → preview
-	[TABS.SEARCH]: 3, // fixed: query | results | detail
-	[TABS.PLAYER]: 1, // single pane
+	[TABS.SEARCH]: 1, // depth: query → results, preview=detail
+	[TABS.PLAYER]: 1, // depth: now-playing (2-pane, no preview)
 	[TABS.SETTINGS]: 1, // depth: sections → items → editor
 };

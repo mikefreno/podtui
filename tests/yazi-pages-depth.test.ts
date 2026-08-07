@@ -1,8 +1,8 @@
 /**
  * yazi-pages-depth.test.ts — task 03 page contract tests.
  *
- * The four depth-stack list tabs (Feed / MyShows / Discover / Settings) all
- * render through `<YaziPaneRow>` with the parent pane reading the
+ * Every depth-stack tab (Feed / MyShows / Discover / Search / Player /
+ * Settings) renders through `<YaziPaneRow>` with the parent pane reading the
  * previous-depth frame's list (blank placeholder at depth 0). Their `open()`
  * action calls `nav.pushDepth(frame)` to drill and the Shell calls
  * `nav.popDepth()` on `h`. This file exercises the nav-store contract those
@@ -37,8 +37,15 @@ function withNav(fn: (nav: ReturnType<typeof createNavigation>) => void) {
 	});
 }
 
-/** The depth-tabs that must render via <YaziPaneRow> (task 03 conversion). */
-const CONVERTED_TABS = [TABS.FEED, TABS.MYSHOWS, TABS.DISCOVER, TABS.SETTINGS];
+/** The depth-tabs that render via <YaziPaneRow> (task 03 conversion). */
+const CONVERTED_TABS = [
+	TABS.FEED,
+	TABS.MYSHOWS,
+	TABS.DISCOVER,
+	TABS.SEARCH,
+	TABS.PLAYER,
+	TABS.SETTINGS,
+];
 
 for (const tab of CONVERTED_TABS) {
 	const name = TABS[tab];
@@ -54,7 +61,11 @@ for (const tab of CONVERTED_TABS) {
 
 			// drill (l): page open() pushes a child frame — parent becomes
 			// the previous-depth list.
-			const child: DepthFrame = { kind: `${name.toLowerCase()}:child`, ctx: "c1", focus: 0 };
+			const child: DepthFrame = {
+				kind: `${name.toLowerCase()}:child`,
+				ctx: "c1",
+				focus: 0,
+			};
 			nav.pushDepth(child);
 			nav.setActivePane(DEPTH_CENTER_PANE);
 			expect(nav.currentDepth()).toBe(1);
@@ -65,7 +76,11 @@ for (const tab of CONVERTED_TABS) {
 
 			// drill again (l): push a second child — parent shows the first
 			// child's list (the chain Settings exercises: sections→items→editor).
-			const grandchild: DepthFrame = { kind: `${name.toLowerCase()}:grand`, ctx: "g1", focus: 0 };
+			const grandchild: DepthFrame = {
+				kind: `${name.toLowerCase()}:grand`,
+				ctx: "g1",
+				focus: 0,
+			};
 			nav.pushDepth(grandchild);
 			expect(nav.currentDepth()).toBe(2);
 			expect(nav.depthStack()).toHaveLength(3);
@@ -97,9 +112,16 @@ for (const tab of CONVERTED_TABS) {
 	});
 }
 
-// ── DEPTH_TABS covers exactly the four converted pages ───────────────────────
-test("DEPTH_TABS is exactly the four converted list tabs", () => {
+// ── DEPTH_TABS covers exactly the depth-stack pages ────────────────────────
+test("DEPTH_TABS is exactly the depth-stack tabs", () => {
 	expect([...DEPTH_TABS].sort()).toEqual(
-		[TABS.FEED, TABS.MYSHOWS, TABS.DISCOVER, TABS.SETTINGS].sort(),
+		[
+			TABS.FEED,
+			TABS.MYSHOWS,
+			TABS.DISCOVER,
+			TABS.SEARCH,
+			TABS.PLAYER,
+			TABS.SETTINGS,
+		].sort(),
 	);
 });

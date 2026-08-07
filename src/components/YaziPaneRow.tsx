@@ -11,7 +11,7 @@
  *   parent  — the previous-depth list. Renders a muted `—` placeholder and
  *             KEEPS its 1/7 slot when blank (never collapses to width 0).
  *   current — the current-depth list. The only focusable content column; it
- *             carries the accent focus ring when `focused` is truthy.
+ *             carries the active-border focus ring when `focused` is truthy.
  *   preview — detail of the hovered item in `current`; always muted border.
  *
  * The primitive is purely structural: callers pass their own JSX per column
@@ -31,7 +31,7 @@
  *   />
  */
 
-import { createMemo } from "solid-js";
+import { createMemo, Show } from "solid-js";
 import type { JSX } from "solid-js";
 import type { RGBA } from "@opentui/core";
 import { useTheme } from "@/context/ThemeContext";
@@ -47,15 +47,19 @@ export type YaziPaneRowProps = {
 	parent?: PaneContent;
 	/** Current column content (the focused list). */
 	current?: PaneContent;
-	/** Preview column content (detail of the hovered item). */
+	/** Preview column content (detail of the hovered item). Omit/undefined
+	 *  together with `panes={2}` to render a 2-pane parent|current row. */
 	preview?: PaneContent;
 	parentLabel?: PaneLabel;
 	currentLabel?: PaneLabel;
 	previewLabel?: PaneLabel;
-	/** Whether the current column carries the accent focus ring. Defaults to
+	/** Whether the current column carries the active-border focus ring. Defaults to
 	 *  true; pass `false` (or a signal) when the row is inactive. Parent and
 	 *  preview columns always render muted borders. */
 	focused?: boolean | (() => boolean);
+	/** Number of visible columns. `3` (default) = parent|current|preview;
+	 *  `2` = parent|current (preview omitted, current grows to fill). */
+	panes?: 2 | 3;
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -107,7 +111,12 @@ function YaziPane(props: {
 	const scrollFocused = createMemo(() => props.scrollFocused());
 
 	return (
-		<box flexDirection="column" flexGrow={props.grow} flexBasis={0} height="100%">
+		<box
+			flexDirection="column"
+			flexGrow={props.grow}
+			flexBasis={0}
+			height="100%"
+		>
 			{/* ── slim header label row ─────────────────────────────────────────── */}
 			<box height={1} paddingLeft={1} backgroundColor={theme.background}>
 				<text fg={theme.textSecondary}>{props.label()}</text>
@@ -143,10 +152,10 @@ function YaziPane(props: {
 export function YaziPaneRow(props: YaziPaneRowProps) {
 	const { theme } = useTheme();
 
-	/** true → the current column gets the accent focus ring. */
+	/** true → the current column gets the active-border focus ring. */
 	const focused = createMemo(() => {
 		const f = props.focused;
-		return typeof f === "function" ? f() : f ?? true;
+		return typeof f === "function" ? f() : (f ?? true);
 	});
 
 	// Normalize static JSX and accessor children into reactive accessors
@@ -159,6 +168,15 @@ export function YaziPaneRow(props: YaziPaneRowProps) {
 	const currentLabel = createMemo(() => resolveLabel(props.currentLabel));
 	const previewLabel = createMemo(() => resolveLabel(props.previewLabel));
 
+	// 2-pane mode (parent|current) grows the current column to fill the
+	// preview slot. Defaults to 3 (parent|current|preview).
+	const panes = createMemo(() => props.panes ?? 3);
+	const currentGrow = createMemo(() =>
+		panes() === 2
+			? PANE_RATIO.current + PANE_RATIO.preview
+			: PANE_RATIO.current,
+	);
+
 	return (
 		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
 			{/* ── parent (1/7) — previous-depth list; always muted ─────────────── */}
@@ -169,22 +187,24 @@ export function YaziPaneRow(props: YaziPaneRowProps) {
 				borderColor={() => theme.border}
 				scrollFocused={() => false}
 			/>
-			{/* ── current (3/7) — the focused list; accent ring when focused ───── */}
+			{/* ── current — the focused list; active-border ring when focused ──────────── */}
 			<YaziPane
-				grow={PANE_RATIO.current}
+				grow={currentGrow()}
 				label={currentLabel}
 				content={currentContent}
-				borderColor={() => (focused() ? theme.accent : theme.border)}
+				borderColor={() => (focused() ? theme.borderActive : theme.border)}
 				scrollFocused={() => focused()}
 			/>
 			{/* ── preview (3/7) — hovered-item detail; always muted ────────────── */}
-			<YaziPane
-				grow={PANE_RATIO.preview}
-				label={previewLabel}
-				content={previewContent}
-				borderColor={() => theme.border}
-				scrollFocused={() => false}
-			/>
+			<Show when={panes() === 3}>
+				<YaziPane
+					grow={PANE_RATIO.preview}
+					label={previewLabel}
+					content={previewContent}
+					borderColor={() => theme.border}
+					scrollFocused={() => false}
+				/>
+			</Show>
 		</box>
 	);
 }

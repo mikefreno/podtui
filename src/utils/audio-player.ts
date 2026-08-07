@@ -78,7 +78,7 @@ function mpvSocketPath(): string {
 // ── mpv Backend ──────────────────────────────────────────────────────
 // Uses JSON IPC over a Unix socket for full bidirectional control.
 
-class MpvBackend implements AudioBackend {
+export class MpvBackend implements AudioBackend {
 	readonly name: BackendName = "mpv";
 	private proc: ReturnType<typeof Bun.spawn> | null = null;
 	private socketPath = mpvSocketPath();

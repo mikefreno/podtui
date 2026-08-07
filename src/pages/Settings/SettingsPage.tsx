@@ -18,6 +18,7 @@
  */
 
 import { For, Show, onMount, onCleanup, createMemo } from "solid-js";
+import { rgbToHex, type RGBA } from "@opentui/core";
 import { useTheme } from "@/context/ThemeContext";
 import {
 	useNavigation,
@@ -230,6 +231,15 @@ export function SettingsPage() {
 	// ── render helpers ───────────────────────────────────────────────────────
 	const isActive = () => nav.activePane() === DEPTH_CENTER_PANE;
 
+	// Whether the currently-focused settings row is the Theme select — the
+	// only item whose Detail pane carries a color breakdown below the help text.
+	const isThemeItem = () => {
+		const d = depth();
+		if (d === 1) return focusedItem()?.id === "theme";
+		if (d === 2) return editorItem()?.id === "theme";
+		return false;
+	};
+
 	// preview text for the right column
 	const previewText = createMemo<string>(() => {
 		const d = depth();
@@ -278,7 +288,7 @@ export function SettingsPage() {
 				<For each={SECTIONS}>
 					{(section, index) => (
 						<Row
-							label={`${section.id + 1}. ${section.label}`}
+							label={section.label}
 							focused={index() === focusedSectionIdx()}
 							active={false}
 						/>
@@ -307,7 +317,7 @@ export function SettingsPage() {
 				<For each={SECTIONS}>
 					{(section, index) => (
 						<Row
-							label={`${section.id + 1}. ${section.label}`}
+							label={section.label}
 							focused={index() === focusedSectionIdx()}
 							active={isActive()}
 							onMouseDown={() => {
@@ -356,8 +366,13 @@ export function SettingsPage() {
 
 	// ── preview pane ──────────────────────────────────────────────────────────
 	const previewContent = () => (
-		<box padding={1}>
-			<MultiLine text={previewText()} />
+		<box padding={1} flexDirection="column">
+			{/* Keep everything on a stable root so Solid re-resolves the swap
+			    between plain help text and the theme breakdown on focus move. */}
+			<Show when={isThemeItem()} fallback={<MultiLine text={previewText()} />}>
+				<MultiLine text={previewText()} />
+				<ThemeBreakdown />
+			</Show>
 		</box>
 	);
 
@@ -454,6 +469,47 @@ function GenericEditor(props: { item: SettingItem }) {
 					Enter/Space to toggle · h to go back
 				</text>
 			</Show>
+		</box>
+	);
+}
+
+/** Curated theme color roles shown in the Theme breakdown. */
+const THEME_ROLES: Array<{ key: keyof ThemeResolved; label: string }> = [
+	{ key: "primary", label: "Primary" },
+	{ key: "secondary", label: "Secondary" },
+	{ key: "accent", label: "Accent" },
+	{ key: "text", label: "Text" },
+	{ key: "textMuted", label: "Muted" },
+	{ key: "background", label: "Background" },
+	{ key: "surface", label: "Surface" },
+	{ key: "border", label: "Border" },
+	{ key: "error", label: "Error" },
+	{ key: "warning", label: "Warning" },
+	{ key: "success", label: "Success" },
+	{ key: "info", label: "Info" },
+];
+
+/** Color swatch breakdown (‹block› <Label> (<HEX>)) of the resolved theme. */
+function ThemeBreakdown() {
+	const { theme, selected } = useTheme();
+	return (
+		<box flexDirection="column" paddingTop={1} gap={1}>
+			<text fg={theme.accent}>Theme · {selected()}</text>
+			<For each={THEME_ROLES}>
+				{(role) => {
+					const color = theme[role.key] as RGBA | undefined;
+					return (
+						<box flexDirection="row" gap={1} alignItems="center">
+							<text backgroundColor={color}> </text>
+							<text fg={theme.text}>{role.label}</text>
+							<box flexGrow={1} />
+							<text fg={theme.textMuted}>
+								{color ? rgbToHex(color).toUpperCase() : "n/a"}
+							</text>
+						</box>
+					);
+				}}
+			</For>
 		</box>
 	);
 }
