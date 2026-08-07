@@ -19,7 +19,7 @@
 
 import { For, Show, onMount, onCleanup, createMemo } from "solid-js";
 import { rgbToHex, type RGBA } from "@opentui/core";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme, type ThemeResolved } from "@/context/ThemeContext";
 import {
 	useNavigation,
 	NavMode,
@@ -494,13 +494,15 @@ function ThemeBreakdown() {
 	const { theme, selected } = useTheme();
 	return (
 		<box flexDirection="column" paddingTop={1} gap={1}>
-			<text fg={theme.accent}>Theme · {selected()}</text>
+			<text fg={theme.accent}>Theme · {selected}</text>
 			<For each={THEME_ROLES}>
 				{(role) => {
 					const color = theme[role.key] as RGBA | undefined;
 					return (
 						<box flexDirection="row" gap={1} alignItems="center">
-							<text backgroundColor={color}> </text>
+							<box backgroundColor={color}>
+								<text>{"  "}</text>
+							</box>
 							<text fg={theme.text}>{role.label}</text>
 							<box flexGrow={1} />
 							<text fg={theme.textMuted}>
