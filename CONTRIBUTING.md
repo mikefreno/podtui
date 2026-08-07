@@ -132,8 +132,12 @@ Releases are built and published from **tags**
 
 ### Steps
 
-1. Bump `VERSION` in `src/index.tsx` (e.g. `0.1.0` → `0.2.0`). Commit and push.
-2. Tag and push:
+1. Run `scripts/release-tag.sh` (interactive: pick major/minor/patch/custom,
+   confirms the plan, bumps `VERSION` in `src/index.tsx`, commits, tags
+   `vX.Y.Z`, and pushes branch + tag to every remote). If the version bump is
+   already committed but the tag is missing, it offers a tag-only path.
+   `--dry-run` prints the plan without doing anything.
+2. Equivalent manual commands:
 
    ```bash
    git tag -a v0.2.0 -m 'PodTUI v0.2.0' && git push gh v0.2.0
