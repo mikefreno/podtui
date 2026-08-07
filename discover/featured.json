@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "podcasts": [
     {
       "id": "discover-daily",
@@ -29,7 +29,7 @@
       "id": "discover-code-switch",
       "title": "Code Switch",
       "description": "Race. In your face. A podcast from NPR that fearlessly explores how race impacts every part of society — from politics to pop culture.",
-      "feedUrl": "https://feeds.npr.org/510352/podcast.xml",
+      "feedUrl": "https://feeds.npr.org/510312/podcast.xml",
       "author": "NPR",
       "categories": ["News", "Culture", "Politics"]
     },
@@ -149,8 +149,8 @@
       "id": "discover-all-in",
       "title": "All-In Podcast",
       "description": "Four tech industry veterans share their unfiltered perspectives on technology, economics, politics, and culture. Insightful, opinionated, and occasionally controversial.",
-      "feedUrl": "https://feeds.transistor.fm/all-in",
-      "author": "Chamath, Jason, Sacks & Friedberg",
+      "feedUrl": "https://allinchamathjason.libsyn.com/rss",
+      "author": "Chamath Palihapitiya, Jason Calacanis, David Sacks & David Friedberg",
       "categories": ["Business", "Technology", "Politics"]
     },
     {
@@ -253,7 +253,7 @@
       "id": "discover-philosophize-this",
       "title": "Philosophize This!",
       "description": "Stephen West walks through the entire history of philosophy chronologically, from the pre-Socratics to contemporary thinkers. Making profound ideas accessible without dumbing them down.",
-      "feedUrl": "https://feed.podbean.com/philosophizethis/feed.xml",
+      "feedUrl": "https://philosophizethis.libsyn.com/rss",
       "author": "Stephen West",
       "categories": ["Philosophy", "Education"]
     },
@@ -261,7 +261,7 @@
       "id": "discover-very-bad-wizards",
       "title": "Very Bad Wizards",
       "description": "A philosopher (Tamler Sommers) and a psychologist (David Pizarro) discuss human nature, ethics, free will, and whatever movie they just watched. Irreverent, insightful, and intellectually honest.",
-      "feedUrl": "https://feed.podbean.com/verybadwizards/feed.xml",
+      "feedUrl": "https://feeds.libsyn.com/474285/rss",
       "author": "Tamler Sommers & David Pizarro",
       "categories": ["Philosophy", "Science"]
     },
@@ -389,8 +389,8 @@
       "id": "discover-sysk",
       "title": "Stuff You Should Know",
       "description": "If you've ever wanted to know about champagne, satanism, the Stonewall Uprising, chaos theory, LSD, El Nino, true crime or Roswell — Josh and Chuck have got you covered.",
-      "feedUrl": "https://rss.art19.com/stuff-you-should-know",
-      "author": "iHeartRadio",
+      "feedUrl": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/A91018A4-EA4F-4130-BF55-AE270180C327/44710ECC-10BB-48D1-93C7-AE270180C33E/podcast.rss",
+      "author": "iHeartPodcasts (Josh Clark & Chuck Bryant)",
       "categories": ["Education", "Comedy"]
     },
     {
