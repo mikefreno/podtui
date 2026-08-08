@@ -12,7 +12,6 @@ import type { DownloadedEpisode } from "../types/episode";
 import type { Episode } from "../types/episode";
 import { downloadEpisode } from "../utils/episode-downloader";
 import { ensureConfigDir, getConfigFilePath } from "../utils/config-dir";
-import { backupConfigFile } from "../utils/config-backup";
 
 const DOWNLOADS_FILE = "downloads.json";
 const MAX_CONCURRENT = 2;
@@ -94,7 +93,6 @@ export function createDownloadStore() {
 	async function saveDownloads(): Promise<void> {
 		try {
 			await ensureConfigDir();
-			await backupConfigFile(DOWNLOADS_FILE);
 			const map = downloads();
 			const records: DownloadRecord[] = [];
 			for (const [, dl] of map) {

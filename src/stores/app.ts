@@ -55,7 +55,7 @@ export function createAppStore() {
 	init();
 
 	const saveState = (next: AppState) => {
-		saveAppStateToFile(next).catch(() => {});
+		saveAppStateToFile(next);
 	};
 
 	const updateState = (next: AppState) => {

@@ -1,6 +1,5 @@
 import { ErrorBoundary } from "solid-js";
 import { useSelectionHandler, useRenderer } from "@opentui/solid";
-import { useAuthStore } from "@/stores/auth";
 import { useAudio } from "@/hooks/useAudio";
 import { useMultimediaKeys } from "@/hooks/useMultimediaKeys";
 import { Clipboard } from "@/utils/clipboard";
@@ -19,7 +18,6 @@ const DEBUG = import.meta.env.DEBUG;
 
 export function App() {
 	const nav = useNavigation();
-	const auth = useAuthStore();
 	const audio = useAudio();
 	const toast = useToast();
 	const renderer = useRenderer();

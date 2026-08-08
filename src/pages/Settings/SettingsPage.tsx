@@ -63,18 +63,12 @@ const SECTIONS: SettingsSectionDef[] = [
 	},
 	{
 		id: 4,
-		label: "Account",
-		description: "Account login & OAuth (not yet implemented).",
-	},
-	{
-		id: 5,
 		label: "Downloads",
 		description: "Manage downloaded episodes — delete by show or individually.",
 	},
 ];
 
-/** Resolve the items for a section id at render time. Section 4 (Account) has
- *  no items yet. */
+/** Resolve the items for a section id at render time. */
 function sectionItems(sectionId: number): SettingItem[] {
 	switch (sectionId) {
 		case 0:
@@ -85,7 +79,7 @@ function sectionItems(sectionId: number): SettingItem[] {
 			return usePreferencesItems();
 		case 3:
 			return useVisualizerItems();
-		case 5:
+		case 4:
 			return useDownloadItems();
 		default:
 			return [];

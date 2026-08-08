@@ -105,8 +105,6 @@ export type AppEvents = {
 	"player.play": { episodeId: string };
 	"player.pause": { episodeId: string };
 	"player.stop": {};
-	"auth.login": { userId: string };
-	"auth.logout": {};
 	"toast.show": {
 		message: string;
 		variant: "info" | "success" | "warning" | "error";
