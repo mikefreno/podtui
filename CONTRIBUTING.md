@@ -164,6 +164,13 @@ Releases are built and published from **tags**
    `Formula/podtui.rb` (URLs + arm64/x64 `sha256`) and pushes it — no
    secrets. See `scripts/sync-formula.sh` in that repo for the logic. Local
    test: `brew install mikefreno/podtui/podtui`.
+5. **AUR packaging** (`packaging/aur/PKGBUILD`): the `podtui-bin` package is
+   staged, not yet published (AUR account registrations are closed; see the
+   README note in section 3). On each release, keep the AUR sources in sync
+   with the new tag: bump `pkgver`, recompute the two tarball `sha256sums`
+   entries, keep the `LICENSE` asset source (the workflow above uploads
+   `LICENSE` to every release), and regenerate `packaging/aur/.SRCINFO` with
+   `bash packaging/aur/gen-srcinfo.sh`.
 
 ### Manual fallback
 
