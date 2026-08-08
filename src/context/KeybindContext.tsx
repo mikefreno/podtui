@@ -67,6 +67,7 @@ export type KeybindActionName =
 	| "sort"
 	| "toggle-hidden"
 	| "refresh"
+	| "unsubscribe"
 	| "audio-toggle"
 	| "audio-next"
 	| "audio-prev"

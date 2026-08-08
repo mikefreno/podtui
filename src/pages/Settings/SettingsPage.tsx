@@ -5,7 +5,7 @@
  *   depth 1 — the focused section's items as a navigable list
  *   depth 2 — per-item editor (for editor-kind items) or value adjuster
  *
- * Renders entirely through `<YaziPaneRow>` (parent | current | preview):
+ * Renders entirely through `<PaneRow>` (parent | current | preview):
  *   parent  = previous depth's list (sections at depth 1, items at depth 2);
  *             blank placeholder at depth 0 (1/7 slot kept).
  *   current = the current-depth list (or editor at depth 2); the only
@@ -33,8 +33,10 @@ import { usePreferencesItems } from "./PreferencesPanel";
 import { useVisualizerItems } from "./VisualizerSettings";
 import { useSyncItems, closeSyncEditor } from "./SyncPanel";
 import { useSourceItems } from "./SourceManager";
-import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { useDownloadItems } from "./DownloadManager";
+import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
+import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 
 export const SettingsPaneCount = 1;
 
@@ -64,6 +66,11 @@ const SECTIONS: SettingsSectionDef[] = [
 		label: "Account",
 		description: "Account login & OAuth (not yet implemented).",
 	},
+	{
+		id: 5,
+		label: "Downloads",
+		description: "Manage downloaded episodes — delete by show or individually.",
+	},
 ];
 
 /** Resolve the items for a section id at render time. Section 4 (Account) has
@@ -78,6 +85,8 @@ function sectionItems(sectionId: number): SettingItem[] {
 			return usePreferencesItems();
 		case 3:
 			return useVisualizerItems();
+		case 5:
+			return useDownloadItems();
 		default:
 			return [];
 	}
@@ -377,7 +386,7 @@ export function SettingsPage() {
 	);
 
 	return (
-		<YaziPaneRow
+		<PaneRow
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}
@@ -422,8 +431,10 @@ function Row(props: {
 				? theme.border
 				: undefined;
 	const fg = () => (props.focused && props.active ? theme.surface : theme.text);
+	const ref = useScrollIntoView(() => props.focused);
 	return (
 		<box
+			ref={ref}
 			flexDirection="row"
 			gap={1}
 			paddingLeft={1}

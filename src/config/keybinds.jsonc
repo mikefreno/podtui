@@ -61,6 +61,7 @@
   "sort":           [","],
   "toggle-hidden":  ["."],
   "refresh":        ["r"],
+  "unsubscribe":    ["x"],   // unsubscribe focused show in My Shows
 
   // ── Audio transport (preserved) ──────────────────────────────────────────
   // Kept on shifted single keys so they never collide with the yazi core

@@ -25,7 +25,7 @@ import { LayerGraph } from "@/utils/layer-graph";
 import { TABS, TabPaneCount } from "@/utils/navigation";
 import { createDispatcher } from "@/utils/dispatch";
 import { TabListPane } from "@/components/TabPanel";
-import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { PaneRow } from "@/components/PaneRow";
 
 const TAB_LABEL: Record<TABS, string> = {
 	[TABS.FEED]: "Feed",
@@ -252,7 +252,7 @@ export function Shell() {
 					}
 				>
 					{/* app root: the tab list is the CURRENT pane, nothing in UP */}
-					<YaziPaneRow
+					<PaneRow
 						parent={
 							<box padding={1}>
 								<text fg={t.textMuted}>—</text>

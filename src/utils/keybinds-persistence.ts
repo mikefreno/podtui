@@ -63,6 +63,7 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
 	sort: [","],
 	"toggle-hidden": ["."],
 	refresh: ["r"],
+	unsubscribe: ["x"],
 	// audio transport (preserved; shifted single keys, no collisions)
 	"audio-toggle": ["P"],
 	"audio-next": ["N"],

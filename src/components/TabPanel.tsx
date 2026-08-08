@@ -18,6 +18,7 @@
 import { For } from "solid-js";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation } from "@/context/NavigationContext";
+import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { TABS } from "@/utils/navigation";
 
 const TAB_LABEL: Record<TABS, string> = {
@@ -67,8 +68,10 @@ export function TabListPane(props: { muted?: boolean }) {
 						: isActive() && !active()
 							? theme.accent
 							: theme.text;
+				const ref = useScrollIntoView(isCursor);
 				return (
 					<box
+						ref={ref}
 						width="100%"
 						height={1}
 						flexDirection="row"

@@ -6,7 +6,7 @@
  *   depth 1 (current) — episodes of the drilled show. Parent pane = shows.
  *   preview            — detail of the hovered item in the current column.
  *
- * Renders entirely through `<YaziPaneRow>`; no bespoke 3-column flexbox JSX
+ * Renders entirely through `<PaneRow>`; no bespoke 3-column flexbox JSX
  * remains. `l`/Enter drills in (show → episodes); `h` pops a depth (noop at
  * 0). j/k move only within the current column.
  */
@@ -31,8 +31,9 @@ import type { KeybindActionName } from "@/context/KeybindContext";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
-import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
+import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 
 export const MyShowsPaneCount = 1;
 
@@ -164,6 +165,16 @@ export function MyShowsPage() {
 			const show = selectedShow();
 			if (show) feedStore.refreshFeed(show.id).catch(() => {});
 		},
+		unsubscribe: () => {
+			if (depth() !== 0) return;
+			const show = selectedShow();
+			if (show) {
+				// unsubscribe = remove feed + purge its downloaded files
+				feedStore.removeFeed(show.id);
+				downloadStore.removeDownloadsForFeed(show.id).catch(() => {});
+				ensureFocus();
+			}
+		},
 	};
 	function step(delta: number) {
 		nav.move(delta, curLen());
@@ -205,8 +216,10 @@ export function MyShowsPage() {
 			<For each={shows()}>
 				{(feed, index) => {
 					const lf = () => nav.depthFocus(0);
+					const ref = useScrollIntoView(() => index() === lf());
 					return (
 						<box
+							ref={ref}
 							flexDirection="row"
 							gap={1}
 							paddingLeft={1}
@@ -243,8 +256,10 @@ export function MyShowsPage() {
 					<For each={shows()}>
 						{(feed, index) => {
 							const lf = () => focusedShowIdx();
+							const ref = useScrollIntoView(() => index() === lf());
 							return (
 								<box
+									ref={ref}
 									flexDirection="row"
 									gap={1}
 									paddingLeft={1}
@@ -283,8 +298,10 @@ export function MyShowsPage() {
 					<For each={episodes()}>
 						{(ep, index) => {
 							const lf = () => focusedEpIdx();
+							const ref = useScrollIntoView(() => index() === lf());
 							return (
 								<box
+									ref={ref}
 									flexDirection="column"
 									gap={0}
 									paddingLeft={1}
@@ -361,7 +378,7 @@ export function MyShowsPage() {
 							{show().podcast.description?.slice(0, 400) ?? "No description."}
 						</text>
 						<box height={1} />
-						<text fg={muted()}>enter/l: open · h: back</text>
+						<text fg={muted()}>enter/l: open · h: back · x: unsubscribe</text>
 					</box>
 				)}
 			</Show>
@@ -408,7 +425,7 @@ export function MyShowsPage() {
 		);
 
 	return (
-		<YaziPaneRow
+		<PaneRow
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}

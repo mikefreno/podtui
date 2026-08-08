@@ -1,5 +1,5 @@
 /**
- * YaziPaneRow — the shared parent | current | preview 3-pane layout primitive.
+ * PaneRow — the shared parent | current | preview 3-pane layout primitive.
  *
  * Implements yazi's `mgr.ratio = [1, 3, 3]` contract: three bordered columns
  * grow at 1/7 : 3/7 : 3/7 of the row width via Yoga `flexGrow`, so every list
@@ -20,7 +20,7 @@
  * `focused`, so scroll focus follows the cursor (j/k stay in the current pane).
  *
  * Example:
- *   <YaziPaneRow
+ *   <PaneRow
  *     parent={parentList}
  *     current={currentList}
  *     preview={detail}
@@ -41,7 +41,7 @@ import { PANE_RATIO } from "@/utils/navigation";
 type PaneContent = JSX.Element | (() => JSX.Element);
 type PaneLabel = string | (() => string);
 
-export type YaziPaneRowProps = {
+export type PaneRowProps = {
 	/** Parent column content (previous-depth list, or null for a muted
 	 *  placeholder — the 1/7 slot is always preserved). */
 	parent?: PaneContent;
@@ -95,7 +95,7 @@ function Placeholder(props: { color: () => RGBA }) {
 }
 
 // ── Pane column ─────────────────────────────────────────────────────────────
-function YaziPane(props: {
+function Pane(props: {
 	grow: number;
 	label: () => string;
 	content: () => JSX.Element | undefined;
@@ -149,7 +149,7 @@ function YaziPane(props: {
 }
 
 // ── Row primitive ───────────────────────────────────────────────────────────
-export function YaziPaneRow(props: YaziPaneRowProps) {
+export function PaneRow(props: PaneRowProps) {
 	const { theme } = useTheme();
 
 	/** true → the current column gets the active-border focus ring. */
@@ -180,7 +180,7 @@ export function YaziPaneRow(props: YaziPaneRowProps) {
 	return (
 		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
 			{/* ── parent (1/7) — previous-depth list; always muted ─────────────── */}
-			<YaziPane
+			<Pane
 				grow={PANE_RATIO.parent}
 				label={parentLabel}
 				content={parentContent}
@@ -188,7 +188,7 @@ export function YaziPaneRow(props: YaziPaneRowProps) {
 				scrollFocused={() => false}
 			/>
 			{/* ── current — the focused list; active-border ring when focused ──────────── */}
-			<YaziPane
+			<Pane
 				grow={currentGrow()}
 				label={currentLabel}
 				content={currentContent}
@@ -197,7 +197,7 @@ export function YaziPaneRow(props: YaziPaneRowProps) {
 			/>
 			{/* ── preview (3/7) — hovered-item detail; always muted ────────────── */}
 			<Show when={panes() === 3}>
-				<YaziPane
+				<Pane
 					grow={PANE_RATIO.preview}
 					label={previewLabel}
 					content={previewContent}

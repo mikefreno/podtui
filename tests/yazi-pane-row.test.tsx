@@ -1,5 +1,5 @@
 /**
- * YaziPaneRow tests — the 1:3:3 parent|current|preview layout primitive.
+ * PaneRow tests — the 1:3:3 parent|current|preview layout primitive.
  *
  * Verified through the opentui test renderer's captured frames (the same
  * mechanism the `.harness` drive uses), since `flexGrow` ratios are only
@@ -19,7 +19,7 @@
 import { describe, test, expect, afterAll } from "bun:test";
 import { testRender } from "@opentui/solid";
 import { ThemeProvider } from "../src/context/ThemeContext";
-import { YaziPaneRow } from "../src/components/YaziPaneRow";
+import { PaneRow } from "../src/components/PaneRow";
 
 type Span = { text: string; fg: { buffer: ArrayLike<number> } | null };
 type Frame = { lines: { spans: Span[] }[] };
@@ -88,7 +88,7 @@ async function renderPaneRow(props: TestPaneProps): Promise<{
 	const setup = await testRender(
 		() => (
 			<ThemeProvider mode="dark">
-				<YaziPaneRow
+				<PaneRow
 					parent={props.parent as any}
 					current={props.current as any}
 					preview={props.preview as any}
@@ -126,7 +126,7 @@ afterAll(async () => {
 });
 
 // ── Unit: three columns at 1:3:3 regardless of null children ───────────────
-describe("YaziPaneRow layout", () => {
+describe("PaneRow layout", () => {
 	test("renders three columns at 1:3:3 even with null parent/preview", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
@@ -172,7 +172,7 @@ describe("YaziPaneRow layout", () => {
 });
 
 // ── Integration: focused toggles the accent ring on the current column ─────
-describe("YaziPaneRow focus ring", () => {
+describe("PaneRow focus ring", () => {
 	test("focused=true puts the accent border on current; parent/preview stay muted", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,

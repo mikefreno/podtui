@@ -10,7 +10,7 @@
  * duplicated My Shows (shows → episodes). Per design, the Feed tab now just
  * shows the full flat episodes list immediately.
  *
- * Renders entirely through `<YaziPaneRow>` (the shared parent|current|preview
+ * Renders entirely through `<PaneRow>` (the shared parent|current|preview
  * primitive). `l`/Enter plays the focused episode; `h` pops back to the tab
  * root. j/k move only within the current column. The Shell router drives
  * everything over `nav.action`; this page only handles list/preview data.
@@ -35,8 +35,9 @@ import type { KeybindActionName } from "@/context/KeybindContext";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
-import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
+import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 
 export const FeedPaneCount = 1;
 
@@ -187,8 +188,10 @@ function FeedPage() {
 			<For each={episodes()}>
 				{(item, index) => {
 					const fi = () => focusedEpIdx();
+					const ref = useScrollIntoView(() => index() === fi());
 					return (
 						<box
+							ref={ref}
 							flexDirection="column"
 							gap={0}
 							paddingLeft={1}
@@ -290,7 +293,7 @@ function FeedPage() {
 	);
 
 	return (
-		<YaziPaneRow
+		<PaneRow
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}

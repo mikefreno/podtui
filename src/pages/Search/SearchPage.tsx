@@ -38,8 +38,9 @@ import {
 import { on, off } from "@/utils/event-bus";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { SearchResult } from "@/types/source";
-import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
+import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 
 export const SearchPaneCount = 1;
 
@@ -256,8 +257,10 @@ function SearchPage() {
 						<For each={recents()}>
 							{(query, index) => {
 								const lf = () => focus(0);
+								const ref = useScrollIntoView(() => index() === lf());
 								return (
 									<box
+										ref={ref}
 										flexDirection="row"
 										gap={1}
 										paddingLeft={1}
@@ -302,8 +305,10 @@ function SearchPage() {
 					<For each={results()}>
 						{(result, index) => {
 							const fi = () => focusedResultIdx();
+							const ref = useScrollIntoView(() => index() === fi());
 							return (
 								<box
+									ref={ref}
 									flexDirection="column"
 									gap={0}
 									paddingLeft={1}
@@ -419,7 +424,7 @@ function SearchPage() {
 			: `Results · ${results().length}`;
 
 	return (
-		<YaziPaneRow
+		<PaneRow
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}

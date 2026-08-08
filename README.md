@@ -80,13 +80,26 @@ sudo ln -sf /opt/podtui/podtui /usr/local/bin/podtui
 ### 3. Arch Linux (AUR)
 
 ```bash
-yay -S podtui-bin
+# Status: PKGBUILD ready, not yet on the AUR (see note below)
+yay -S podtui-bin   # once published
 ```
 
 Requires an AUR helper ([paru](https://github.com/morgan/paru)). The AUR
 package (PKGBUILD lives in `packaging/aur/`) installs the released binary and
 its two FFI sibling libraries into `/usr/lib/podtui/` with a `/usr/bin/podtui`
 symlink, and pulls in `mpv` (the sole audio backend) as a dependency.
+
+> **Not yet on the AUR.** The `podtui-bin` PKGBUILD and `.SRCINFO` are ready
+> in `packaging/aur/` and can be built locally today:
+>
+> ```bash
+> cd packaging/aur && makepkg -si
+> ```
+>
+> Publishing is on hold until [AUR account registrations](https://aur.archlinux.org)
+> reopen (suspended while the AUR team works on suspicious-package
+> moderation). Once a key can be registered, push `PKGBUILD` + `.SRCINFO`
+> with `git push ssh://aur@aur.archlinux.org/podtui-bin` and update this note.
 
 ### 4. From source
 

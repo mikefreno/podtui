@@ -4,7 +4,7 @@
  *   depth 0 (parent)  — tab list (muted, read-only).
  *   depth 0 (current) — the single now-playing pane (rich view + controls).
  *
- * No preview pane (YaziPaneRow `panes={2}`). Audio transport (play/pause,
+ * No preview pane (PaneRow `panes={2}`). Audio transport (play/pause,
  * next/prev, seek) is handled globally by the Shell router (P/N/B/</>); this
  * page only renders the now-playing surface. `h` at depth 0 returns to the
  * tab root.
@@ -17,7 +17,7 @@ import { useAudio } from "@/hooks/useAudio";
 import { useAppStore } from "@/stores/app";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation, DEPTH_CENTER_PANE } from "@/context/NavigationContext";
-import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 
 export const PlayerPaneCount = 1;
@@ -116,7 +116,7 @@ export function PlayerPage() {
 	);
 
 	return (
-		<YaziPaneRow
+		<PaneRow
 			parent={parentContent}
 			current={currentContent}
 			parentLabel="Up"

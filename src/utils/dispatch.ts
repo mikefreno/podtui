@@ -75,6 +75,7 @@ export const PAGE_ACTIONS: ReadonlySet<KeybindActionName> =
 		"sort",
 		"toggle-hidden",
 		"refresh",
+		"unsubscribe",
 	]);
 
 /** Resolve a `tab-goto-N` digit action (1..TabsCount) to a TABS value, or null. */

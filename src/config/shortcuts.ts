@@ -18,6 +18,7 @@ export const shortcuts = [
 	{ keys: "Esc", action: "Clear selection / exit visual / cancel" },
 	{ keys: ":", action: "Open command bar (:quit :refresh :play …)" },
 	{ keys: "r / s / f", action: "Refresh / search / filter" },
+	{ keys: "x", action: "Unsubscribe focused show (My Shows)" },
 	{ keys: ", / .", action: "Sort / toggle hidden" },
 	{ keys: "P / N / B", action: "Play-pause / next / prev episode" },
 	{ keys: "< / >", action: "Seek backward / forward 10s" },

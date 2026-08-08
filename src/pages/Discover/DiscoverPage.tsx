@@ -8,7 +8,7 @@
  *   preview            — detail of the hovered item (category summary, or
  *                       podcast detail + subscribe action).
  *
- * Renders entirely through `<YaziPaneRow>`; no bespoke 3-column flexbox JSX
+ * Renders entirely through `<PaneRow>`; no bespoke 3-column flexbox JSX
  * remains. `l`/Enter drills in (category → results) or subscribes (on a
  * podcast); `h` pops a depth (noop at 0). j/k move only within the current
  * column. Moving through categories at depth 0 updates the store's selected
@@ -28,8 +28,9 @@ import {
 } from "@/context/NavigationContext";
 import { on, off } from "@/utils/event-bus";
 import type { KeybindActionName } from "@/context/KeybindContext";
-import { YaziPaneRow } from "@/components/YaziPaneRow";
+import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
+import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 
 export const DiscoverPaneCount = 1;
 
@@ -39,7 +40,6 @@ function DiscoverPage() {
 	const muted = () => theme.muted || theme.text;
 	const nav = useNavigation();
 
-	const stack = nav.depthStack;
 	const depth = nav.currentDepth;
 	const focus = (d: number = depth()) => nav.depthFocus(d);
 
@@ -160,22 +160,27 @@ function DiscoverPage() {
 	const parentContent = () => (
 		<Show when={depth() >= 1} fallback={<TabListPane muted />}>
 			<For each={categories()}>
-				{(cat, index) => (
-					<box
-						flexDirection="row"
-						gap={1}
-						paddingLeft={1}
-						paddingRight={1}
-						backgroundColor={focusBg(index(), nav.depthFocus(0), false)}
-					>
-						<text fg={focusFg(index(), nav.depthFocus(0), false)}>
-							{index() === nav.depthFocus(0) ? "❯" : " "}
-						</text>
-						<text fg={focusFg(index(), nav.depthFocus(0), false)}>
-							{cat.name}
-						</text>
-					</box>
-				)}
+				{(cat, index) => {
+					const lf = () => nav.depthFocus(0);
+					const ref = useScrollIntoView(() => index() === lf());
+					return (
+						<box
+							ref={ref}
+							flexDirection="row"
+							gap={1}
+							paddingLeft={1}
+							paddingRight={1}
+							backgroundColor={focusBg(index(), lf(), false)}
+						>
+							<text fg={focusFg(index(), nav.depthFocus(0), false)}>
+								{index() === nav.depthFocus(0) ? "❯" : " "}
+							</text>
+							<text fg={focusFg(index(), nav.depthFocus(0), false)}>
+								{cat.name}
+							</text>
+						</box>
+					);
+				}}
 			</For>
 		</Show>
 	);
@@ -188,9 +193,10 @@ function DiscoverPage() {
 				<For each={categories()}>
 					{(cat, index) => {
 						const lf = () => focusedCatIdx();
-						const selected = () => cat.id === discoverStore.selectedCategory();
+						const ref = useScrollIntoView(() => index() === lf());
 						return (
 							<box
+								ref={ref}
 								flexDirection="row"
 								gap={1}
 								paddingLeft={1}
@@ -206,11 +212,6 @@ function DiscoverPage() {
 									{index() === lf() ? "❯" : " "}
 								</text>
 								<text fg={focusFg(index(), lf(), isActive())}>{cat.name}</text>
-								<Show when={selected()}>
-									<text fg={index() === lf() ? theme.surface : theme.accent}>
-										*
-									</text>
-								</Show>
 							</box>
 						);
 					}}
@@ -229,8 +230,10 @@ function DiscoverPage() {
 					<For each={podcasts()}>
 						{(podcast, index) => {
 							const lf = () => focusedPodIdx();
+							const ref = useScrollIntoView(() => index() === lf());
 							return (
 								<box
+									ref={ref}
 									flexDirection="column"
 									gap={0}
 									paddingLeft={1}
@@ -276,7 +279,7 @@ function DiscoverPage() {
 	// ── preview pane ───────────────────────────────────────────────────────────
 	const previewContent = () =>
 		depth() === 0 ? (
-			// depth 0 preview: hovered category
+			// depth 0 preview: shows for the hovered category
 			<Show
 				when={focusedCategory()}
 				fallback={
@@ -286,16 +289,35 @@ function DiscoverPage() {
 				}
 			>
 				{(cat) => (
-					<box flexDirection="column" gap={1} padding={1}>
+					<box flexDirection="column" gap={0} padding={1}>
 						<text fg={theme.textPrimary ?? theme.text}>
 							<strong>{cat().name}</strong>
 						</text>
-						<text fg={theme.textSecondary}>
-							{(cat() as any).description ??
-								`Browse top podcasts in ${cat().name}.`}
-						</text>
+						<Show when={(cat() as any).description}>
+							<text fg={theme.textSecondary}>{(cat() as any).description}</text>
+						</Show>
 						<box height={1} />
-						<text fg={muted()}>enter/l: open · h: back</text>
+						<Show
+							when={podcasts().length > 0}
+							fallback={
+								<text fg={muted()}>
+									No shows in this category yet. :refresh
+								</text>
+							}
+						>
+							<For each={podcasts()}>
+								{(pod) => (
+									<box flexDirection="column" gap={0}>
+										<text fg={theme.text}>{pod.title}</text>
+										<Show when={pod.author}>
+											<text fg={muted()} paddingLeft={2}>
+												by {pod.author}
+											</text>
+										</Show>
+									</box>
+								)}
+							</For>
+						</Show>
 					</box>
 				)}
 			</Show>
@@ -347,7 +369,7 @@ function DiscoverPage() {
 		);
 
 	return (
-		<YaziPaneRow
+		<PaneRow
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}
