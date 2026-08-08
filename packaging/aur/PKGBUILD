@@ -1,0 +1,42 @@
+# Maintainer: Michael Freno <michael.freno@gmail.com>
+# Contributor: Michael Freno <michael.freno@gmail.com>
+# podtui-bin — TUI podcast/audiobook player with synchronized audio-waveform
+# visualization. Serves the official standalone release binary and its two FFI
+# sibling libraries (libcavacore.so + libopentui.so) from GitHub Releases.
+#
+# The embedded Bun runtime is statically linked into the binary — no Bun, no
+# fftw needed at runtime (fftw3 is linked statically into libcavacore.so).
+
+pkgname=podtui-bin
+_pkgname=podtui
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Terminal podcast and audio player with synchronized audio-waveform visualization"
+url="https://github.com/mikefreno/podtui"
+arch=('x86_64' 'aarch64')
+license=('MIT')
+depends=('mpv')                             # sole audio backend; no-op without it
+provides=("${_pkgname}")
+conflicts=("${_pkgname}")
+options=('!strip')                          # standalone binary, pre-minified
+source_x86_64=("https://github.com/mikefreno/podtui/releases/download/v${pkgver}/podtui-linux-x64.tar.gz")
+source_aarch64=("https://github.com/mikefreno/podtui/releases/download/v${pkgver}/podtui-linux-arm64.tar.gz")
+sha256sums_x86_64=('5c2be309341bda9550ad7669b48d3f46341c687234ddfaa0c84a6a9177f049fc')
+sha256sums_aarch64=('c9c22d3a18cd192f89fbd5ff712d3502c4de0cce7550156c6a0d48d76e56e0d5')
+
+package() {
+	local libdir
+
+	case "$CARCH" in
+	x86_64) libdir="podtui-linux-x64" ;;
+	aarch64) libdir="podtui-linux-arm64" ;;
+	esac
+
+	# Binary + native FFI libs must stay side by side in /usr/lib/podtui/;
+	# a /usr/bin symlink works because the embedded Bun runtime resolves
+	# process.execPath through symlinks (verified against the compiled binary).
+	install -Dm755 "${srcdir}/${libdir}/podtui" "${pkgdir}/usr/lib/podtui/podtui"
+	install -Dm644 "${srcdir}/${libdir}/libcavacore.so" "${pkgdir}/usr/lib/podtui/libcavacore.so"
+	install -Dm644 "${srcdir}/${libdir}/libopentui.so" "${pkgdir}/usr/lib/podtui/libopentui.so"
+	ln -s /usr/lib/podtui/podtui "${pkgdir}/usr/bin/podtui"
+}

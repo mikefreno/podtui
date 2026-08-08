@@ -61,10 +61,11 @@ Grab `podtui-<platform>-<arch>.tar.gz` from the latest
 put `podtui` on your `PATH`:
 
 ```bash
-curl -sSL -o podtui.tar.gz \
+curl -sS -o /tmp/podtui.tar.gz \
   https://github.com/mikefreno/podtui/releases/latest/download/podtui-linux-x64.tar.gz
-tar -xzf podtui.tar.gz
-sudo install -m755 podtui /usr/local/bin/podtui
+sudo mkdir -p /opt/podtui
+sudo tar -xzf /tmp/podtui.tar.gz -C /opt/podtui --strip-components=1
+sudo ln -sf /opt/podtui/podtui /usr/local/bin/podtui
 ```
 
 > The tarball contains `podtui` plus `libopentui.<ext>` and
@@ -79,11 +80,13 @@ sudo install -m755 podtui /usr/local/bin/podtui
 ### 3. Arch Linux (AUR)
 
 ```bash
-yay -S podtui
+yay -S podtui-bin
 ```
 
-or build from the PKGBUILD (`podtui-bin`). The package installs the released
-binary and its sibling libraries.
+Requires an AUR helper ([paru](https://github.com/morgan/paru)). The AUR
+package (PKGBUILD lives in `packaging/aur/`) installs the released binary and
+its two FFI sibling libraries into `/usr/lib/podtui/` with a `/usr/bin/podtui`
+symlink, and pulls in `mpv` (the sole audio backend) as a dependency.
 
 ### 4. From source
 
@@ -214,7 +217,7 @@ is no cross-compilation.
 
 ## License
 
-TBD — choose and document a license before first release.
+MIT. See [LICENSE](LICENSE).
 
 ## Related
 
