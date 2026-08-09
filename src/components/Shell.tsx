@@ -12,7 +12,7 @@
  */
 
 import { createSignal, Show, For } from "solid-js";
-import { useKeyboard } from "@opentui/solid";
+import { useKeyboard, useRenderer } from "@opentui/solid";
 import { useTheme } from "@/context/ThemeContext";
 import { useKeybinds, type KeybindActionName } from "@/context/KeybindContext";
 import { useNavigation, NavMode } from "@/context/NavigationContext";
@@ -43,6 +43,7 @@ export function Shell() {
 	const nav = useNavigation();
 	const k = useKeybinds();
 	const audio = useAudio();
+	const renderer = useRenderer();
 	const audioNav = useAudioNavStore();
 	const toast = useToast();
 	const feedStore = useFeedStore();
@@ -205,6 +206,11 @@ export function Shell() {
 				if (evt.name === "escape") {
 					evt.preventDefault();
 					nav.setInputFocused(false);
+					// Actually blur the focused renderable too — setting the flag alone
+					// leaves the opentui input owning keys, so nav keys would still be
+					// typed into it. Blurring fires our useInputFocusNav BLURRED handler
+					// (and re-blurs the SearchPage input via its `focused` prop).
+					renderer.currentFocusedRenderable?.blur();
 				}
 				return;
 			}

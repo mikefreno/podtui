@@ -4,7 +4,7 @@
  */
 
 import { createSignal } from "solid-js";
-import { searchPodcasts } from "../utils/search";
+import { searchPodcasts, searchByFeedUrl } from "../utils/search";
 import { useFeedStore } from "./feed";
 import type { SearchResult } from "../types/source";
 
@@ -83,6 +83,15 @@ export function createSearchStore() {
 		addToHistory(q);
 
 		try {
+			// A query that is a direct RSS feed URL (e.g. a private feed that
+			// isn't in any public directory) resolves to that feed directly,
+			// independent of enabled search sources.
+			const urlResults = await searchByFeedUrl(q);
+			if (urlResults.length > 0) {
+				setResults(applySubscribedStatus(urlResults));
+				return;
+			}
+
 			const sources = feedStore.sources();
 			const enabledSourceIds = sources
 				.filter((s) => s.enabled)

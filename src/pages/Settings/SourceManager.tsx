@@ -14,6 +14,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { useTheme } from "@/context/ThemeContext";
+import { useInputFocusNav } from "@/hooks/useInputFocusNav";
 import { SourceType } from "@/types/source";
 import type { PodcastSource } from "@/types/source";
 import type { SettingItem } from "./types";
@@ -61,6 +62,9 @@ function AddSourceForm() {
 	const [name, setName] = createSignal("");
 	const [url, setUrl] = createSignal("");
 	const [error, setError] = createSignal<string | null>(null);
+	// Yield navigation keybinds to the Shell router while either input is focused.
+	const nameRef = useInputFocusNav();
+	const urlRef = useInputFocusNav();
 
 	const submit = () => {
 		const u = url().trim();
@@ -94,6 +98,7 @@ function AddSourceForm() {
 			<box flexDirection="row" gap={1}>
 				<text fg={theme.textMuted}>Name:</text>
 				<input
+					ref={nameRef}
 					value={name()}
 					onInput={setName}
 					placeholder="My Custom Feed"
@@ -103,6 +108,7 @@ function AddSourceForm() {
 			<box flexDirection="row" gap={1}>
 				<text fg={theme.textMuted}>URL:</text>
 				<input
+					ref={urlRef}
 					value={url()}
 					onInput={(v) => {
 						setUrl(v);

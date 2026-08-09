@@ -1,4 +1,6 @@
 import { searchSourceByType } from "./source-searcher";
+import { parseRSSFeed } from "../api/rss-parser";
+import { SourceType } from "../types/source";
 import type { PodcastSource, SearchResult } from "../types/source";
 
 type SearchCacheEntry = {
@@ -53,6 +55,47 @@ const dedupeResults = (results: SearchResult[]): SearchResult[] => {
 		}
 	}
 	return Array.from(map.values());
+};
+
+const FEED_URL_RE = /^https?:\/\/.+/i;
+
+/**
+ * If the query is a direct RSS feed URL (useful for private feeds that aren't
+ * in public directories), fetch and parse it into a single search result.
+ * Returns an empty array when the query is not a URL so normal search proceeds.
+ */
+export const searchByFeedUrl = async (
+  query: string,
+): Promise<SearchResult[]> => {
+  const trimmed = query.trim();
+  if (!FEED_URL_RE.test(trimmed)) return [];
+
+  try {
+    const response = await fetch(trimmed, {
+      headers: {
+        "Accept-Encoding": "identity",
+        Accept: "application/rss+xml, application/xml, text/xml, */*",
+      },
+    });
+    if (!response.ok) return [];
+
+    const xml = await response.text();
+    const podcast = parseRSSFeed(xml, trimmed);
+
+    return [
+      {
+        sourceId: "direct-rss",
+        sourceName: "RSS Feed",
+        sourceType: SourceType.RSS,
+        // parseRSSFeed marks feeds subscribed; a search result should start
+        // unsubscribed so the store can flag it correctly if already added.
+        podcast: { ...podcast, isSubscribed: false },
+        score: 1,
+      },
+    ];
+  } catch {
+    return [];
+  }
 };
 
 export const searchPodcasts = async (
