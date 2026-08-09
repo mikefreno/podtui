@@ -132,7 +132,7 @@ for r in $REMOTES; do
 done
 echo ""
 echo -e "${YELLOW}Note: pushing the tag to ${BLUE}gh${YELLOW} triggers release.yml CI (4-platform"
-echo "binaries + GitHub Release) and the homebrew-podtui tap update.${NC}"
+echo "binaries + GitHub Release) and the homebrew-tap tap update.${NC}"
 echo ""
 read -p "Proceed? (y/n) " -n 1 -r
 echo ""
@@ -236,5 +236,5 @@ echo ""
 echo -e "${BLUE}Next steps (automatic, nothing to do):${NC}"
 echo "  1. GitHub Action release.yml builds 4 tarballs and attaches them:"
 echo -e "     ${CYAN}gh run watch \$(gh run list --limit 1 --json databaseId -q .[0].databaseId)${NC}"
-echo "  2. mikefreno/homebrew-podtui self-updates within the hour (Formula"
+echo "  2. mikefreno/homebrew-tap self-updates within the hour (Formula"
 echo "     URLs + sha256s); brew upgrade podtui afterwards."

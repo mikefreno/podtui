@@ -159,11 +159,11 @@ Releases are built and published from **tags**
 
 4. A release is auto-created with all 4 tarballs attached. `brew` never
    sees the new version: the **tap self-updates**: the
-   `mikefreno/homebrew-podtui` repo has a scheduled workflow (hourly) that
+   `mikefreno/homebrew-tap` repo has a scheduled workflow (hourly) that
    polls GitHub releases, and when a new tag appears, rewrites
    `Formula/podtui.rb` (URLs + arm64/x64 `sha256`) and pushes it — no
    secrets. See `scripts/sync-formula.sh` in that repo for the logic. Local
-   test: `brew install mikefreno/podtui/podtui`.
+   test: `brew install mikefreno/tap/podtui`.
 5. **AUR packaging** (`packaging/aur/PKGBUILD`): the `podtui-bin` package is
    staged, not yet published (AUR account registrations are closed; see the
    README note in section 3). On each release, keep the AUR sources in sync
@@ -177,7 +177,7 @@ Releases are built and published from **tags**
 If you ever need to sync the tap by hand (or before the hourly job runs):
 
 ```bash
-cd <clone of mikefreno/homebrew-podtui>
+cd <clone of mikefreno/homebrew-tap>
 ./scripts/sync-formula.sh 0.2.0
 git commit -am 'podtui 0.2.0' && git push
 ```

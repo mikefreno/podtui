@@ -47,7 +47,7 @@ Linux (arm64/x64). Pick whichever fits your platform.
 ### 1. Homebrew (macOS)
 
 ```sh
-brew install mikefreno/podtui/podtui   # requires mpv: brew install mpv
+brew install mikefreno/tap/podtui   # requires mpv: brew install mpv
 ```
 
 > The formula installs the standalone binary plus its two native libraries
