@@ -85,7 +85,6 @@ function init() {
 	);
 	const suspended = () => suspendCount() > 0;
 
-	// Handle keybind shortcuts
 	useKeyboard((evt) => {
 		if (suspended()) return;
 		if (dialog.isOpen) return;
@@ -258,7 +257,6 @@ function CommandDialog(props: {
 			return;
 		}
 
-		// Handle text input
 		if (evt.name && evt.name.length === 1 && !evt.ctrl && !evt.meta) {
 			setFilter((f) => f + evt.name);
 			return;

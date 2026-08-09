@@ -116,7 +116,6 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		}
 		reader.start(position, speed);
 
-		// Start render loop
 		frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
 	};
 
@@ -140,11 +139,9 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 	const renderFrame = () => {
 		if (!cava?.isReady || !reader?.running || !sampleBuffer) return;
 
-		// Read available PCM samples from the stream
 		const count = reader.read(sampleBuffer);
 		if (count === 0) return;
 
-		// Feed samples to cavacore → get frequency bars
 		const input =
 			count < sampleBuffer.length
 				? sampleBuffer.subarray(0, count)
@@ -198,7 +195,6 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		}),
 	);
 
-	// Cleanup on unmount
 	onCleanup(() => {
 		stopVisualization();
 		if (reader) {
@@ -222,7 +218,6 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		const bars = barData();
 		const count = numBars();
 
-		// If no data yet, show empty placeholder
 		if (bars.length === 0) {
 			const placeholder = ".".repeat(count);
 			return (

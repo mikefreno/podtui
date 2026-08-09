@@ -97,14 +97,6 @@ export interface FeedListOptions {
   compact: boolean
 }
 
-/** Default feed list options */
-export const DEFAULT_FEED_LIST_OPTIONS: FeedListOptions = {
-  showEpisodeCount: true,
-  showLastUpdated: true,
-  showSource: false,
-  compact: false,
-}
-
 /** Feed statistics */
 export interface FeedStats {
   /** Total feed count */

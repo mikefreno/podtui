@@ -12,7 +12,7 @@ export type DialogSize = "medium" | "large"
 /**
  * Dialog component that renders a modal overlay with content.
  */
-export function Dialog(
+function Dialog(
   props: ParentProps<{
     size?: DialogSize
     onClose: () => void

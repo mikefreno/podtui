@@ -21,20 +21,6 @@ export type MediaKeyAction =
 	| "media.seekBackward"
 	| "media.speedCycle";
 
-/** Key-to-action mappings for multimedia controls */
-const MEDIA_KEY_MAP: Record<string, MediaKeyAction> = {
-	// Common terminal media keys — these overlap with Player.tsx local
-	// bindings, but Player guards on `props.focused` so the global
-	// handler fires independently when the player tab is *not* active.
-	//
-	// When Player IS focused both handlers fire, but since the audio
-	// actions are idempotent (toggle = toggle, seek = additive) having
-	// them called twice for the same keypress is avoided by the event
-	// bus approach — the audio hook only processes event-bus events, and
-	// Player.tsx calls audio methods directly.  We therefore guard with
-	// a "playerFocused" flag passed via options.
-};
-
 export interface MultimediaKeysOptions {
 	/** When true, skip handling (Player.tsx handles keys locally) */
 	playerFocused?: () => boolean;

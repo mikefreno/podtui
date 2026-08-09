@@ -208,7 +208,6 @@ export function MyShowsPage() {
 			: `${selectedShow() ? showTitle(selectedShow()!) : "Episodes"} · ${episodes().length}`;
 
 	// ── parent pane: previous-depth list (muted/blank at depth 0) ─────────────
-	// ── parent pane: previous-depth list (muted/blank at depth 0) ──────────
 	// Stable <Show> gate (not a ternary root swap) so the parent list
 	// mounts/unmounts cleanly on depth change.
 	const parentContent = () => (

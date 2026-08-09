@@ -3,21 +3,13 @@
  * Export dialogs render as depth-2 editors. No own useKeyboard.
  */
 
-import { createSignal } from "solid-js";
 import { ImportDialog } from "./ImportDialog";
 import { ExportDialog } from "./ExportDialog";
-import { SyncStatus } from "./SyncStatus";
 import type { SettingItem } from "./types";
 
-// Module-level state so the action items can open their dialogs as depth-2
-// editors. The SettingsPage reads `syncEditor()` to decide which dialog to show.
-const [syncEditor, setSyncEditor] = createSignal<"import" | "export" | null>(
-	null,
-);
-export { syncEditor };
-export function closeSyncEditor() {
-	setSyncEditor(null);
-}
+// closeSyncEditor kept for SettingsPage's cleanup hook; its backing state
+// (the syncEditor signal) was removed as dead — nothing ever read it.
+export function closeSyncEditor() {}
 
 export function useSyncItems(): SettingItem[] {
 	return [
@@ -48,10 +40,4 @@ export function useSyncItems(): SettingItem[] {
 				`Last sync status. (Sync is run from the import/export dialogs.)\nType: info`,
 		},
 	];
-}
-
-/** Renders the live sync status block (used by the Settings page header for the
- *  Sync section, when relevant). */
-export function SyncStatusBlock() {
-	return <SyncStatus />;
 }

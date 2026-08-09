@@ -47,7 +47,7 @@ test("createNavigation starts on the tab root (atRootTab true)", () => {
 // ── depth-tab focus: reads/writes the top frame's focus ───────────────────────
 test("depth-tab focusedIndex(DEPTH_CENTER_PANE) returns top frame's focus", () => {
 	withNav((nav) => {
-		// FeeD is a depth-tab; its root frame is a the top frame on the stack.
+		// FEED is a depth-tab; its root frame is the top frame on the stack.
 		nav.setActiveTab(TABS.FEED);
 		expect(nav.isDepthTab()).toBe(true);
 		expect(nav.focusedIndex(DEPTH_CENTER_PANE)).toBe(0);

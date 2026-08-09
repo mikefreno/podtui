@@ -11,8 +11,8 @@
  *
  * Uses a real `Bun.spawn(["sleep", "60"])` subprocess as a stand-in for the
  * player process, injected into the (private) `proc` slot of an MpvBackend —
- * mpv is the only real backend, and it uses the kill-on-dispose
- * exercising one is enough to guard the family.
+ * mpv is the only real backend; its kill-on-dispose path exercises the
+ * whole family, so one test suffices to guard it.
  */
 import { test, expect } from "bun:test";
 import { MpvBackend } from "../src/utils/audio-player";

@@ -385,8 +385,7 @@ function SearchPage() {
 						</Show>
 						<Show when={result().podcast.description}>
 							<text fg={theme.textSecondary}>
-								{result().podcast.description!.slice(0, 400) ??
-									"No description available."}
+								{result().podcast.description!.slice(0, 400)}
 								{(result().podcast.description?.length ?? 0) > 400 ? "…" : ""}
 							</text>
 						</Show>

@@ -488,11 +488,7 @@ export function createNavigation() {
 		exitVisual,
 		// modes
 		setActiveTabSignal: setActiveTab,
-		setActiveDepth: setPane, // legacy alias
-		activeDepth: activePane, // legacy alias
 		setInputFocused,
-		nextPane: () => {}, // legacy noop; swipe() replaces this
-		prevPane: () => {},
 		setMode,
 		enterCommand,
 		enterInput,

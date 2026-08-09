@@ -3,7 +3,6 @@ import { useTheme } from "@/context/ThemeContext";
 
 const spinnerChars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-//TODO: Watch for actual loading state (fetching feeds)
 export function LoadingIndicator() {
   const { theme } = useTheme();
   const [index, setIndex] = createSignal(0);

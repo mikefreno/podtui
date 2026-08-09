@@ -2,23 +2,23 @@
  * yazi-pages-depth.test.ts — task 03 page contract tests.
  *
  * Every depth-stack tab (Feed / MyShows / Discover / Search / Player /
- * Settings) renders through `<YaziPaneRow>` with the parent pane reading the
- * previous-depth frame's list (blank placeholder at depth 0). Their `open()`
- * action calls `nav.pushDepth(frame)` to drill and the Shell calls
+ * Settings) renders through `<PaneRow>` with the parent pane reading the
+ * previous-depth frame's list (muted tab-list placeholder at depth 0). Their
+ * `open()` action calls `nav.pushDepth(frame)` to drill and the Shell calls
  * `nav.popDepth()` on `h`. This file exercises the nav-store contract those
  * pages depend on for every depth-tab, asserting the parent-slot data model:
  *
- *   • depth 0  → stack has exactly the root frame (parent pane is blank)
- *   • drill(l)→ push a child frame; stack length 2, parent = previous list
- *   • drill(l)→ push again; stack length 3 (Settings sections→items→editor)
+ *   • depth 0  → stack has exactly the root frame (parent pane is the muted tab list)
+ *   • drill(l) → push a child frame; stack length 2, parent = previous list
+ *   • drill(l) → push again; stack length 3 (Settings sections→items→editor)
  *   • pop(h)  → stack shrinks; parent returns to the previous list
- *   • pop(h)  → back at root; parent is blank again
+ *   • pop(h)  → back at root; parent is the muted tab list again
  *
- * The visual "blank → list → list → blank" transition is the union of this
- * data model (which list each depth renders) with `<YaziPaneRow>`'s null
- * placeholder (covered by yazi-pane-row.test.tsx). Tested at the store level
- * because the page `open()` closures are not exported and the nav store is
- * the shared contract all four pages route through.
+ * The visual "muted → list → list → muted" transition is the union of this
+ * data model (which list each depth renders) with `<PaneRow>`'s parent slot
+ * (covered by yazi-pane-row.test.tsx). Tested at the store level because the
+ * page `open()` closures are not exported and the nav store is the shared
+ * contract all six depth-tabs route through.
  */
 
 import { test, expect } from "bun:test";
@@ -37,7 +37,7 @@ function withNav(fn: (nav: ReturnType<typeof createNavigation>) => void) {
 	});
 }
 
-/** The depth-tabs that render via <YaziPaneRow> (task 03 conversion). */
+/** The depth-tabs that render via <PaneRow> (task 03 conversion). */
 const CONVERTED_TABS = [
 	TABS.FEED,
 	TABS.MYSHOWS,
@@ -55,7 +55,7 @@ for (const tab of CONVERTED_TABS) {
 			nav.setActiveTab(tab);
 			expect(nav.isDepthTab()).toBe(true);
 
-			// depth 0: exactly the root frame → parent pane renders blank.
+			// depth 0: exactly the root frame → parent pane is the muted tab list.
 			expect(nav.currentDepth()).toBe(0);
 			expect(nav.depthStack()).toHaveLength(1);
 
@@ -92,7 +92,7 @@ for (const tab of CONVERTED_TABS) {
 			expect(nav.depthStack()).toHaveLength(2);
 			expect(nav.topFrame()).toEqual(child);
 
-			// pop (h): back to depth 0 — parent pane is blank again.
+			// pop (h): back to depth 0 — parent pane is the muted tab list again.
 			expect(nav.popDepth()).toBe(true);
 			expect(nav.currentDepth()).toBe(0);
 			expect(nav.depthStack()).toHaveLength(1);
@@ -105,7 +105,7 @@ for (const tab of CONVERTED_TABS) {
 			expect(nav.currentDepth()).toBe(0);
 			expect(nav.popDepth()).toBe(false);
 			expect(nav.currentDepth()).toBe(0);
-			// the root frame is preserved (parent stays blank, not undefined).
+			// the root frame is preserved (parent stays the muted tab list, not undefined).
 			expect(nav.depthStack()).toHaveLength(1);
 			expect(nav.topFrame()).toBeDefined();
 		});
