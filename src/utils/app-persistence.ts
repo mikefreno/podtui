@@ -38,6 +38,7 @@ const defaultSettings: AppSettings = {
 const defaultPreferences: UserPreferences = {
 	showExplicit: false,
 	autoDownload: false,
+	autoJumpToPlayer: true,
 };
 
 const defaultState: AppState = {

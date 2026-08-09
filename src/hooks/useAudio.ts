@@ -138,7 +138,6 @@ function startPolling(): void {
 					const progressStore = useProgressStore();
 					progressStore.update(ep.id, pos, dur > 0 ? dur : duration(), speed());
 
-					// Update platform media position
 					const media = useMediaRegistry();
 					media.setPosition(pos);
 				}
@@ -215,6 +214,9 @@ async function play(episode: Episode): Promise<void> {
 
 		startPolling();
 		emit("player.play", { episodeId: episode.id });
+		// Distinct from "player.play" (which also fires on resume): signals a
+		// fresh episode start so Shell can honor the auto-jump-to-player pref.
+		emit("player.started", { episodeId: episode.id });
 	} catch (err) {
 		setError(err instanceof Error ? err.message : "Playback failed");
 		setIsPlaying(false);
@@ -285,7 +287,6 @@ async function stop(): Promise<void> {
 		stopPolling();
 		emit("player.stop", {});
 
-		// Clear platform media controls
 		const media = useMediaRegistry();
 		media.clearNowPlaying();
 	} catch (err) {
@@ -332,12 +333,8 @@ async function doSetSpeed(spd: number): Promise<void> {
 	setSpeed(clamped);
 
 	// Sync back to app store
-	try {
-		const appStore = useAppStore();
-		appStore.updateSettings({ playbackSpeed: clamped });
-	} catch {
-		// Store may not be available
-	}
+	const appStore = useAppStore();
+	appStore.updateSettings({ playbackSpeed: clamped });
 }
 
 async function switchBackend(name: BackendName): Promise<void> {
@@ -347,14 +344,12 @@ async function switchBackend(name: BackendName): Promise<void> {
 	const vol = volume();
 	const spd = speed();
 
-	// Stop current backend
 	if (backend) {
 		stopPolling();
 		backend.dispose();
 		backend = null;
 	}
 
-	// Create new backend
 	backend = createAudioBackend(name);
 	setBackendName(backend.name);
 	setAvailablePlayers(detectPlayers());
@@ -388,14 +383,10 @@ export function useAudio(): AudioControls {
 
 	// Sync initial speed from app store
 	if (refCount === 0) {
-		try {
-			const appStore = useAppStore();
-			const storeSpeed = appStore.state().settings.playbackSpeed;
-			if (storeSpeed && storeSpeed !== speed()) {
-				setSpeed(storeSpeed);
-			}
-		} catch {
-			// Store may not be available yet
+		const appStore = useAppStore();
+		const storeSpeed = appStore.state().settings.playbackSpeed;
+		if (storeSpeed && storeSpeed !== speed()) {
+			setSpeed(storeSpeed);
 		}
 	}
 

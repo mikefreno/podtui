@@ -8,7 +8,7 @@
 /**
  * Remove JSONC comments from a string
  */
-export function stripComments(jsonString: string): string {
+function stripComments(jsonString: string): string {
   const comments = [
     { pattern: /\/\/.*$/gm, replacement: "" },
     { pattern: /\/\*[\s\S]*?\*\//g, replacement: "" },

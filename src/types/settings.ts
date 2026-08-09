@@ -85,6 +85,8 @@ export type AppSettings = {
 export type UserPreferences = {
 	showExplicit: boolean;
 	autoDownload: boolean;
+	/** Jump to the Player view automatically when playback starts (default: true) */
+	autoJumpToPlayer: boolean;
 };
 
 export type AppState = {

@@ -43,7 +43,7 @@ function saveSources(sources: PodcastSource[]): void {
 }
 
 /** Create feed store */
-export function createFeedStore() {
+function createFeedStore() {
 	const [feeds, setFeeds] = createSignal<Feed[]>([]);
 	const [sources, setSources] = createSignal<PodcastSource[]>([
 		...DEFAULT_SOURCES,
@@ -62,22 +62,18 @@ export function createFeedStore() {
 		let result = [...feeds()];
 		const f = filter();
 
-		// Filter by visibility
 		if (f.visibility && f.visibility !== "all") {
 			result = result.filter((feed) => feed.visibility === f.visibility);
 		}
 
-		// Filter by source
 		if (f.sourceId) {
 			result = result.filter((feed) => feed.sourceId === f.sourceId);
 		}
 
-		// Filter by pinned
 		if (f.pinnedOnly) {
 			result = result.filter((feed) => feed.isPinned);
 		}
 
-		// Filter by search query
 		if (f.searchQuery) {
 			const query = f.searchQuery.toLowerCase();
 			result = result.filter(
@@ -88,7 +84,6 @@ export function createFeedStore() {
 			);
 		}
 
-		// Sort by selected field
 		const sortDir = f.sortDirection === "asc" ? 1 : -1;
 		result.sort((a, b) => {
 			switch (f.sortBy) {
@@ -111,7 +106,6 @@ export function createFeedStore() {
 			}
 		});
 
-		// Pinned feeds always first
 		result.sort((a, b) => {
 			if (a.isPinned && !b.isPinned) return -1;
 			if (!a.isPinned && b.isPinned) return 1;
@@ -224,25 +218,21 @@ export function createFeedStore() {
 		newEpisodes: Episode[],
 		count: number,
 	) => {
-		try {
-			const dlStore = useDownloadStore();
-			// Sort by pubDate descending (newest first)
-			const sorted = [...newEpisodes].sort(
-				(a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
-			);
-			// count = 0 means download all new episodes
-			const toDownload = count > 0 ? sorted.slice(0, count) : sorted;
-			for (const ep of toDownload) {
-				const status = dlStore.getDownloadStatus(ep.id);
-				if (
-					status === DownloadStatus.NONE ||
-					status === DownloadStatus.FAILED
-				) {
-					dlStore.startDownload(ep, feedId);
-				}
+		const dlStore = useDownloadStore();
+		// Sort by pubDate descending (newest first)
+		const sorted = [...newEpisodes].sort(
+			(a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
+		);
+		// count = 0 means download all new episodes
+		const toDownload = count > 0 ? sorted.slice(0, count) : sorted;
+		for (const ep of toDownload) {
+			const status = dlStore.getDownloadStatus(ep.id);
+			if (
+				status === DownloadStatus.NONE ||
+				status === DownloadStatus.FAILED
+			) {
+				dlStore.startDownload(ep, feedId);
 			}
-		} catch {
-			// Download store may not be available yet
 		}
 	};
 

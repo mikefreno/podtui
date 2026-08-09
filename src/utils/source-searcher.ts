@@ -85,7 +85,7 @@ const makeResults = (query: string, source: PodcastSource, seedOffset = 0): Sear
   })
 }
 
-export const searchRSSSource = async (
+const searchRSSSource = async (
   query: string,
   source: PodcastSource
 ): Promise<SearcherResult> => {
@@ -148,7 +148,7 @@ const mapItunesResult = (result: ItunesResult, source: PodcastSource): Podcast |
   }
 }
 
-export const searchAPISource = async (
+const searchAPISource = async (
   query: string,
   source: PodcastSource
 ): Promise<SearcherResult> => {
@@ -173,7 +173,7 @@ export const searchAPISource = async (
   }))
 }
 
-export const searchCustomSource = async (
+const searchCustomSource = async (
   query: string,
   source: PodcastSource
 ): Promise<SearcherResult> => {

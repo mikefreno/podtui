@@ -17,10 +17,11 @@ import { useTheme } from "@/context/ThemeContext";
 import { useKeybinds, type KeybindActionName } from "@/context/KeybindContext";
 import { useNavigation, NavMode } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
-import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
+import { useAudioNavStore } from "@/stores/audio-nav";
 import { useFeedStore } from "@/stores/feed";
+import { useAppStore } from "@/stores/app";
 import { useToast } from "@/ui/toast";
-import { emit } from "@/utils/event-bus";
+import { emit, on } from "@/utils/event-bus";
 import { LayerGraph } from "@/utils/layer-graph";
 import { TABS, TabPaneCount } from "@/utils/navigation";
 import { createDispatcher } from "@/utils/dispatch";
@@ -47,6 +48,18 @@ export function Shell() {
 	const feedStore = useFeedStore();
 
 	const [showHelp, setShowHelp] = createSignal(false);
+
+	// ── Auto jump to Player on podcast start ───────────────────────────────────
+	// Honor the `autoJumpToPlayer` preference: when a NEW episode starts (see
+	// "player.started" — distinct from "player.play", which also fires on
+	// resume), switch to the Player tab and drop into its content pane.
+	on("player.started", () => {
+		const app = useAppStore();
+		if (app.state().preferences.autoJumpToPlayer) {
+			nav.setActiveTab(TABS.PLAYER);
+			nav.enterTabContent(); // PLAYER is a depth-tab — enter its content.
+		}
+	});
 
 	/** Play the episode adjacent (offset ±1) to the currently-playing one,
 	 *  within its feed's episode list. Updates audio-nav context accordingly. */
@@ -83,74 +96,60 @@ export function Shell() {
 	}
 
 	// ── Command bar dispatch ────────────────────────────────────────────────────
+	const COMMANDS: Record<string, (arg: string) => void> = {
+		quit: () => process.exit(0),
+		exit: () => process.exit(0),
+		q: () => process.exit(0),
+		refresh: () =>
+			emit("nav.action", {
+				action: "refresh",
+				tab: nav.activeTab(),
+				pane: nav.activePane(),
+				mode: nav.mode(),
+			}),
+		r: () =>
+			emit("nav.action", {
+				action: "refresh",
+				tab: nav.activeTab(),
+				pane: nav.activePane(),
+				mode: nav.mode(),
+			}),
+		play: () => audio.togglePlayback().catch(() => {}),
+		pause: () => audio.togglePlayback().catch(() => {}),
+		p: () => audio.togglePlayback().catch(() => {}),
+		next: () => advanceEpisode(1),
+		n: () => advanceEpisode(1),
+		prev: () => advanceEpisode(-1),
+		seek: (arg) => {
+			const n = Number(arg) || 0;
+			audio.seek(n).catch(() => {});
+		},
+		feed: () => nav.setActiveTab(TABS.FEED),
+		f: () => nav.setActiveTab(TABS.FEED),
+		shows: () => nav.setActiveTab(TABS.MYSHOWS),
+		myshows: () => nav.setActiveTab(TABS.MYSHOWS),
+		discover: () => nav.setActiveTab(TABS.DISCOVER),
+		d: () => nav.setActiveTab(TABS.DISCOVER),
+		search: () => nav.setActiveTab(TABS.SEARCH),
+		player: () => nav.setActiveTab(TABS.PLAYER),
+		settings: () => nav.setActiveTab(TABS.SETTINGS),
+		set: () => nav.setActiveTab(TABS.SETTINGS),
+		help: () => setShowHelp((v) => !v),
+		h: () => setShowHelp((v) => !v),
+	};
+
 	function runCommand(raw: string) {
 		const cmd = raw.trim();
 		if (!cmd) return;
 		const name = cmd.split(/\s+/)[0].toLowerCase();
 		const arg = cmd.slice(name.length).trim();
-		switch (name) {
-			case "q":
-			case "quit":
-			case "exit":
-				return process.exit(0);
-			case "refresh":
-			case "r":
-				emit("nav.action", {
-					action: "refresh",
-					tab: nav.activeTab(),
-					pane: nav.activePane(),
-					mode: nav.mode(),
-				});
-				break;
-			case "play":
-			case "pause":
-			case "p":
-				audio.togglePlayback().catch(() => {});
-				break;
-			case "next":
-			case "n":
-				advanceEpisode(1);
-				break;
-			case "prev":
-				advanceEpisode(-1);
-				break;
-			case "seek": {
-				const n = Number(arg) || 0;
-				audio.seek(n).catch(() => {});
-				break;
-			}
-			case "feed":
-			case "f":
-				nav.setActiveTab(TABS.FEED);
-				break;
-			case "shows":
-			case "myshows":
-				nav.setActiveTab(TABS.MYSHOWS);
-				break;
-			case "discover":
-			case "d":
-				nav.setActiveTab(TABS.DISCOVER);
-				break;
-			case "search":
-				nav.setActiveTab(TABS.SEARCH);
-				break;
-			case "player":
-				nav.setActiveTab(TABS.PLAYER);
-				break;
-			case "settings":
-			case "set":
-				nav.setActiveTab(TABS.SETTINGS);
-				break;
-			case "help":
-			case "h":
-				setShowHelp((v) => !v);
-				break;
-			default:
-				nav.setCommandError(`unknown command: ${name}`);
-				// re-enter command mode so the user sees the error + can correct
-				nav.enterCommand();
-				nav.setCommandBuffer(cmd);
-		}
+		const unknownCommand = () => {
+			nav.setCommandError(`unknown command: ${name}`);
+			// re-enter command mode so the user sees the error + can correct
+			nav.enterCommand();
+			nav.setCommandBuffer(cmd);
+		};
+		(COMMANDS[name] ?? unknownCommand)(arg);
 	}
 
 	// ── Command-mode key handling ───────────────────────────────────────────────
@@ -456,19 +455,6 @@ function k_match_escape(evt: any): boolean {
 	return (
 		evt.name === "escape" || evt.name === "~" || (evt.ctrl && evt.name === "[")
 	);
-}
-
-/** Exposed so App can route an externally-triggered "play episode" (e.g. from
- *  search) into the player tab. */
-export function playEpisodeAndSwitch(
-	nav: ReturnType<typeof useNavigation>,
-	audio: ReturnType<typeof useAudio>,
-	episode: import("@/types/episode").Episode,
-) {
-	audio.play(episode);
-	nav.setActiveTab(TABS.PLAYER);
-	nav.enterTabContent(); // PLAYER is a depth-tab — drop into its content pane.
-	useAudioNavStore().setSource(AudioSource.FEED);
 }
 
 // Re-export Episode type for callers building pane trees.

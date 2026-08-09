@@ -77,7 +77,6 @@ export async function copyKeybindsIfNeeded(): Promise<void> {
 	try {
 		const targetPath = getConfigFilePath(KEYBINDS_FILE);
 
-		// Check if file already exists
 		const targetFile = Bun.file(targetPath);
 		if (await targetFile.exists()) return;
 

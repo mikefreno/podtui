@@ -69,16 +69,13 @@ function resolveLabel(v: PaneLabel | undefined): string {
 }
 
 /** Normalize a PaneContent (static JSX or accessor) into a reactive accessor.
- *  We deliberately do NOT use Solid's `children()` helper here: that helper
- *  flattens accessor children into a stable resolved-nodes array and is the
- *  wrong tool for content whose ROOT swaps at runtime (e.g. the current pane
- *  switching between a depth-1 list fragment and a depth-2 editor — both
- *  truthy JSX roots). `children()` would not re-resolve on a truthy<@->truthy
- *  root swap, freezing the previous subtree in place. Instead we hand the
- *  raw accessor to a reactive `{ expr ?? <Placeholder/> }` expression below,
- *  which Solid compiles into a tracked `insert` effect that disposes the old
- *  subtree and mounts the new whenever the accessor returns a different
- *  element identity. */
+ *  We deliberately avoid Solid's `children()` helper: it flattens accessor
+ *  children into a stable resolved-nodes array and won't re-resolve on a
+ *  truthy→truthy root swap (e.g. the current pane switching between a
+ *  depth-1 list fragment and a depth-2 editor), freezing the previous
+ *  subtree. Instead the raw accessor feeds a reactive `{ expr ?? <Placeholder/> }`
+ *  expression — a tracked `insert` effect that disposes the old subtree and
+ *  mounts the new whenever the accessor returns a different element identity. */
 function normalizeContent(
 	v: PaneContent | undefined,
 ): () => JSX.Element | undefined {
@@ -129,20 +126,7 @@ function Pane(props: {
 				borderColor={borderColor()}
 				backgroundColor={theme.background}
 			>
-				{/*
-				 * Render the content accessor directly via a reactive expression.
-				 * `{ accessor() ?? <Placeholder/> }` compiles to a Solid `insert`
-				 * effect that re-runs whenever the accessor's tracked signals
-				 * change (e.g. `depth()` swapping the root from a list fragment to
-				 * an editor). Solid disposes the previously-rendered subtree and
-				 * mounts the new element identity. `null`/`undefined` falls back
-				 * to the muted placeholder so the parent pane keeps its 1/7 slot
-				 * visibly blank at depth 0. This is the correct tool for root
-				 * swapping — unlike Solid's `children()` / `<Show>`-children,
-				 * which only react to truthiness flips, not truthy<@->truthy root
-				 * identity changes.
-				 */}
-				{props.content() ?? <Placeholder color={muted} />}
+			{props.content() ?? <Placeholder color={muted} />}
 			</scrollbox>
 		</box>
 	);

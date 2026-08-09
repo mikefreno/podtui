@@ -90,5 +90,17 @@ export function usePreferencesItems(): SettingItem[] {
 					autoDownload: !prefs().autoDownload,
 				}),
 		},
+		{
+			id: "autoJumpToPlayer",
+			label: "Auto Jump to Player",
+			kind: "toggle",
+			display: () => (prefs().autoJumpToPlayer ? "On" : "Off"),
+			help: () =>
+				`Jump to the Player view automatically when a podcast starts.\nType: toggle\nDefault: true\nCurrent: ${prefs().autoJumpToPlayer ? "On" : "Off"}\nSpace/Enter to toggle.`,
+			toggle: () =>
+				app.updatePreferences({
+					autoJumpToPlayer: !prefs().autoJumpToPlayer,
+				}),
+		},
 	];
 }

@@ -135,10 +135,8 @@ export class AudioStreamReader {
 		this.writePos = 0;
 		this.totalSamplesWritten = 0;
 
-		// Capture generation for this run
 		const myGeneration = this.generation;
 
-		// Start async reading loop
 		this.readLoop(myGeneration);
 
 		// Detect process exit

@@ -79,7 +79,7 @@ export const PAGE_ACTIONS: ReadonlySet<KeybindActionName> =
 	]);
 
 /** Resolve a `tab-goto-N` digit action (1..TabsCount) to a TABS value, or null. */
-export function tabByDigit(action: KeybindActionName): TABS | null {
+function tabByDigit(action: KeybindActionName): TABS | null {
 	if (action.startsWith("tab-goto-")) {
 		const n = Number(action.slice("tab-goto-".length));
 		return (n >= 1 && n <= TabsCount ? n : null) as TABS | null;

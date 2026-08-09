@@ -87,7 +87,7 @@ function createEventBus(): EventBusInstance {
 }
 
 // Singleton event bus instance
-export const EventBus = createEventBus();
+const EventBus = createEventBus();
 
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { TABS } from "@/utils/navigation";
@@ -105,6 +105,8 @@ export type AppEvents = {
 	"player.play": { episodeId: string };
 	"player.pause": { episodeId: string };
 	"player.stop": {};
+	// Emitted when a NEW episode begins playback (not on resume).
+	"player.started": { episodeId: string };
 	"toast.show": {
 		message: string;
 		variant: "info" | "success" | "warning" | "error";

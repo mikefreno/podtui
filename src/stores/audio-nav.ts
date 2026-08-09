@@ -36,7 +36,7 @@ const defaultNavState: AudioNavState = {
 };
 
 /** Create audio navigation store */
-export function createAudioNavStore() {
+function createAudioNavStore() {
 	const [navState, setNavState] = createSignal<AudioNavState>(defaultNavState);
 
 	/** Persist current navigation state to file (fire-and-forget) */

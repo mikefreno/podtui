@@ -127,7 +127,6 @@ export function createDiscoverStore() {
 				return;
 			}
 
-			// Build the podcast list from the manifest entries
 			const fetched = manifest.podcasts.map(entryToPodcast);
 			cachedAt = now;
 			setPodcasts(fetched);
@@ -173,7 +172,6 @@ export function createDiscoverStore() {
 	const unsubscribe = (podcastId: string) => {
 		const podcast = podcasts().find((p) => p.id === podcastId);
 		if (podcast) {
-			// Remove the feed from the feed store
 			const feedStore = useFeedStore();
 			feedStore.removeFeedByUrl(podcast.feedUrl);
 		}

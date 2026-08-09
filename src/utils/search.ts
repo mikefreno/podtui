@@ -1,6 +1,5 @@
 import { searchSourceByType } from "./source-searcher";
 import type { PodcastSource, SearchResult } from "../types/source";
-import type { Episode } from "../types/episode";
 
 type SearchCacheEntry = {
 	timestamp: number;
@@ -114,61 +113,4 @@ export const searchPodcasts = async (
 	return sorted;
 };
 
-type ItunesEpisodeResult = {
-	trackId?: number;
-	trackName?: string;
-	description?: string;
-	shortDescription?: string;
-	releaseDate?: string;
-	trackTimeMillis?: number;
-	episodeUrl?: string;
-	previewUrl?: string;
-	trackViewUrl?: string;
-};
 
-type ItunesEpisodeResponse = {
-	resultCount: number;
-	results: ItunesEpisodeResult[];
-};
-
-export const searchEpisodes = async (
-	query: string,
-	feedId: string,
-): Promise<Episode[]> => {
-	const trimmed = query.trim();
-	if (!trimmed) return [];
-
-	const url = new URL("https://itunes.apple.com/search");
-	url.searchParams.set("term", trimmed);
-	url.searchParams.set("media", "podcast");
-	url.searchParams.set("entity", "podcastEpisode");
-	url.searchParams.set("country", "US");
-	url.searchParams.set("lang", "en_us");
-
-	const response = await fetch(url.toString());
-	if (!response.ok) return [];
-
-	const data = (await response.json()) as ItunesEpisodeResponse;
-	return data.results
-		.map((item) => {
-			if (!item.trackName) return null;
-			const id = item.trackId
-				? `episode-${item.trackId}`
-				: `episode-${item.trackName}`;
-			const audioUrl =
-				item.episodeUrl || item.previewUrl || item.trackViewUrl || "";
-
-			return {
-				id,
-				podcastId: feedId,
-				title: item.trackName,
-				description: item.description || item.shortDescription || "",
-				audioUrl,
-				duration: item.trackTimeMillis
-					? Math.round(item.trackTimeMillis / 1000)
-					: 0,
-				pubDate: item.releaseDate ? new Date(item.releaseDate) : new Date(),
-			};
-		})
-		.filter((item): item is Episode => Boolean(item));
-};

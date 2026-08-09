@@ -7,40 +7,12 @@
  * - Tracking theme change state
  */
 
-import { emit, on, off, type EventHandler } from "./event-bus"
-
-/**
- * Subscribe to theme reload events.
- * These are triggered by SIGUSR2 signals.
- */
-export function onThemeReload(handler: EventHandler<{}>): () => void {
-  return on("theme.reload", handler)
-}
-
-/**
- * Subscribe to theme changed events.
- * These are triggered when the theme selection changes.
- */
-export function onThemeChanged(
-  handler: EventHandler<{ theme: string; mode: "dark" | "light" }>
-): () => void {
-  return on("theme.changed", handler)
-}
-
-/**
- * Subscribe to theme mode changed events.
- * These are triggered when switching between dark/light mode.
- */
-export function onThemeModeChanged(
-  handler: EventHandler<{ mode: "dark" | "light" }>
-): () => void {
-  return on("theme.mode.changed", handler)
-}
+import { emit } from "./event-bus"
 
 /**
  * Emit a theme reload event.
  */
-export function emitThemeReload(): void {
+function emitThemeReload(): void {
   emit("theme.reload", {})
 }
 
@@ -77,28 +49,5 @@ export function setupThemeSignalHandler(onReload: () => void): () => void {
 
   return () => {
     process.off("SIGUSR2", handler)
-  }
-}
-
-/**
- * Create a debounced theme change handler to prevent rapid consecutive updates.
- *
- * @param handler - The handler to debounce
- * @param delay - Delay in milliseconds (default: 100ms)
- */
-export function createDebouncedThemeHandler<T>(
-  handler: (event: T) => void,
-  delay: number = 100
-): (event: T) => void {
-  let timeout: NodeJS.Timeout | null = null
-
-  return (event: T) => {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-    timeout = setTimeout(() => {
-      handler(event)
-      timeout = null
-    }, delay)
   }
 }

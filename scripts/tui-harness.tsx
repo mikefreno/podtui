@@ -205,7 +205,7 @@ function parseFlags(rest: string[]): {
 			} else if (a === "--from") {
 				flags.from = rest[++i];
 			} else {
-				flags[a.slice(2)] = rest[++i] ?? true;
+				throw new Error(`unknown flag: ${a}`);
 			}
 		} else {
 			positional.push(a);
@@ -222,52 +222,68 @@ function parseMods(positional: string[]): Mod[] {
 	return mods;
 }
 
-function buildAction(cmd: string, positional: string[]): Action | null {
+// Per-command builders. Leading positional tokens that name a modifier
+// (ctrl/shift/...) are stripped as mods; the rest is the command's data.
+const modsOrUndefined = (positional: string[]): Mod[] | undefined => {
 	const mods = parseMods(positional);
-	const first = positional[0];
-	switch (cmd) {
-		case "key":
-			if (!first) throw new Error("key requires a <key> argument");
-			return { t: "key", k: first, mods: mods.length ? mods : undefined };
-		case "arrow":
-			if (!first || !["up", "down", "left", "right"].includes(first))
-				throw new Error("arrow requires up|down|left|right");
-			return {
-				t: "arrow",
-				d: first as any,
-				mods: mods.length ? mods : undefined,
-			};
-		case "enter":
-		case "escape":
-		case "tab":
-		case "space":
-		case "backspace":
-			return { t: cmd, mods: mods.length ? mods : undefined };
-		case "type":
-			if (first === undefined) throw new Error("type requires <text>");
-			// Re-join the rest in case text had spaces; positional[0] already is first token,
-			// caller should quote. We join all positional as the text.
-			return { t: "type", s: positional.join(" ") };
-		case "wait":
-			if (!first) throw new Error("wait requires <ms>");
-			return { t: "wait", ms: parseInt(first, 10) || 0 };
-		case "resize":
-			if (!first || !positional[1]) throw new Error("resize requires <w> <h>");
-			return {
-				t: "resize",
-				w: parseInt(first, 10) || 100,
-				h: parseInt(positional[1], 10) || 30,
-			};
-		case "frame":
-		case "state":
-		case "reset":
-		case "actions":
-		case "init":
-		case "seed":
-			return null;
-		default:
-			throw new Error(`unknown command: ${cmd}`);
-	}
+	return mods.length ? mods : undefined;
+};
+
+const BUILDERS: Record<string, (positional: string[]) => Action> = {
+	key: (p) => {
+		if (!p[0]) throw new Error("key requires a <key> argument");
+		return { t: "key", k: p[0], mods: modsOrUndefined(p) };
+	},
+	arrow: (p) => {
+		if (!p[0] || !["up", "down", "left", "right"].includes(p[0]))
+			throw new Error("arrow requires up|down|left|right");
+		return {
+			t: "arrow",
+			d: p[0] as "up" | "down" | "left" | "right",
+			mods: modsOrUndefined(p),
+		};
+	},
+	enter: (p) => ({ t: "enter", mods: modsOrUndefined(p) }),
+	escape: (p) => ({ t: "escape", mods: modsOrUndefined(p) }),
+	tab: (p) => ({ t: "tab", mods: modsOrUndefined(p) }),
+	space: (p) => ({ t: "space", mods: modsOrUndefined(p) }),
+	backspace: (p) => ({ t: "backspace", mods: modsOrUndefined(p) }),
+	type: (p) => {
+		if (p[0] === undefined) throw new Error("type requires <text>");
+		// Re-join the rest in case text had spaces; p[0] already is first token,
+		// caller should quote. We join all positional as the text.
+		return { t: "type", s: p.join(" ") };
+	},
+	wait: (p) => {
+		if (!p[0]) throw new Error("wait requires <ms>");
+		return { t: "wait", ms: parseInt(p[0], 10) || 0 };
+	},
+	resize: (p) => {
+		if (!p[0] || !p[1]) throw new Error("resize requires <w> <h>");
+		return {
+			t: "resize",
+			w: parseInt(p[0], 10) || 100,
+			h: parseInt(p[1], 10) || 30,
+		};
+	},
+};
+
+function buildAction(cmd: string, positional: string[]): Action | null {
+	const builder = BUILDERS[cmd];
+	if (builder) return builder(positional);
+	// Local-only commands return early in main before this is reached; keep
+	// the null contract so the public behavior is unchanged.
+	if (
+		cmd === "frame" ||
+		cmd === "state" ||
+		cmd === "reset" ||
+		cmd === "actions" ||
+		cmd === "init" ||
+		cmd === "seed"
+	)
+		return null;
+	// Single table-miss error for any unknown command.
+	throw new Error(`unknown command: ${cmd}`);
 }
 
 // ── Execute one action against a mounted setup ──────────────────────────────
@@ -317,26 +333,53 @@ async function execAction(setup: any, a: Action): Promise<void> {
 	await new Promise((r) => setTimeout(r, 40));
 }
 
-// ── Main ───────────────────────────────────────────────────────────────────
-async function main() {
-	activateSandbox();
-	captureIssues();
+// ── Mount, snapshot & output (extracted from main) ─────────────────────────
+// A line is "visually empty" if it's either fully blank OR contains only
+// box-drawing chars + whitespace (i.e. empty-pane interior padding like
+// "│   │"). Runs of these collapse to a single `…N` marker so an empty
+// 24-row pane costs 1 line, not 18.
+const BOX_CHARS = "│┌┐└─┤├┬┴┼┐┘┌└┤├┬┴┼┌┐└┘─│┤├┬┴┼";
+const isVisuallyEmpty = (l: string): boolean =>
+	l === "" || [...l].every((ch) => ch === " " || BOX_CHARS.includes(ch));
 
-	const argv = process.argv.slice(2);
-	const cmd = argv[0] ?? "frame";
-	const { flags, positional } = parseFlags(argv.slice(1));
+function trimFrame(plainFrame: string): string {
+	const lines = plainFrame
+		.replace(/\n+$/, "")
+		.split("\n")
+		.map((l) => l.replace(/\s+$/, ""));
+	while (lines.length && isVisuallyEmpty(lines[lines.length - 1]))
+		lines.pop();
+	const out: string[] = [];
+	let blank = 0;
+	const flushBlanks = () => {
+		if (blank >= 3) out.push(`  …${blank} empty`);
+		else for (let i = 0; i < blank; i++) out.push("");
+		blank = 0;
+	};
+	for (const l of lines) {
+		if (isVisuallyEmpty(l)) {
+			blank++;
+		} else {
+			flushBlanks();
+			out.push(l);
+		}
+	}
+	flushBlanks();
+	return out.join("\n");
+}
 
-	// Local-only commands that don't mount.
+// Local-only commands that don't mount. Returns true if handled (main returns).
+function runLocal(cmd: string, flags: Record<string, string | boolean>): boolean {
 	if (cmd === "reset") {
 		saveActions([]);
 		console.log("✔ actions log cleared.");
-		return;
+		return true;
 	}
 	if (cmd === "actions") {
 		const a = loadActions();
 		console.log(`Action log (${a.length}):`);
 		console.log(JSON.stringify(a, null, 2));
-		return;
+		return true;
 	}
 	if (cmd === "seed") {
 		const from = String(
@@ -349,9 +392,29 @@ async function main() {
 		const dest = join(process.env.XDG_CONFIG_HOME!, "podtui");
 		cpSync(from, dest, { recursive: true });
 		console.log(`✔ seeded sandbox config from ${from} → ${dest}`);
-		return;
+		return true;
 	}
+	return false;
+}
 
+type FrameCapture = {
+	lines: { spans: Span[] }[];
+	cols: number;
+	rows: number;
+	cursor: [number, number];
+};
+
+async function mountApp(
+	flags: Record<string, string | boolean>,
+	cmd: string,
+	positional: string[],
+): Promise<{
+	setup: any;
+	spans: FrameCapture;
+	plainFrame: string;
+	audioControls: any;
+	actions: Action[];
+}> {
 	// Size settings.
 	let width = 100;
 	let height = 30;
@@ -448,12 +511,7 @@ async function main() {
 	// Final settle + capture.
 	await setup.renderOnce();
 	await new Promise((r) => setTimeout(r, 60));
-	const spans = setup.captureSpans() as {
-		lines: { spans: Span[] }[];
-		cols: number;
-		rows: number;
-		cursor: [number, number];
-	};
+	const spans = setup.captureSpans() as FrameCapture;
 	const plainFrame = setup.captureCharFrame();
 
 	// Dump structured spans + plain frame.
@@ -462,6 +520,10 @@ async function main() {
 		writeFileSync(FRAME_TXT, plainFrame);
 	} catch {}
 
+	return { setup, spans, plainFrame, audioControls, actions };
+}
+
+async function snapshotState(audioControls: any): Promise<Record<string, unknown>> {
 	// Store state snapshot.
 	const state: Record<string, unknown> = {};
 	try {
@@ -514,54 +576,31 @@ async function main() {
 	try {
 		writeFileSync(STATE_JSON, JSON.stringify(state));
 	} catch {}
+	return state;
+}
 
-	// ── Output ──────────────────────────────────────────────────────────────
+function emitOutput(p: {
+	spans: FrameCapture;
+	plainFrame: string;
+	state: Record<string, unknown>;
+	actions: Action[];
+	cmd: string;
+	flags: Record<string, string | boolean>;
+	positional: string[];
+}): void {
 	// Compact by default: trimmed frame, one-line state per section, no styles
 	// block, no boilerplate footer. Use --styles / --verbose to opt back in.
-	const verbose = !!flags.verbose;
-	const scope = cmd === "state" ? String(positional[0] || "all") : "all";
-
-	// A line is "visually empty" if it's either fully blank OR contains only
-	// box-drawing chars + whitespace (i.e. empty-pane interior padding like
-	// "│   │"). Runs of these collapse to a single `…N` marker so an empty
-	// 24-row pane costs 1 line, not 18.
-	const BOX_CHARS = "│┌┐└─┤├┬┴┼┐┘┌└┤├┬┴┼┌┐└┘─│┤├┬┴┼";
-	const isVisuallyEmpty = (l: string): boolean =>
-		l === "" || [...l].every((ch) => ch === " " || BOX_CHARS.includes(ch));
-	const frameTrimmed = (() => {
-		const lines = plainFrame
-			.replace(/\n+$/, "")
-			.split("\n")
-			.map((l) => l.replace(/\s+$/, ""));
-		while (lines.length && isVisuallyEmpty(lines[lines.length - 1]))
-			lines.pop();
-		const out: string[] = [];
-		let blank = 0;
-		const flushBlanks = () => {
-			if (blank >= 3) out.push(`  …${blank} empty`);
-			else for (let i = 0; i < blank; i++) out.push("");
-			blank = 0;
-		};
-		for (const l of lines) {
-			if (isVisuallyEmpty(l)) {
-				blank++;
-			} else {
-				flushBlanks();
-				out.push(l);
-			}
-		}
-		flushBlanks();
-		return out.join("\n");
-	})();
+	const verbose = !!p.flags.verbose;
+	const scope = p.cmd === "state" ? String(p.positional[0] || "all") : "all";
 
 	console.log(
-		`FRAME ${spans.cols}x${spans.rows} cur=${spans.cursor[0]},${spans.cursor[1]} acts=${actions.length} ${cmd}`,
+		`FRAME ${p.spans.cols}x${p.spans.rows} cur=${p.spans.cursor[0]},${p.spans.cursor[1]} acts=${p.actions.length} ${p.cmd}`,
 	);
-	console.log(frameTrimmed);
+	console.log(trimFrame(p.plainFrame));
 
 	// ── distinct styles: opt-in only (--styles OR --verbose) ──
-	if (scope === "all" && (flags.styles || verbose)) {
-		const styles = distinctStyles(spans);
+	if (scope === "all" && (p.flags.styles || verbose)) {
+		const styles = distinctStyles(p.spans);
 		if (styles.length) {
 			console.log("-- styles (top 20) --");
 			for (const s of styles) console.log(`  ${s.tag} ×${s.n} “${s.sample}”`);
@@ -572,9 +611,9 @@ async function main() {
 	const want = (k: string) => scope === "all" || scope === k;
 	const compact = (obj: unknown): string =>
 		verbose ? JSON.stringify(obj, null, 2) : JSON.stringify(obj);
-	if (want("nav")) console.log("nav " + compact(state.nav));
-	if (want("audio")) console.log("audio " + compact(state.audio));
-	if (want("feed")) console.log("feed " + compact(state.feed));
+	if (want("nav")) console.log("nav " + compact(p.state.nav));
+	if (want("audio")) console.log("audio " + compact(p.state.audio));
+	if (want("feed")) console.log("feed " + compact(p.state.feed));
 	if (want("app")) console.log("app (not dumped in v1)");
 
 	// ── issues: terse ──
@@ -586,12 +625,14 @@ async function main() {
 	}
 
 	// Footer is identical every run — only print on init or --verbose.
-	if (cmd === "init" || verbose) {
+	if (p.cmd === "init" || verbose) {
 		console.log(
 			`(spans ${FRAME_JSON} | frame ${FRAME_TXT} | state ${STATE_JSON})`,
 		);
 	}
+}
 
+async function teardown(setup: any, audioControls: any): Promise<void> {
 	// Tear down child processes (audio backend) before exit to avoid orphans.
 	try {
 		if (audioControls?.stop) await audioControls.stop().catch(() => {});
@@ -604,6 +645,32 @@ async function main() {
 		issues.push("teardown renderer: " + String(e));
 	}
 	process.exit(0);
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+async function main() {
+	activateSandbox();
+	captureIssues();
+
+	const argv = process.argv.slice(2);
+	const cmd = argv[0] ?? "frame";
+	const { flags, positional } = parseFlags(argv.slice(1));
+
+	// Local-only commands that don't mount.
+	if (runLocal(cmd, flags)) return;
+
+	const m = await mountApp(flags, cmd, positional);
+	const state = await snapshotState(m.audioControls);
+	emitOutput({
+		spans: m.spans,
+		plainFrame: m.plainFrame,
+		state,
+		actions: m.actions,
+		cmd,
+		flags,
+		positional,
+	});
+	await teardown(m.setup, m.audioControls);
 }
 
 main().catch((err) => {

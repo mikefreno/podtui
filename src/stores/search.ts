@@ -80,7 +80,6 @@ export function createSearchStore() {
 		setIsSearching(true);
 		setError(null);
 
-		// Add to history
 		addToHistory(q);
 
 		try {
@@ -122,7 +121,6 @@ export function createSearchStore() {
 	/** Add query to history */
 	const addToHistory = (q: string) => {
 		setHistory((prev) => {
-			// Remove duplicates and add to front
 			const filtered = prev.filter((h) => h.toLowerCase() !== q.toLowerCase());
 			const updated = [q, ...filtered].slice(0, MAX_HISTORY);
 			saveHistory(updated);

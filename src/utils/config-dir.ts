@@ -13,7 +13,7 @@ import path from "path"
 const APP_DIR_NAME = "podtui"
 
 /** Resolve the XDG_CONFIG_HOME directory, defaulting to ~/.config */
-export function getXdgConfigHome(): string {
+function getXdgConfigHome(): string {
   const xdg = process.env.XDG_CONFIG_HOME
   if (xdg) return xdg
 
@@ -44,7 +44,7 @@ export async function ensureConfigDir(): Promise<string> {
 }
 
 /** Resolve the XDG_DATA_HOME directory, defaulting to ~/.local/share */
-export function getXdgDataHome(): string {
+function getXdgDataHome(): string {
   const xdg = process.env.XDG_DATA_HOME
   if (xdg) return xdg
 
@@ -55,12 +55,12 @@ export function getXdgDataHome(): string {
 }
 
 /** Get the application-specific data directory path */
-export function getDataDir(): string {
+function getDataDir(): string {
   return path.join(getXdgDataHome(), APP_DIR_NAME)
 }
 
 /** Get the downloads directory path */
-export function getDownloadsDir(): string {
+function getDownloadsDir(): string {
   return path.join(getDataDir(), "downloads")
 }
 

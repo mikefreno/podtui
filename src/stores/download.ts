@@ -38,7 +38,7 @@ interface QueueItem {
 }
 
 /** Create download store */
-export function createDownloadStore() {
+function createDownloadStore() {
 	const [downloads, setDownloads] = createSignal<
 		Map<string, DownloadedEpisode>
 	>(new Map());
@@ -48,7 +48,6 @@ export function createDownloadStore() {
 	/** Active AbortControllers keyed by episodeId */
 	const abortControllers = new Map<string, AbortController>();
 
-	// Load persisted downloads on init
 	(async () => {
 		const loaded = await loadDownloads();
 		if (loaded.size > 0) setDownloads(loaded);
@@ -153,7 +152,6 @@ export function createDownloadStore() {
 		const slotsAvailable = MAX_CONCURRENT - current;
 		const toStart = q.slice(0, slotsAvailable);
 
-		// Remove started items from queue
 		if (toStart.length > 0) {
 			setQueue((prev) => prev.slice(toStart.length));
 		}
@@ -250,7 +248,6 @@ export function createDownloadStore() {
 			return; // Already downloading or queued
 		}
 
-		// Create download entry
 		const entry: DownloadedEpisode = {
 			episodeId: episode.id,
 			feedId,
@@ -269,7 +266,6 @@ export function createDownloadStore() {
 			return next;
 		});
 
-		// Add to queue
 		const queueItem: QueueItem = {
 			episodeId: episode.id,
 			feedId,
@@ -291,10 +287,8 @@ export function createDownloadStore() {
 			abortControllers.delete(episodeId);
 		}
 
-		// Remove from queue
 		setQueue((prev) => prev.filter((q) => q.episodeId !== episodeId));
 
-		// Update status
 		updateDownload(episodeId, {
 			status: DownloadStatus.NONE,
 			progress: 0,

@@ -73,11 +73,6 @@ export function updateConfig(patch: Partial<PodTuiConfig>): void {
 	});
 }
 
-/** Await all pending config writes (used by sync/export flows). */
-export async function flushConfig(): Promise<void> {
-	await writeChain;
-}
-
 /** Guards so migration runs exactly once per process. */
 let migrationDone = false;
 let migrationPromise: Promise<void> | null = null;
@@ -98,7 +93,7 @@ async function migrateOnce(): Promise<void> {
  * Safe to call on every startup — no-op once config.json exists (except for
  * backup cleanup, which runs unconditionally since those files are now dead).
  */
-export async function migrateLegacyConfig(): Promise<void> {
+async function migrateLegacyConfig(): Promise<void> {
 	try {
 		await ensureConfigDir();
 		const dir = getConfigDir();

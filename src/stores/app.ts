@@ -35,6 +35,7 @@ const defaultSettings: AppSettings = {
 const defaultPreferences: UserPreferences = {
 	showExplicit: false,
 	autoDownload: false,
+	autoJumpToPlayer: true,
 };
 
 const defaultState: AppState = {
@@ -43,7 +44,7 @@ const defaultState: AppState = {
 	customTheme: DEFAULT_THEME,
 };
 
-export function createAppStore() {
+function createAppStore() {
 	// Start with defaults; async load will update once ready
 	const [state, setState] = createSignal<AppState>(defaultState);
 

@@ -106,7 +106,7 @@ export namespace Clipboard {
   /**
    * Read text from the clipboard.
    */
-  export async function readText(): Promise<string | undefined> {
+  async function readText(): Promise<string | undefined> {
     const os = platform()
 
     if (os === "darwin") {

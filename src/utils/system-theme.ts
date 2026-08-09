@@ -13,15 +13,6 @@ export function clearPaletteCache() {
   cached = null;
 }
 
-export function detectSystemTheme(colors: TerminalColors) {
-  const bg = RGBA.fromHex(
-    colors.defaultBackground ?? colors.palette[0] ?? "#000000",
-  );
-  const luminance = 0.299 * bg.r + 0.587 * bg.g + 0.114 * bg.b;
-  const mode = luminance > 0.5 ? "light" : "dark";
-  return { mode, background: bg };
-}
-
 export function generateSystemTheme(
   colors: TerminalColors,
   mode: "dark" | "light",

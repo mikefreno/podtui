@@ -72,20 +72,7 @@ export type KeybindActionName =
 	| "audio-next"
 	| "audio-prev"
 	| "audio-seek-forward"
-	| "audio-seek-backward"
-	// legacy compat (kept so older callers don't crash)
-	| "select"
-	| "leader"
-	| "inverseModifier"
-	| "cycle"
-	| "dive"
-	| "out"
-	| "up"
-	| "down"
-	| "left"
-	| "right"
-	| "audio-pause"
-	| "audio-play";
+	| "audio-seek-backward";
 
 /** Resolved config: action -> list of alternative stroke-sequences. */
 export type KeybindsResolved = Partial<Record<KeybindActionName, KeybindSpec>>;
@@ -146,7 +133,7 @@ export function parseBindingSpec(spec: KeybindSpec | undefined): Stroke[][] {
 }
 
 /** Build a Stroke from a keyboard event (opentui shape: name + ctrl/shift/meta). */
-export function strokeFromEvent(evt: {
+function strokeFromEvent(evt: {
 	name: string;
 	ctrl?: boolean;
 	meta?: boolean;
@@ -154,7 +141,7 @@ export function strokeFromEvent(evt: {
 }): Stroke {
 	// Uppercase letter events from opentui arrive as name="q" + shift; normalize.
 	return {
-		key: (evt.name ?? "").toLowerCase(),
+		key: evt.name.toLowerCase(),
 		ctrl: !!evt.ctrl,
 		shift: !!evt.shift,
 		meta: !!evt.meta,
@@ -171,7 +158,7 @@ function strokeEq(a: Stroke, b: Stroke): boolean {
 }
 
 /** A human label for a stroke, for the status bar / help. */
-export function strokeLabel(s: Stroke): string {
+function strokeLabel(s: Stroke): string {
 	let out = "";
 	if (s.ctrl) out += "C-";
 	if (s.meta) out += "M-";
@@ -180,7 +167,7 @@ export function strokeLabel(s: Stroke): string {
 	return out;
 }
 
-export function sequenceLabel(seq: Stroke[]): string {
+function sequenceLabel(seq: Stroke[]): string {
 	return seq.map(strokeLabel).join(" ");
 }
 
@@ -338,17 +325,6 @@ export const { use: useKeybinds, provider: KeybindProvider } =
 				return best;
 			}
 
-			// `isInverting` kept for legacy callers; yazi model has no inverse mod,
-			// so it always reports false. Migrated callers should use tryMatch().
-			function isInverting(_evt: {
-				name: string;
-				ctrl?: boolean;
-				meta?: boolean;
-				shift?: boolean;
-			}): boolean {
-				return false;
-			}
-
 			onMount(() => {
 				load().catch(() => {});
 			});
@@ -366,7 +342,6 @@ export const { use: useKeybinds, provider: KeybindProvider } =
 				pending,
 				match,
 				tryMatch,
-				isInverting,
 				print,
 				save,
 				load,
