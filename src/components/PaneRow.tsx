@@ -1,18 +1,20 @@
 /**
  * PaneRow — the shared parent | current | preview 3-pane layout primitive.
  *
- * Implements yazi's `mgr.ratio = [1, 2, 2]` contract: three bordered columns
- * grow at 1/5 : 2/5 : 2/5 of the row width via Yoga `flexGrow`, so every list
- * tab renders an identical, layout-stable shell. Columns use `flexBasis={0}`
- * so the ratio is exact regardless of content width — a column's content can
+ * Implements yazi's `mgr.ratio = [1, 2, 2]` contract: three columns grow at
+ * 1/5 : 2/5 : 2/5 of the row width via Yoga `flexGrow`, so every list tab
+ * renders an identical, layout-stable shell. Columns use `flexBasis={0}` so
+ * the ratio is exact regardless of content width — a column's content can
  * never stretch its slot.
  *
  * Column semantics (per the yazi depth model):
  *   parent  — the previous-depth list. Renders a muted `—` placeholder and
  *             KEEPS its 1/5 slot when blank (never collapses to width 0).
+ *             Borderless (no left/right/top/bottom edge).
  *   current — the current-depth list. The only focusable content column; it
- *             carries the active-border focus ring when `focused` is truthy.
- *   preview — detail of the hovered item in `current`; always muted border.
+ *             is the ONLY bordered column (full border, always muted — no
+ *             active-border highlight).
+ *   preview — detail of the hovered item in `current`. Borderless.
  *
  * The primitive is purely structural: callers pass their own JSX per column
  * (static elements or accessors) plus header labels. Theme colors are resolved
@@ -33,7 +35,7 @@
 
 import { createMemo, Show } from "solid-js";
 import type { JSX } from "solid-js";
-import type { RGBA } from "@opentui/core";
+import type { RGBA, BorderSides } from "@opentui/core";
 import { useTheme } from "@/context/ThemeContext";
 import { PANE_RATIO } from "@/utils/navigation";
 
@@ -53,9 +55,9 @@ export type PaneRowProps = {
 	parentLabel?: PaneLabel;
 	currentLabel?: PaneLabel;
 	previewLabel?: PaneLabel;
-	/** Whether the current column carries the active-border focus ring. Defaults to
-	 *  true; pass `false` (or a signal) when the row is inactive. Parent and
-	 *  preview columns always render muted borders. */
+	/** Whether the current column's `<scrollbox>` receives scroll focus. Defaults to
+	 *  true; pass `false` (or a signal) when the row is inactive. Does NOT change
+	 *  border colors — the current column's border is always muted. */
 	focused?: boolean | (() => boolean);
 	/** Number of visible columns. `3` (default) = parent|current|preview;
 	 *  `2` = parent|current (preview omitted, current grows to fill). */
@@ -96,16 +98,15 @@ function Pane(props: {
 	grow: number;
 	label: () => string;
 	content: () => JSX.Element | undefined;
-	borderColor: () => RGBA;
+	border: boolean | BorderSides[];
 	scrollFocused: () => boolean;
 }) {
 	const themeContext = useTheme();
 	const theme = themeContext.theme;
 	const muted = () => theme.muted ?? theme.textMuted ?? theme.text;
 
-	// Memoize accessor results so the prop expressions below stay reactive
-	// when the underlying signals (e.g. `focused`) change.
-	const borderColor = createMemo(() => props.borderColor());
+	// Memoize the scroll-focus accessor result so the prop expression below
+	// stays reactive when the underlying signal (e.g. `focused`) changes.
 	const scrollFocused = createMemo(() => props.scrollFocused());
 
 	return (
@@ -131,8 +132,7 @@ function Pane(props: {
 			<scrollbox
 				height="100%"
 				focused={scrollFocused()}
-				border
-				borderColor={borderColor()}
+				border={props.border}
 				backgroundColor={
 					themeContext.transparentBackground()
 						? "transparent"
@@ -147,9 +147,7 @@ function Pane(props: {
 
 // ── Row primitive ───────────────────────────────────────────────────────────
 export function PaneRow(props: PaneRowProps) {
-	const { theme } = useTheme();
-
-	/** true → the current column gets the active-border focus ring. */
+	/** true → the current column's scrollbox is focused (scroll follows cursor). */
 	const focused = createMemo(() => {
 		const f = props.focused;
 		return typeof f === "function" ? f() : (f ?? true);
@@ -181,15 +179,15 @@ export function PaneRow(props: PaneRowProps) {
 				grow={PANE_RATIO.parent}
 				label={parentLabel}
 				content={parentContent}
-				borderColor={() => theme.border}
+				border={false}
 				scrollFocused={() => false}
 			/>
-			{/* ── current — the focused list; active-border ring when focused ──────────── */}
+			{/* ── current — the focused list; no border, no highlight ─────────── */}
 			<Pane
 				grow={currentGrow()}
 				label={currentLabel}
 				content={currentContent}
-				borderColor={() => (focused() ? theme.borderActive : theme.border)}
+				border={false}
 				scrollFocused={() => focused()}
 			/>
 			{/* ── preview (2/5) — hovered-item detail; always muted ────────────── */}
@@ -198,7 +196,7 @@ export function PaneRow(props: PaneRowProps) {
 					grow={PANE_RATIO.preview}
 					label={previewLabel}
 					content={previewContent}
-					borderColor={() => theme.border}
+					border={false}
 					scrollFocused={() => false}
 				/>
 			</Show>
