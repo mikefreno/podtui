@@ -53,9 +53,10 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
 	"tab-goto-4": ["4"],
 	"tab-goto-5": ["5"],
 	"tab-goto-6": ["6"],
-	// command / help / quit
-	command: [":"],
-	quit: ["q", "ctrl-c"],
+	// command palette / help / quit
+	// q opens the palette (type q + Enter to quit there); Q is the quick quit.
+	command: [":", "q"],
+	quit: ["Q", "ctrl-c"],
 	help: ["~", "f1"],
 	// list ops
 	search: ["s"],

@@ -7,7 +7,7 @@
  *
  * Renders entirely through `<PaneRow>` (parent | current | preview):
  *   parent  = previous depth's list (sections at depth 1, items at depth 2);
- *             blank placeholder at depth 0 (1/7 slot kept).
+ *             blank placeholder at depth 0 (1/5 slot kept).
  *   current = the current-depth list (or editor at depth 2); the only
  *             focusable column.
  *   preview = help/preview text for the hovered item in current.
@@ -424,7 +424,12 @@ function Row(props: {
 			: props.focused
 				? theme.border
 				: undefined;
-	const fg = () => (props.focused && props.active ? theme.surface : theme.text);
+	const fg = () =>
+		props.focused && props.active
+			? theme.surface
+			: props.focused
+				? theme.selectedListItemText ?? theme.text
+				: theme.text;
 	const ref = useScrollIntoView(() => props.focused);
 	return (
 		<box

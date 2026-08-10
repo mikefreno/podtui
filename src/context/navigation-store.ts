@@ -13,7 +13,7 @@
  *
  *        parent  |  current  |  preview
  *
- * Layout ratios (1/7 : 3/7 : 3/7 in the final remake) live in
+ * Layout ratios (1/5 : 2/5 : 2/5 in the final remake) live in
  * `@/utils/navigation` (PANE_RATIO). This module owns only the *focusable*
  * nav model — which column is focused and where its list cursor lives. The
  * parent/preview columns are always derived, never focused.
@@ -267,6 +267,9 @@ export function createNavigation() {
 	/** The tab the root's cursor is hovering (independent of activeTab). */
 	const tabCursor = (): TABS => tabCursorSignal();
 
+	/** Directly set the root's tab cursor (e.g. a mouse click on a tab row). */
+	const setTabCursorTo = (tab: TABS) => setTabCursor(tab);
+
 	/** Move the root's cursor to the adjacent tab (clamped, no wrap). */
 	const moveTabCursor = (dir: -1 | 1) => {
 		setTabCursor((c) => Math.max(1, Math.min(TabsCount, c + dir)) as TABS);
@@ -469,6 +472,7 @@ export function createNavigation() {
 		enterTabContent,
 		backToTabRoot,
 		tabCursor,
+		setTabCursor: setTabCursorTo,
 		moveTabCursor,
 		activateTabCursor,
 		// pane focus

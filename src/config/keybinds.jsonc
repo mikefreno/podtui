@@ -11,7 +11,8 @@
   //
   // Yazi heritage: j/k move, h/l swipe between panes, Enter open, Space select,
   // v visual mode, gg/G top/bottom, [ ] switch tabs, 1-6 goto tab,
-  // : command bar, q quit, ~ help. Audio transport kept on shifted keys / ctrl.
+  // : / q command palette (q + Enter quits there), Q quick quit, ~ help.
+  // Audio transport kept on shifted keys / ctrl.
 
   // ── Movement (within a pane) ─────────────────────────────────────────────
   "move-down":      ["j", "down"],
@@ -50,9 +51,11 @@
   "tab-goto-5":     ["5"],
   "tab-goto-6":     ["6"],
 
-  // ── Command bar & help & quit ────────────────────────────────────────────
-  "command":        [":"],
-  "quit":           ["q", "ctrl-c"],
+  // ── Command palette & help & quit ────────────────────────────────────────
+  // q opens the command palette (neovim-style: type q + Enter to quit there).
+  // Q (shift+q) is the instant quick quit. ctrl-c also quits.
+  "command":        [":", "q"],
+  "quit":           ["Q", "ctrl-c"],
   "help":           ["~", "f1"],
 
   // ── List operations (yazi: s search, f filter, , sort, . hidden, r refresh)

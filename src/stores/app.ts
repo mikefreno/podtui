@@ -29,6 +29,7 @@ const defaultSettings: AppSettings = {
 	fontSize: 14,
 	playbackSpeed: 1,
 	downloadPath: "",
+	transparentBackground: false,
 	visualizer: defaultVisualizerSettings,
 };
 

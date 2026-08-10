@@ -179,9 +179,8 @@ export function CommandProvider(props: ParentProps) {
 	const dialog = useDialog();
 	const keybind = useKeybinds();
 
-	// Open the command palette via the `command` keybind (bound to `:` in
-	// keybinds.jsonc). The old hardcoded "command_list" name was never a
-	// canonical action, so the palette was unreachable dead code.
+	// Open the command palette via the `command` keybind (bound to `:` or `q`
+	// in keybinds.jsonc; the Shell router owns the action and runs it first).
 	useKeyboard((evt) => {
 		if (value.suspended()) return;
 		if (dialog.isOpen) return;

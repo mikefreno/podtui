@@ -18,7 +18,7 @@ export function resolveTheme(theme: ThemeJson, mode: ThemeMode) {
       if (value.startsWith("#")) return RGBA.fromHex(value)
       if (defs[value] != null) return resolveColor(defs[value])
       const ref = theme.theme[value]
-      if (ref != null) return resolveColor(ref)
+      if (ref != null && typeof ref !== "boolean") return resolveColor(ref)
       throw new Error(`Color reference "${value}" not found in defs or theme`)
     }
     return resolveColor(value[mode])
@@ -26,8 +26,15 @@ export function resolveTheme(theme: ThemeJson, mode: ThemeMode) {
 
   const resolved = Object.fromEntries(
     Object.entries(theme.theme)
-      .filter(([key]) => key !== "selectedListItemText" && key !== "backgroundMenu" && key !== "thinkingOpacity")
-      .map(([key, value]) => [key, resolveColor(value)])
+      .filter(
+        (entry): entry is [string, ColorValue] =>
+          entry[0] !== "selectedListItemText" &&
+          entry[0] !== "backgroundMenu" &&
+          entry[0] !== "thinkingOpacity" &&
+          entry[0] !== "transparent" &&
+          typeof entry[1] !== "boolean",
+      )
+      .map(([key, value]) => [key, resolveColor(value)]),
   ) as Record<string, RGBA>
 
   const hasSelected = theme.theme.selectedListItemText !== undefined
@@ -40,6 +47,7 @@ export function resolveTheme(theme: ThemeJson, mode: ThemeMode) {
     : resolved.backgroundElement
 
   const thinkingOpacity = theme.theme.thinkingOpacity ?? 0.6
+  const transparent = theme.theme.transparent === true
 
   const background = resolved.background
   const backgroundPanel = resolved.backgroundPanel ?? background
@@ -58,5 +66,6 @@ export function resolveTheme(theme: ThemeJson, mode: ThemeMode) {
     },
     _hasSelectedListItemText: hasSelected,
     thinkingOpacity,
+    transparent,
   }
 }

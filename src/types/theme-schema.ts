@@ -13,10 +13,12 @@ export type ColorValue = HexColor | RefName | Variant | RGBA | number
 export type ThemeJson = {
   $schema?: string
   defs?: Record<string, HexColor | RefName>
-  theme: Record<string, ColorValue> & {
+  theme: Record<string, ColorValue | boolean> & {
     selectedListItemText?: ColorValue
     backgroundMenu?: ColorValue
     thinkingOpacity?: number
+    /** Render the app background transparent (let the terminal's own bg show). */
+    transparent?: boolean
   }
 }
 

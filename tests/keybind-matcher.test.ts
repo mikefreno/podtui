@@ -11,8 +11,8 @@ const cfg = {
 	"audio-seek-forward": parseBindingSpec(["shift-."]),
 	"audio-seek-backward": parseBindingSpec(["shift-,"]),
 	sort: parseBindingSpec([","]),
-	quit: parseBindingSpec(["q"]),
-	command: parseBindingSpec([":"]),
+	quit: parseBindingSpec(["Q"]),
+	command: parseBindingSpec([":", "q"]),
 	"tab-next": parseBindingSpec(["]"]),
 } as Record<string, ReturnType<typeof parseBindingSpec>>;
 
@@ -95,7 +95,8 @@ check("down -> move-down", sim([E("down")]), "move-down");
 check("gg -> goto-top", sim([E("g"), E("g")]), "goto-top");
 check("G -> goto-bottom", sim([E("g", { shift: true })]), "goto-bottom");
 check("space -> toggle-select", sim([E("space")]), "toggle-select");
-check("q -> quit", sim([E("q")]), "quit");
+check("q -> command", sim([E("q")]), "command");
+check("Q -> quit (shift+q)", sim([E("q", { shift: true })]), "quit");
 check(": -> command", sim([E(":")]), "command");
 check("] -> tab-next", sim([E("]")]), "tab-next");
 check(

@@ -1,15 +1,15 @@
 /**
  * PaneRow — the shared parent | current | preview 3-pane layout primitive.
  *
- * Implements yazi's `mgr.ratio = [1, 3, 3]` contract: three bordered columns
- * grow at 1/7 : 3/7 : 3/7 of the row width via Yoga `flexGrow`, so every list
+ * Implements yazi's `mgr.ratio = [1, 2, 2]` contract: three bordered columns
+ * grow at 1/5 : 2/5 : 2/5 of the row width via Yoga `flexGrow`, so every list
  * tab renders an identical, layout-stable shell. Columns use `flexBasis={0}`
  * so the ratio is exact regardless of content width — a column's content can
  * never stretch its slot.
  *
  * Column semantics (per the yazi depth model):
  *   parent  — the previous-depth list. Renders a muted `—` placeholder and
- *             KEEPS its 1/7 slot when blank (never collapses to width 0).
+ *             KEEPS its 1/5 slot when blank (never collapses to width 0).
  *   current — the current-depth list. The only focusable content column; it
  *             carries the active-border focus ring when `focused` is truthy.
  *   preview — detail of the hovered item in `current`; always muted border.
@@ -43,7 +43,7 @@ type PaneLabel = string | (() => string);
 
 export type PaneRowProps = {
 	/** Parent column content (previous-depth list, or null for a muted
-	 *  placeholder — the 1/7 slot is always preserved). */
+	 *  placeholder — the 1/5 slot is always preserved). */
 	parent?: PaneContent;
 	/** Current column content (the focused list). */
 	current?: PaneContent;
@@ -99,7 +99,8 @@ function Pane(props: {
 	borderColor: () => RGBA;
 	scrollFocused: () => boolean;
 }) {
-	const { theme } = useTheme();
+	const themeContext = useTheme();
+	const theme = themeContext.theme;
 	const muted = () => theme.muted ?? theme.textMuted ?? theme.text;
 
 	// Memoize accessor results so the prop expressions below stay reactive
@@ -115,7 +116,15 @@ function Pane(props: {
 			height="100%"
 		>
 			{/* ── slim header label row ─────────────────────────────────────────── */}
-			<box height={1} paddingLeft={1} backgroundColor={theme.background}>
+			<box
+				height={1}
+				paddingLeft={1}
+				backgroundColor={
+					themeContext.transparentBackground()
+						? "transparent"
+						: theme.background
+				}
+			>
 				<text fg={theme.textSecondary}>{props.label()}</text>
 			</box>
 			{/* ── bordered scrollbox ────────────────────────────────────────────── */}
@@ -124,7 +133,11 @@ function Pane(props: {
 				focused={scrollFocused()}
 				border
 				borderColor={borderColor()}
-				backgroundColor={theme.background}
+				backgroundColor={
+					themeContext.transparentBackground()
+						? "transparent"
+						: theme.background
+				}
 			>
 			{props.content() ?? <Placeholder color={muted} />}
 			</scrollbox>
@@ -163,7 +176,7 @@ export function PaneRow(props: PaneRowProps) {
 
 	return (
 		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
-			{/* ── parent (1/7) — previous-depth list; always muted ─────────────── */}
+			{/* ── parent (1/5) — previous-depth list; always muted ─────────────── */}
 			<Pane
 				grow={PANE_RATIO.parent}
 				label={parentLabel}
@@ -179,7 +192,7 @@ export function PaneRow(props: PaneRowProps) {
 				borderColor={() => (focused() ? theme.borderActive : theme.border)}
 				scrollFocused={() => focused()}
 			/>
-			{/* ── preview (3/7) — hovered-item detail; always muted ────────────── */}
+			{/* ── preview (2/5) — hovered-item detail; always muted ────────────── */}
 			<Show when={panes() === 3}>
 				<Pane
 					grow={PANE_RATIO.preview}

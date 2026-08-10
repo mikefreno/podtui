@@ -2,7 +2,7 @@
  * MyShowsPage — yazi depth-stack view of subscribed shows.
  *
  *   depth 0 (current) — subscribed shows. Parent pane shows the muted
- *                       placeholder (1/7 slot kept).
+ *                       placeholder (1/5 slot kept).
  *   depth 1 (current) — episodes of the drilled show. Parent pane = shows.
  *   preview            — detail of the hovered item in the current column.
  *
@@ -199,7 +199,11 @@ export function MyShowsPage() {
 	const focusBg = (i: number, lf: number, active: boolean) =>
 		i === lf && active ? theme.primary : i === lf ? theme.border : undefined;
 	const focusFg = (i: number, lf: number, active: boolean) =>
-		i === lf && active ? theme.surface : theme.text;
+		i === lf && active
+			? theme.surface
+			: i === lf
+				? theme.selectedListItemText ?? theme.text
+				: theme.text;
 	const showTitle = (f: Feed) => f.customName || f.podcast.title;
 
 	const currentLabel = () =>

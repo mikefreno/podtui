@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createEffect, createMemo, onMount, onCleanup } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { useRenderer } from "@opentui/solid";
@@ -10,6 +11,7 @@ import {
   generateSubtleSyntax,
 } from "../utils/syntax-highlighter";
 import { resolveTerminalTheme, loadThemes } from "../utils/theme";
+import { detectModeFromBackground } from "../utils/system-theme";
 import { createSimpleContext } from "./helper";
 import {
   setupThemeSignalHandler,
@@ -84,6 +86,8 @@ export type ThemeResolved = {
   muted?: RGBA;
   surface?: RGBA;
   selectedListItemText?: RGBA;
+  /** Theme declares a transparent (terminal-bg-visible) background. */
+  transparent?: boolean;
   layerBackgrounds?: {
     layer0: RGBA;
     layer1: RGBA;
@@ -93,6 +97,61 @@ export type ThemeResolved = {
   _hasSelectedListItemText?: boolean;
   thinkingOpacity?: number;
 };
+
+/**
+ * A TerminalColors with no values — used to keep the "system" theme rendering
+ * with default ANSI colors + the detected dark/light mode when the terminal
+ * cannot answer OSC queries (e.g. inside tmux without OSC forwarding).
+ */
+const EMPTY_TERMINAL_COLORS: TerminalColors = {
+  palette: Array.from({ length: 16 }, () => null),
+  defaultForeground: null,
+  defaultBackground: null,
+  cursorColor: null,
+  mouseForeground: null,
+  mouseBackground: null,
+  tekForeground: null,
+  tekBackground: null,
+  highlightBackground: null,
+  highlightForeground: null,
+};
+
+/** Cached macOS appearance (dark/light), independent of the terminal. */
+let cachedOsMode: "dark" | "light" | null = null;
+
+/**
+ * Detect the terminal's dark/light mode.
+ *
+ * Priority:
+ *   1. The terminal's real background color (OSC 11 response) — terminal-specific.
+ *   2. The macOS appearance via `defaults read -g AppleInterfaceStyle` — works
+ *      even inside tmux, where OSC queries are usually not forwarded.
+ *      An unset value means light mode (macOS defaults to light).
+ *   3. null → keep whatever mode is currently active.
+ */
+function detectSystemMode(
+  colors: TerminalColors | null,
+): "dark" | "light" | null {
+  const fromBg = detectModeFromBackground(colors?.defaultBackground);
+  if (fromBg) return fromBg;
+
+  if (process.platform === "darwin" && cachedOsMode === null) {
+    let style: string | null = null;
+    try {
+      style = execFileSync("defaults", ["read", "-g", "AppleInterfaceStyle"], {
+        encoding: "utf8",
+        timeout: 2000,
+      })
+        .trim()
+        .toLowerCase();
+    } catch {
+      // Unset → light appearance (macOS default).
+    }
+    cachedOsMode = style?.includes("dark") ? "dark" : "light";
+  }
+
+  return cachedOsMode;
+}
 
 /**
  * Theme context using the createSimpleContext pattern.
@@ -195,6 +254,16 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         }
       }
 
+      // ── dark/light mode detection ─────────────────────────────────────────
+      // The provider starts with a hardcoded mode (e.g. "dark"); detect the
+      // real one from the terminal's background color (OSC 11) or, when that
+      // is unavailable (tmux without OSC forwarding), the OS appearance.
+      const detectedMode = detectSystemMode(colors);
+      if (detectedMode && detectedMode !== store.mode) {
+        setStore("mode", detectedMode);
+        emitThemeModeChanged(detectedMode);
+      }
+
       const hasPalette = Boolean(
         colors?.palette?.some((value) => Boolean(value)),
       );
@@ -203,13 +272,14 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       );
 
       if (!hasPalette && !hasDefaultColors) {
-        // No system colors available, fall back to default
-        // This happens when the terminal doesn't support OSC palette queries
-        // (e.g., running inside tmux, or on unsupported terminals)
+        // No system colors available — the terminal can't answer OSC queries
+        // (e.g. inside tmux, or unsupported terminals). Keep the "system"
+        // theme anyway: the detected dark/light mode plus default ANSI colors
+        // still produce a usable, mode-correct palette.
         if (store.active === "system") {
           setStore(
             produce((draft) => {
-              draft.active = "catppuccin";
+              draft.system = colors ?? EMPTY_TERMINAL_COLORS;
               draft.ready = true;
             }),
           );
@@ -292,6 +362,15 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       subtleSyntax,
       mode() {
         return store.mode;
+      },
+      /** Whether the app background should be transparent (no solid fill):
+       *  either the global preference is on, or the selected theme declares
+       *  transparency (e.g. the system theme). */
+      transparentBackground() {
+        return (
+          appStore.state().settings.transparentBackground ||
+          values().transparent === true
+        );
       },
       setMode(mode: "dark" | "light") {
         setStore("mode", mode);

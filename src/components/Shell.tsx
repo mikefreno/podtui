@@ -241,11 +241,13 @@ export function Shell() {
 
 	return (
 		<box
-			flexDirection="column"
-			width="100%"
-			height="100%"
-			backgroundColor={t.surface}
-		>
+				flexDirection="column"
+				width="100%"
+				height="100%"
+				backgroundColor={
+					theme.transparentBackground() ? "transparent" : t.surface
+				}
+			>
 			{/* ── Middle row: tab list (pane 0) + active tab content (panes 1..n) ─ */}
 			<box flexDirection="row" flexGrow={1} width="100%">
 				<Show
@@ -281,7 +283,11 @@ export function Shell() {
 				flexDirection="row"
 				height={1}
 				width="100%"
-				backgroundColor={t.backgroundPanel ?? t.background}
+				backgroundColor={
+					theme.transparentBackground()
+						? "transparent"
+						: (t.backgroundPanel ?? t.background)
+				}
 			>
 				<Show
 					when={nav.mode() === NavMode.COMMAND}

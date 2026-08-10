@@ -1,11 +1,11 @@
 /**
- * PaneRow tests — the 1:3:3 parent|current|preview layout primitive.
+ * PaneRow tests — the 1:2:2 parent|current|preview layout primitive.
  *
  * Verified through the opentui test renderer's captured frames (the same
  * mechanism the `.harness` drive uses), since `flexGrow` ratios are only
  * observable as rendered column widths and border colors.
  *
- *  • Unit: three columns render at 1:3:3 (e.g. 14/43/43 of 100) even when the
+ *  • Unit: three columns render at 1:2:2 (e.g. 20/40/40 of 100) even when the
  *    parent and preview children are null, and the blank parent keeps its
  *    slot with a muted placeholder.
  *  • Integration: toggling `focused` moves the accent focus ring onto/off the
@@ -125,9 +125,9 @@ afterAll(async () => {
 	}
 });
 
-// ── Unit: three columns at 1:3:3 regardless of null children ───────────────
+// ── Unit: three columns at 1:2:2 regardless of null children ───────────────
 describe("PaneRow layout", () => {
-	test("renders three columns at 1:3:3 even with null parent/preview", async () => {
+	test("renders three columns at 1:2:2 even with null parent/preview", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
 			current: () => <text>ITEM</text>,
@@ -138,15 +138,15 @@ describe("PaneRow layout", () => {
 		const widths = columnWidths(spans);
 		expect(widths).toHaveLength(3);
 		const [p, c, v] = widths;
-		// 100-wide row splits as 14 / 43 / 43 (1/7 : 3/7 : 3/7, borders included).
-		expect(p).toBe(14);
-		expect(c).toBe(43);
-		expect(v).toBe(43);
-		// Exact 1:3:3 proportion (within 1 col rounding).
-		expect(c).toBeGreaterThanOrEqual(p * 3 - 1);
-		expect(c).toBeLessThanOrEqual(p * 3 + 1);
-		expect(v).toBeGreaterThanOrEqual(p * 3 - 1);
-		expect(v).toBeLessThanOrEqual(p * 3 + 1);
+		// 100-wide row splits as 20 / 40 / 40 (1/5 : 2/5 : 2/5, borders included).
+		expect(p).toBe(20);
+		expect(c).toBe(40);
+		expect(v).toBe(40);
+		// Exact 1:2:2 proportion (within 1 col rounding).
+		expect(c).toBeGreaterThanOrEqual(p * 2 - 1);
+		expect(c).toBeLessThanOrEqual(p * 2 + 1);
+		expect(v).toBeGreaterThanOrEqual(p * 2 - 1);
+		expect(v).toBeLessThanOrEqual(p * 2 + 1);
 		// Parent keeps a visibly non-zero slot and renders the muted placeholder.
 		expect(p).toBeGreaterThan(4);
 		const body = spans.lines
@@ -156,7 +156,7 @@ describe("PaneRow layout", () => {
 		expect(body).toContain("ITEM");
 	});
 
-	test("keeps the 1/7 parent slot across widths (ratio stable)", async () => {
+	test("keeps the 1/5 parent slot across widths (ratio stable)", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
 			current: () => <text>x</text>,
@@ -165,9 +165,9 @@ describe("PaneRow layout", () => {
 		});
 		cleanups.push(destroy);
 		const [p, c, v] = columnWidths(spans);
-		expect(p).toBe(10); // 70 → 10 / 30 / 30
-		expect(c).toBe(30);
-		expect(v).toBe(30);
+		expect(p).toBe(14); // 70 → 14 / 28 / 28
+		expect(c).toBe(28);
+		expect(v).toBe(28);
 	});
 });
 

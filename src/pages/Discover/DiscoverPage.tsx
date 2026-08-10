@@ -2,7 +2,7 @@
  * DiscoverPage — yazi depth-stack view of discoverable podcasts.
  *
  *   depth 0 (current) — category list. Parent pane shows the muted
- *                       placeholder (1/7 slot kept).
+ *                       placeholder (1/5 slot kept).
  *   depth 1 (current) — podcast results for the drilled category. Parent
  *                       pane = the categories list.
  *   preview            — detail of the hovered item (category summary, or
@@ -146,7 +146,11 @@ function DiscoverPage() {
 	const focusBg = (i: number, lf: number, active: boolean) =>
 		i === lf && active ? theme.primary : i === lf ? theme.border : undefined;
 	const focusFg = (i: number, lf: number, active: boolean) =>
-		i === lf && active ? theme.surface : theme.text;
+		i === lf && active
+			? theme.surface
+			: i === lf
+				? theme.selectedListItemText ?? theme.text
+				: theme.text;
 
 	const currentLabel = () =>
 		depth() === 0

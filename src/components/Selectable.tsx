@@ -20,7 +20,8 @@ export const SelectableBox: ParentComponent<
       backgroundColor={
         props.selected()
           ? theme.primary
-          : themeContext.selected === "system"
+          : themeContext.transparentBackground() ||
+              themeContext.selected === "system"
             ? "transparent"
             : themeContext.theme.surface
       }

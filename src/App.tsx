@@ -50,6 +50,7 @@ export function App() {
 	});
 
 	const backgroundColor = () =>
+		themeContext.transparentBackground() ||
 		themeContext.selected === "system"
 			? "transparent"
 			: themeContext.theme.surface;

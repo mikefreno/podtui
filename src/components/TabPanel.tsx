@@ -53,7 +53,11 @@ export function TabListPane(props: { muted?: boolean }) {
 				? theme.border
 				: undefined;
 	const focusFg = (t: TABS) =>
-		t === cursor() && active() ? theme.surface : theme.text;
+		t === cursor() && active()
+			? theme.surface
+			: t === cursor()
+				? theme.selectedListItemText ?? theme.text
+				: theme.text;
 
 	return (
 		<For each={TAB_ORDER}>
@@ -77,6 +81,14 @@ export function TabListPane(props: { muted?: boolean }) {
 						flexDirection="row"
 						paddingRight={1}
 						backgroundColor={focusBg(tab)}
+						onMouseDown={() => {
+							// Click = hover + open, the yazi "open" of the row
+							// (switches to the tab and enters its content), the same
+							// as l/Enter. Restores mouse support the tab-strip
+							// refactor dropped.
+							nav.setTabCursor(tab);
+							nav.activateTabCursor();
+						}}
 					>
 						{/* ── selection marker (j/k cursor) ─────────────────────────── */}
 						<text fg={focusFg(tab)}>{isCursor() ? "❯" : " "}</text>

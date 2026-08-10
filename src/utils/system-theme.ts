@@ -13,19 +13,40 @@ export function clearPaletteCache() {
   cached = null;
 }
 
+/** Relative luminance of a hex color (0 = black, 1 = white). */
+function luminance(hex: string): number {
+  const c = RGBA.fromHex(hex);
+  return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+}
+
+/**
+ * Infer the terminal's dark/light mode from its default background color
+ * (the OSC 11 query response). Returns null when no background is available.
+ */
+export function detectModeFromBackground(
+  background: string | null | undefined,
+): "dark" | "light" | null {
+  if (!background) return null;
+  return luminance(background) < 0.5 ? "dark" : "light";
+}
+
 export function generateSystemTheme(
   colors: TerminalColors,
   mode: "dark" | "light",
 ): ThemeJson {
   cached = colors;
+  const isDark = mode === "dark";
   const bg = RGBA.fromHex(
-    colors.defaultBackground ?? colors.palette[0] ?? "#000000",
+    colors.defaultBackground ??
+      colors.palette[0] ??
+      (isDark ? "#000000" : "#ffffff"),
   );
   const fg = RGBA.fromHex(
-    colors.defaultForeground ?? colors.palette[7] ?? "#ffffff",
+    colors.defaultForeground ??
+      colors.palette[7] ??
+      (isDark ? "#ffffff" : "#000000"),
   );
   const transparent = RGBA.fromInts(0, 0, 0, 0);
-  const isDark = mode === "dark";
 
   const col = (i: number) => {
     const value = colors.palette[i];
@@ -87,6 +108,7 @@ export function generateSystemTheme(
       textSelectedTertiary: selectedTertiary,
       selectedListItemText: bg,
       background: transparent,
+      transparent: true,
       backgroundPanel: grays[2],
       backgroundElement: grays[3],
       backgroundMenu: grays[3],

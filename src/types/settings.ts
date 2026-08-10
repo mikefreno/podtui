@@ -79,6 +79,8 @@ export type AppSettings = {
 	fontSize: number;
 	playbackSpeed: number;
 	downloadPath: string;
+	/** Render the app background transparent (let the terminal's own bg show). */
+	transparentBackground: boolean;
 	visualizer: VisualizerSettings;
 };
 

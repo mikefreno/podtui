@@ -57,13 +57,13 @@ export function rootFrameFor(
 // terminal size — more robust than fixed percentages and exactly mirrors
 // yazi's `mgr.ratio` config. Set a slot's ratio to 0 to hide it (2-pane tabs).
 //
-// NOTE (task 01 leave-behind): the nav-model task intentionally does NOT
-// touch these values. Task 02 re-tunes them to the remake target ratios
-// (parent : current : preview = 1 : 3 : 3 i.e. 1/7 : 3/7 : 3/7). Do it there.
+// Current ratios: parent : current : preview = 1 : 2 : 2, i.e. 1/5 : 2/5 : 2/5
+// (20% / 40% / 40% of the row width). 2-pane tabs drop the preview slot and
+// give `current` the combined 4/5.
 export const PANE_RATIO = {
 	parent: 1,
-	current: 3,
-	preview: 3,
+	current: 2,
+	preview: 2,
 } as const;
 
 // Number of *focusable* content panes per tab. The three visible columns

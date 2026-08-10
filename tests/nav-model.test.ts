@@ -214,6 +214,17 @@ test("direct tab switches re-sync the tab cursor", () => {
 	});
 });
 
+test("setTabCursor moves the cursor directly (mouse click support), activateTabCursor opens it", () => {
+	withNav((nav) => {
+		nav.setTabCursor(TABS.SETTINGS);
+		expect(nav.tabCursor()).toBe(TABS.SETTINGS);
+		expect(nav.activeTab()).toBe(TABS.FEED); // cursor only — active tab untouched
+		nav.activateTabCursor();
+		expect(nav.activeTab()).toBe(TABS.SETTINGS);
+		expect(nav.atRootTab()).toBe(false);
+	});
+});
+
 test("tab-switch resets mode/visual/command state", () => {
 	withNav((nav) => {
 		nav.enterVisual();

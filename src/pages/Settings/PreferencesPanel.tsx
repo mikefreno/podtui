@@ -40,6 +40,19 @@ export function usePreferencesItems(): SettingItem[] {
 			},
 		},
 		{
+			id: "transparentBackground",
+			label: "Transparent Background",
+			kind: "toggle",
+			display: () =>
+				settings().transparentBackground ? "On" : "Off",
+			help: () =>
+				`Let the terminal's own background show through (no app background fill).\nType: toggle\nDefault: false\nCurrent: ${settings().transparentBackground ? "On" : "Off"}\nSpace/Enter to toggle.`,
+			toggle: () =>
+				app.updateSettings({
+					transparentBackground: !settings().transparentBackground,
+				}),
+		},
+		{
 			id: "fontSize",
 			label: "Font Size",
 			kind: "number",

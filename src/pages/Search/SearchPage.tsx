@@ -205,7 +205,11 @@ function SearchPage() {
 				? theme.border
 				: undefined;
 	const focusFg = (i: number, listFocus: number, active: boolean) =>
-		i === listFocus && active ? theme.surface : theme.text;
+		i === listFocus && active
+			? theme.surface
+			: i === listFocus
+				? theme.selectedListItemText ?? theme.text
+				: theme.text;
 
 	// ── parent pane: previous-depth content (tab list at depth 0) ──────────────
 	const parentContent = () => (
