@@ -7,6 +7,7 @@
  */
 
 import { useTerminalDimensions } from "@opentui/solid";
+import type { Renderable } from "@opentui/core";
 import { useAudio } from "@/hooks/useAudio";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -16,6 +17,11 @@ export function ProgressBar() {
 	const audio = useAudio();
 	const { theme } = useTheme();
 	const dimensions = useTerminalDimensions();
+
+	// The bar's renderable, captured for its absolute left edge: MouseEvent.x
+	// is terminal-absolute (not bar-relative), so local x needs the offset
+	// of the bar inside the 2-pane row (parent pane ≈ 20% of the width).
+	let bar: Renderable | undefined;
 
 	// Full content width of the player pane: the player is a 2-pane row
 	// (parent 1/5 + current 4/5 of the terminal width). Subtract ~8 chars
@@ -39,15 +45,21 @@ export function ProgressBar() {
 			padding={0}
 			flexDirection="row"
 			gap={0}
+			ref={(el) => {
+				bar = el;
+			}}
 			onMouseDown={(e: { x: number }) => {
 				const duration = audio.duration();
-				if (duration <= 0) return;
-				// e.x = 0 is the box border; content starts at x = 1.
-				const ratio = Math.max(0, Math.min(1, (e.x - 1) / width()));
+				if (duration <= 0 || !bar) return;
+				// localX = 0 is the box border; content starts at localX = 1.
+				const localX = e.x - bar.x;
+				const ratio = Math.max(0, Math.min(1, (localX - 1) / width()));
 				void audio.seek(ratio * duration);
 			}}
 		>
-			<text fg={theme.primary}>{"\u2588".repeat(playedChars())}</text>
+			{playedChars() > 0 && (
+				<text fg={theme.primary}>{"\u2588".repeat(playedChars())}</text>
+			)}
 			<text fg={remainingColor}>
 				{"\u2591".repeat(width() - playedChars())}
 			</text>
