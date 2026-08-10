@@ -51,5 +51,13 @@ package() {
 	install -Dm644 "${srcdir}/${libdir}/libcavacore.so" "${pkgdir}/usr/lib/podtui/libcavacore.so"
 	install -Dm644 "${srcdir}/${libdir}/libopentui.so" "${pkgdir}/usr/lib/podtui/libopentui.so"
 	ln -s /usr/lib/podtui/podtui "${pkgdir}/usr/bin/podtui"
+
+	# App icon + desktop entry ship inside the release tarball; Terminal=true
+	# makes launchers drop the TUI into a terminal window.
+	install -Dm644 "${srcdir}/${libdir}/podtui.png" \
+		"${pkgdir}/usr/share/icons/hicolor/512x512/apps/podtui.png"
+	install -Dm644 "${srcdir}/${libdir}/podtui.desktop" \
+		"${pkgdir}/usr/share/applications/podtui.desktop"
+
 	install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

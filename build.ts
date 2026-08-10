@@ -116,6 +116,21 @@ if (COMPILE) {
 		const s = join("dist", lib);
 		if (existsSync(s)) copyFileSync(s, join(tarRoot, lib));
 	}
+
+	// App icon: bundled into every platform tarball; Linux also gets the
+	// desktop entry so the AUR package can install both system-wide
+	// (icon to hicolor, entry to applications/).
+	const iconSrc = join("assets", "App Icon", "App Icon.png");
+	if (existsSync(iconSrc)) {
+		copyFileSync(iconSrc, join(tarRoot, "podtui.png"));
+	}
+	if (platform === "linux") {
+		const desktopSrc = join("packaging", "podtui.desktop");
+		if (existsSync(desktopSrc)) {
+			copyFileSync(desktopSrc, join(tarRoot, "podtui.desktop"));
+		}
+	}
+
 	const tar = Bun.spawnSync([
 		"tar",
 		"-czf",

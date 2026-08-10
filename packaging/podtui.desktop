@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=PodTui
+GenericName=Podcast Player
+Comment=Terminal podcast and audio player with waveform visualization
+Exec=podtui
+Icon=podtui
+Terminal=true
+Categories=Audio;AudioVideo;Player;
+Keywords=podcast;audio;player;terminal;
+StartupNotify=false
