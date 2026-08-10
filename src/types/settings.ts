@@ -84,11 +84,16 @@ export type AppSettings = {
 	visualizer: VisualizerSettings;
 };
 
+/** How the Feed list loads older episodes (default: manual "[Fetch More]"). */
+export type FetchMoreMode = "manual" | "auto";
+
 export type UserPreferences = {
 	showExplicit: boolean;
 	autoDownload: boolean;
 	/** Jump to the Player view automatically when playback starts (default: true) */
 	autoJumpToPlayer: boolean;
+	/** Load older episodes from the Feed list: manual button or automatic at the bottom (default: manual). */
+	fetchMoreMode: FetchMoreMode;
 };
 
 export type AppState = {

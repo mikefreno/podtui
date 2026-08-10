@@ -40,6 +40,7 @@ import type { KeybindActionName } from "@/context/KeybindContext";
 import type { SearchResult } from "@/types/source";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 
 export const SearchPaneCount = 1;
@@ -241,7 +242,7 @@ function SearchPage() {
 						/>
 					</box>
 					<Show when={searchStore.isSearching()}>
-						<text fg={theme.warning}>Searching...</text>
+						<LoadingIndicator label="Searching…" />
 					</Show>
 					<Show when={searchStore.error()}>
 						<text fg={theme.error}>{searchStore.error()}</text>
@@ -298,11 +299,18 @@ function SearchPage() {
 					when={results().length > 0}
 					fallback={
 						<box padding={1}>
-							<text fg={muted()}>
-								{searchStore.query()
-									? "No results found"
-									: "Enter a search term to find podcasts"}
-							</text>
+							<Show
+								when={searchStore.isSearching()}
+								fallback={
+									<text fg={muted()}>
+										{searchStore.query()
+											? "No results found"
+											: "Enter a search term to find podcasts"}
+									</text>
+								}
+							>
+								<LoadingIndicator label="Searching…" />
+							</Show>
 						</box>
 					}
 				>

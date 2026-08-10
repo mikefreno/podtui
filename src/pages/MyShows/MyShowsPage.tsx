@@ -346,7 +346,7 @@ export function MyShowsPage() {
 					</For>
 					<Show when={feedStore.isLoadingMore()}>
 						<box paddingLeft={2} paddingTop={1}>
-							<LoadingIndicator />
+							<LoadingIndicator label="Loading more…" />
 						</box>
 					</Show>
 				</Show>

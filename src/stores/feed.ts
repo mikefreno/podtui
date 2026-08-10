@@ -399,52 +399,79 @@ function createFeedStore() {
 		return loaded < cached.length;
 	};
 
+	/** Load the next chunk of episodes for one feed from the cache.
+	 *  No global guard — callers own the `isLoadingMore` flag so batches
+	 *  (loadMoreAllFeeds) can loop over multiple feeds in one go. */
+	const loadMoreEpisodesForFeed = async (feedId: string) => {
+		const feed = getFeed(feedId);
+		if (!feed) return;
+
+		let cached = fullEpisodeCache.get(feedId);
+
+		// If no cache, re-fetch and parse the full feed
+		if (!cached) {
+			const response = await fetch(feed.podcast.feedUrl, {
+				headers: {
+					"Accept-Encoding": "identity",
+					Accept: "application/rss+xml, application/xml, text/xml, */*",
+				},
+			});
+			if (!response.ok) return;
+			const xml = await response.text();
+			const parsed = parseRSSFeed(xml, feed.podcast.feedUrl);
+			cached = parsed.episodes;
+			fullEpisodeCache.set(feedId, cached);
+			// Set current load count to match what's already displayed
+			episodeLoadCount.set(feedId, feed.episodes.length);
+		}
+
+		const currentCount = episodeLoadCount.get(feedId) ?? feed.episodes.length;
+		const newCount = Math.min(
+			currentCount + MAX_EPISODES_REFRESH,
+			cached.length,
+		);
+
+		if (newCount <= currentCount) return; // nothing more to load
+
+		episodeLoadCount.set(feedId, newCount);
+		const episodes = cached.slice(0, newCount);
+
+		setFeeds((prev) => {
+			const updated = prev.map((f) =>
+				f.id === feedId ? { ...f, episodes } : f,
+			);
+			saveFeeds(updated);
+			return updated;
+		});
+	};
+
 	/** Load the next chunk of episodes for a feed from the cache.
 	 *  If no cache exists (e.g. app restart), re-fetches from the RSS feed. */
 	const loadMoreEpisodes = async (feedId: string) => {
 		if (isLoadingMore()) return;
-		const feed = getFeed(feedId);
-		if (!feed) return;
-
 		setIsLoadingMore(true);
 		try {
-			let cached = fullEpisodeCache.get(feedId);
+			await loadMoreEpisodesForFeed(feedId);
+		} finally {
+			setIsLoadingMore(false);
+		}
+	};
 
-			// If no cache, re-fetch and parse the full feed
-			if (!cached) {
-				const response = await fetch(feed.podcast.feedUrl, {
-					headers: {
-						"Accept-Encoding": "identity",
-						Accept: "application/rss+xml, application/xml, text/xml, */*",
-					},
-				});
-				if (!response.ok) return;
-				const xml = await response.text();
-				const parsed = parseRSSFeed(xml, feed.podcast.feedUrl);
-				cached = parsed.episodes;
-				fullEpisodeCache.set(feedId, cached);
-				// Set current load count to match what's already displayed
-				episodeLoadCount.set(feedId, feed.episodes.length);
+	/** True if any feed still has cached episodes beyond its loaded window. */
+	const hasMoreAcrossAll = (): boolean => {
+		return feeds().some((f) => hasMoreEpisodes(f.id));
+	};
+
+	/** Advance the loaded window by MAX_EPISODES_REFRESH for every feed that
+	 *  still has cached episodes — powers the Feed page's "[Fetch More]". */
+	const loadMoreAllFeeds = async () => {
+		if (isLoadingMore()) return;
+		setIsLoadingMore(true);
+		try {
+			const pending = feeds().filter((f) => hasMoreEpisodes(f.id));
+			for (const feed of pending) {
+				await loadMoreEpisodesForFeed(feed.id);
 			}
-
-			const currentCount = episodeLoadCount.get(feedId) ?? feed.episodes.length;
-			const newCount = Math.min(
-				currentCount + MAX_EPISODES_REFRESH,
-				cached.length,
-			);
-
-			if (newCount <= currentCount) return; // nothing more to load
-
-			episodeLoadCount.set(feedId, newCount);
-			const episodes = cached.slice(0, newCount);
-
-			setFeeds((prev) => {
-				const updated = prev.map((f) =>
-					f.id === feedId ? { ...f, episodes } : f,
-				);
-				saveFeeds(updated);
-				return updated;
-			});
 		} finally {
 			setIsLoadingMore(false);
 		}
@@ -487,6 +514,8 @@ function createFeedStore() {
 		refreshFeed,
 		refreshAllFeeds,
 		loadMoreEpisodes,
+		loadMoreAllFeeds,
+		hasMoreAcrossAll,
 		addSource,
 		removeSource,
 		toggleSource,

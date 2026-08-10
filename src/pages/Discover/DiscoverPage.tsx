@@ -30,6 +30,7 @@ import { on, off } from "@/utils/event-bus";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 
 export const DiscoverPaneCount = 1;
@@ -226,7 +227,14 @@ function DiscoverPage() {
 					when={podcasts().length > 0}
 					fallback={
 						<box padding={1}>
-							<text fg={muted()}>No podcasts found. :refresh</text>
+							<Show
+								when={discoverStore.isLoading()}
+								fallback={
+									<text fg={muted()}>No podcasts found. :refresh</text>
+								}
+							>
+								<LoadingIndicator label="Discovering…" />
+							</Show>
 						</box>
 					}
 				>
@@ -274,6 +282,11 @@ function DiscoverPage() {
 							);
 						}}
 					</For>
+					<Show when={discoverStore.isLoading()}>
+						<box paddingLeft={2} paddingTop={1}>
+							<LoadingIndicator label="Refreshing…" />
+						</box>
+					</Show>
 				</Show>
 			</Show>
 		</>

@@ -16,9 +16,10 @@
  * everything over `nav.action`; this page only handles list/preview data.
  */
 
-import { createMemo, For, Show, onMount, onCleanup } from "solid-js";
+import { createMemo, createEffect, For, Show, onMount, onCleanup } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
+import { useAppStore } from "@/stores/app";
 import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
@@ -56,17 +57,47 @@ function FeedPage() {
 	const episodes = createMemo<EpItem[]>(
 		() => feedStore.getAllEpisodesChronological() as EpItem[],
 	);
+
+	// ── Fetch More ───────────────────────────────────────────────────────────
+	// A "[Fetch More]" row at the bottom of the list advances every feed's
+	// loaded window by 50 episodes. manual mode: Enter on the row. auto mode:
+	// reaching the bottom row fetches automatically (see the effect below).
+	const app = useAppStore();
+	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "manual";
+	const showFetchMore = () => feedStore.hasMoreAcrossAll();
+	// Total navigable rows: episodes + the optional Fetch More row.
+	const rowCount = () => episodes().length + (showFetchMore() ? 1 : 0);
 	const focus = () => nav.depthFocus(0);
+	const focusedRow = () =>
+		rowCount() === 0 ? 0 : Math.min(focus(), rowCount() - 1);
+	const focusedOnMore = () =>
+		showFetchMore() && focusedRow() === episodes().length;
+	// -1 while the Fetch More row is focused so no episode row renders the
+	// cursor/highlight (the button is the focused row, not the last episode).
 	const focusedEpIdx = () =>
-		episodes().length === 0 ? 0 : Math.min(focus(), episodes().length - 1);
-	const focusedItem = (): EpItem | undefined => episodes()[focusedEpIdx()];
-	const curLen = () => episodes().length;
+		focusedOnMore()
+			? -1
+			: Math.min(focusedRow(), Math.max(episodes().length - 1, 0));
+	const focusedItem = (): EpItem | undefined =>
+		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
+	const curLen = () => rowCount();
+	const moreRef = useScrollIntoView(() => focusedOnMore());
 
 	const ensureFocus = () => {
-		if (episodes().length > 0 && focus() >= episodes().length)
-			nav.setDepthFocus(episodes().length - 1, 0);
+		if (rowCount() > 0 && focus() >= rowCount())
+			nav.setDepthFocus(rowCount() - 1, 0);
 	};
 	onMount(ensureFocus);
+
+	// Auto mode: reaching the bottom row loads the next batch. Guarded by
+	// isLoadingMore so concurrent loads never stack.
+	createEffect(() => {
+		if (fetchMoreMode() !== "auto") return;
+		if (!showFetchMore()) return;
+		if (feedStore.isLoadingMore()) return;
+		if (focusedRow() < rowCount() - 1) return;
+		feedStore.loadMoreAllFeeds().catch(() => {});
+	});
 
 	onMount(() => {
 		nav.registerResolver(
@@ -118,6 +149,10 @@ function FeedPage() {
 
 	// ── open ───────────────────────────────────────────────────────────────────
 	function open() {
+		if (focusedOnMore()) {
+			feedStore.loadMoreAllFeeds().catch(() => {});
+			return;
+		}
 		playEpisode(focusedItem());
 	}
 
@@ -185,7 +220,16 @@ function FeedPage() {
 			when={episodes().length > 0}
 			fallback={
 				<box padding={1}>
-					<text fg={muted()}>No feeds. Subscribe from Discover/Search.</text>
+					<Show
+						when={feedStore.isLoadingFeeds()}
+						fallback={
+							<text fg={muted()}>
+								No feeds. Subscribe from Discover/Search.
+							</text>
+						}
+					>
+						<LoadingIndicator label="Refreshing…" />
+					</Show>
 				</box>
 			}
 		>
@@ -240,60 +284,106 @@ function FeedPage() {
 					);
 				}}
 			</For>
+			<Show when={showFetchMore()}>
+				<box
+					ref={moreRef}
+					flexDirection="row"
+					gap={1}
+					paddingLeft={1}
+					paddingRight={1}
+					backgroundColor={focusBg(episodes().length, focusedRow(), isActive())}
+					onMouseDown={() => {
+						nav.setActivePane(DEPTH_CENTER_PANE);
+						nav.setDepthFocus(episodes().length, 0);
+					}}
+				>
+					<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
+						{focusedOnMore() ? "❯" : " "}
+					</text>
+					<Show
+						when={!feedStore.isLoadingMore()}
+						fallback={<LoadingIndicator label="Fetching…" />}
+					>
+						<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
+							[Fetch More]
+						</text>
+					</Show>
+				</box>
+			</Show>
 			<Show when={feedStore.isLoadingFeeds()}>
 				<box paddingLeft={2} paddingTop={1}>
-					<LoadingIndicator />
+					<LoadingIndicator label="Refreshing…" />
 				</box>
 			</Show>
 		</Show>
 	);
 
-	// ── preview pane: hovered-episode detail ───────────────────────────────────
+	// ── preview pane: hovered-episode detail (or the Fetch More row) ──────────
 	const previewContent = () => (
-		<Show
-			when={focusedItem()}
-			fallback={
-				<box padding={1}>
-					<text fg={muted()}>No episode focused</text>
-				</box>
-			}
-		>
-			{(item) => (
+		<>
+			<Show when={focusedOnMore()}>
 				<box flexDirection="column" gap={1} padding={1}>
 					<text fg={theme.textPrimary ?? theme.text}>
-						<strong>
-							{item().episode.episodeNumber
-								? `#${item().episode.episodeNumber} `
-								: ""}
-							{item().episode.title}
-						</strong>
+						<strong>[Fetch More]</strong>
 					</text>
-					<box flexDirection="row" gap={2}>
-						<text fg={theme.info}>{formatDate(item().episode.pubDate)}</text>
-						<text fg={muted()}>{formatDuration(item().episode.duration)}</text>
-						<Show when={downloadLabel(item().episode.id)}>
-							<text fg={downloadColor(item().episode.id)}>
-								{downloadLabel(item().episode.id)}
-							</text>
-						</Show>
-					</box>
 					<text fg={muted()}>
-						{item().feed.customName || item().feed.podcast.title}
-					</text>
-					<Show when={item().feed.podcast.author}>
-						<text fg={muted()}>by {item().feed.podcast.author}</text>
-					</Show>
-					<box height={1} />
-					<text fg={theme.textSecondary}>
-						{item().episode.description?.slice(0, 400) ??
-							"No description available."}
-						{(item().episode.description?.length ?? 0) > 400 ? "…" : ""}
+						{feedStore.isLoadingMore()
+							? "Loading the next batch of episodes…"
+							: fetchMoreMode() === "auto"
+								? "Auto mode: the next batch loads automatically at the bottom of the list."
+								: "Load the next batch of older episodes across all feeds (Enter)."}
 					</text>
 					<box height={1} />
-					<text fg={muted()}>enter: play · space: select · h back</text>
+					<text fg={muted()}>enter: load more · h back</text>
 				</box>
-			)}
-		</Show>
+			</Show>
+			<Show when={!focusedOnMore()}>
+				<Show
+					when={focusedItem()}
+					fallback={
+						<box padding={1}>
+							<text fg={muted()}>No episode focused</text>
+						</box>
+					}
+				>
+					{(item) => (
+						<box flexDirection="column" gap={1} padding={1}>
+							<text fg={theme.textPrimary ?? theme.text}>
+								<strong>
+									{item().episode.episodeNumber
+										? `#${item().episode.episodeNumber} `
+										: ""}
+									{item().episode.title}
+								</strong>
+							</text>
+							<box flexDirection="row" gap={2}>
+								<text fg={theme.info}>{formatDate(item().episode.pubDate)}</text>
+								<text fg={muted()}>{formatDuration(item().episode.duration)}</text>
+								<Show when={downloadLabel(item().episode.id)}>
+									<text fg={downloadColor(item().episode.id)}>
+										{downloadLabel(item().episode.id)}
+									</text>
+								</Show>
+							</box>
+							<text fg={muted()}>
+								{item().feed.customName || item().feed.podcast.title}
+							</text>
+							<Show when={item().feed.podcast.author}>
+								<text fg={muted()}>by {item().feed.podcast.author}</text>
+							</Show>
+							<box height={1} />
+							<text fg={theme.textSecondary}>
+								{item().episode.description?.slice(0, 400) ??
+									"No description available."}
+								{(item().episode.description?.length ?? 0) > 400 ? "…" : ""}
+							</text>
+							<box height={1} />
+							<text fg={muted()}>enter: play · space: select · h back</text>
+						</box>
+					)}
+				</Show>
+			</Show>
+		</>
 	);
 
 	return (

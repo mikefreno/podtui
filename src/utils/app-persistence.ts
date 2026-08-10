@@ -40,6 +40,7 @@ const defaultPreferences: UserPreferences = {
 	showExplicit: false,
 	autoDownload: false,
 	autoJumpToPlayer: true,
+	fetchMoreMode: "manual",
 };
 
 const defaultState: AppState = {
