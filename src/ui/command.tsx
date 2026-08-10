@@ -274,7 +274,7 @@ function CommandDialog(props: {
 			{/* Search input */}
 			<box marginBottom={1}>
 				<text fg={theme.textMuted}>{"> "}</text>
-				<text fg={theme.text}>{filter() || "Type to search commands..."}</text>
+				<text fg={theme.accent}>{filter() || "Type to search commands..."}</text>
 			</box>
 
 			{/* Command list */}
