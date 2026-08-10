@@ -132,8 +132,6 @@ export type AppEvents = {
 	"media.toggle": {};
 	"media.volumeUp": {};
 	"media.volumeDown": {};
-	"media.seekForward": {};
-	"media.seekBackward": {};
 	"media.speedCycle": {};
 };
 

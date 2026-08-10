@@ -110,7 +110,7 @@ export function PlayerPage() {
 
 			<box height={1} />
 			<text fg={muted()}>
-				{"P play/pause  N next  B prev  ◀▶ seek  h back"}
+				{"P play/pause  N next  B prev  < > seek  h back"}
 			</text>
 		</box>
 	);

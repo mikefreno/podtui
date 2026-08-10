@@ -421,14 +421,6 @@ export function useAudio(): AudioControls {
 		await doSetVolume(Math.max(0, Number((volume() - 0.05).toFixed(2))));
 	});
 
-	const unsubMediaSeekFwd = on("media.seekForward", async () => {
-		await seekRelative(10);
-	});
-
-	const unsubMediaSeekBack = on("media.seekBackward", async () => {
-		await seekRelative(-10);
-	});
-
 	const unsubMediaSpeed = on("media.speedCycle", async () => {
 		const next = speed() >= 2 ? 0.5 : Number((speed() + 0.25).toFixed(2));
 		await doSetSpeed(next);
@@ -515,8 +507,6 @@ export function useAudio(): AudioControls {
 		unsubMediaToggle();
 		unsubMediaVolUp();
 		unsubMediaVolDown();
-		unsubMediaSeekFwd();
-		unsubMediaSeekBack();
 		unsubMediaSpeed();
 
 		if (refCount <= 0) {

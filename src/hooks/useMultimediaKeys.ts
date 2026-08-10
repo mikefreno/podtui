@@ -1,13 +1,14 @@
 /**
  * Global multimedia key handler hook.
  *
- * Captures media-related key events (play/pause, volume, seek, speed)
+ * Captures media-related key events (play/pause, volume, speed)
  * regardless of which component is focused. Uses the event bus to
  * decouple key detection from audio control logic.
  *
  * Volume and speed are app-level settings — adjustable with or without
  * an episode loaded (they apply to the next playback and persist). Seek
- * is playback-dependent, so it still requires a loaded episode.
+ * is NOT handled here: it lives on the yazi keybind router (`<` / `>` =
+ * shift+, / shift+.), so the arrow keys stay free for navigation.
  */
 
 import { useKeyboard } from "@opentui/solid";
@@ -17,8 +18,6 @@ export type MediaKeyAction =
 	| "media.toggle"
 	| "media.volumeUp"
 	| "media.volumeDown"
-	| "media.seekForward"
-	| "media.seekBackward"
 	| "media.speedCycle";
 
 export interface MultimediaKeysOptions {
@@ -26,8 +25,6 @@ export interface MultimediaKeysOptions {
 	playerFocused?: () => boolean;
 	/** When true, skip handling (text input has focus) */
 	inputFocused?: () => boolean;
-	/** Whether an episode is currently loaded */
-	hasEpisode?: () => boolean;
 }
 
 /**
@@ -57,16 +54,6 @@ export function useMultimediaKeys(options: MultimediaKeysOptions = {}) {
 
 			case "down":
 				emit("media.volumeDown", {});
-				break;
-
-			case "left":
-				if (!options.hasEpisode?.()) return;
-				emit("media.seekBackward", {});
-				break;
-
-			case "right":
-				if (!options.hasEpisode?.()) return;
-				emit("media.seekForward", {});
 				break;
 
 			case "s":

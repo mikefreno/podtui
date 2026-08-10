@@ -69,8 +69,8 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
 	"audio-toggle": ["P"],
 	"audio-next": ["N"],
 	"audio-prev": ["B"],
-	"audio-seek-forward": ["shift-."],
-	"audio-seek-backward": ["shift-,"],
+	"audio-seek-forward": ["shift-."], // > = shift+.
+	"audio-seek-backward": ["shift-,"], // < = shift+,
 };
 
 /** Copy keybinds.jsonc to user config directory on first run */

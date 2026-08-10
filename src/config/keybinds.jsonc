@@ -72,6 +72,6 @@
   "audio-toggle":          ["P"],   // play / pause   (shift+p)
   "audio-next":            ["N"],   // next episode   (shift+n)
   "audio-prev":            ["B"],   // prev episode   (shift+b)
-  "audio-seek-forward":    ["shift-."],   // seek forward   (shift+.)
-  "audio-seek-backward":   ["shift-,"]    // seek backward  (shift+,)
+  "audio-seek-forward":    ["shift-."],   // seek forward   (> = shift+.)
+  "audio-seek-backward":   ["shift-,"]    // seek backward  (< = shift+,)
 }

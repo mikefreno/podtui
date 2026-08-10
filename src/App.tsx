@@ -18,22 +18,21 @@ const DEBUG = import.meta.env.DEBUG;
 
 export function App() {
 	const nav = useNavigation();
-	const audio = useAudio();
 	const toast = useToast();
 	const renderer = useRenderer();
 	const themeContext = useTheme();
 	const theme = themeContext.theme;
 	const keybind = useKeybinds();
 
-	// Multimedia keys (physical play/seek keys) still feed the audio backend
-	// regardless of the on-screen yazi keybinds.
+	// Multimedia keys (physical play/volume/speed keys) still feed the audio
+	// backend regardless of the on-screen yazi keybinds. Seek lives on the
+	// keybind router (< / > = shift+, / shift+.), so arrows stay on navigation.
 	useMultimediaKeys({
 		playerFocused: () =>
 			nav.activeTab() === TABS.PLAYER && nav.mode() !== NavMode.NORMAL
 				? true
 				: false,
 		inputFocused: () => nav.inputFocused(),
-		hasEpisode: () => !!audio.currentEpisode(),
 	});
 
 	// Mouse text-selection → clipboard (unchanged from the old shell).
