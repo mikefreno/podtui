@@ -161,6 +161,9 @@ All keys are remappable — edit `keybinds.jsonc` in your config directory
 | `.` | Toggle hidden |
 | `r` | Refresh |
 | `x` | Unsubscribe the focused show (My Shows) |
+| `d` | Download the focused episode (Feed / My Shows detail pane) |
+| `D` | Delete the focused episode's download (if one exists) |
+| `w` | Toggle the focused show in/out of the auto-download whitelist (My Shows, whitelist scope) |
 
 **Audio**
 
@@ -184,6 +187,13 @@ default (`$XDG_CONFIG_HOME/podtui` if set).
 
 Legacy `feeds.json`, `sources.json`, and `app-state.json` are auto-migrated
 into `config.json` on first run.
+
+**Auto-download** — in Settings → Preferences: `Auto Download` (master
+toggle) downloads the `Auto Download Count` most recent episodes (default 2,
+any positive integer — type it in the editor) of every show in the `Auto
+Download Scope` (all / none / whitelist, default all). With the whitelist
+scope, a search field appears under the setting to pick shows (Space toggles
+a suggestion in/out), and `w` in My Shows adds/removes the focused show.
 
 Env overrides: `PODTUI_AUDIO_BACKEND`, `XDG_CONFIG_HOME`.
 

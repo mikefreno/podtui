@@ -87,9 +87,18 @@ export type AppSettings = {
 /** How the Feed list loads older episodes (default: manual "[Fetch More]"). */
 export type FetchMoreMode = "manual" | "auto";
 
+/** Which shows the auto-download setting applies to (default: all). */
+export type AutoDownloadScope = "all" | "none" | "whitelist";
+
 export type UserPreferences = {
 	showExplicit: boolean;
 	autoDownload: boolean;
+	/** Most recent episodes to auto-download per in-scope show (default: 2). */
+	autoDownloadCount: number;
+	/** Shows auto-download covers: all / none / whitelist (default: all). */
+	autoDownloadScope: AutoDownloadScope;
+	/** Feed ids in the auto-download whitelist (used when scope is "whitelist"). */
+	autoDownloadWhitelist: string[];
 	/** Jump to the Player view automatically when playback starts (default: true) */
 	autoJumpToPlayer: boolean;
 	/** Load older episodes from the Feed list: manual button or automatic at the bottom (default: manual). */

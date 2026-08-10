@@ -14,6 +14,7 @@
 import { createMemo, For, Show, onMount, onCleanup } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
+import { useAppStore } from "@/stores/app";
 import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
@@ -40,6 +41,7 @@ export const MyShowsPaneCount = 1;
 export function MyShowsPage() {
 	const feedStore = useFeedStore();
 	const downloadStore = useDownloadStore();
+	const app = useAppStore();
 	const audioNav = useAudioNavStore();
 	const audio = useAudio();
 	const { theme } = useTheme();
@@ -160,6 +162,33 @@ export function MyShowsPage() {
 				const ep = focusedEpisode();
 				if (ep) nav.toggleSelected(ep.id);
 			}
+		},
+		download: () => {
+			if (depth() < 1) return;
+			const ep = focusedEpisode();
+			if (ep) downloadStore.startDownload(ep, drilledShowId());
+		},
+		"delete-download": () => {
+			if (depth() < 1) return;
+			const ep = focusedEpisode();
+			if (!ep) return;
+			const id = ep.id;
+			if (downloadStore.getDownloadStatus(id) === DownloadStatus.NONE) return;
+			downloadStore.cancelDownload(id);
+			downloadStore.removeDownload(id).catch(() => {});
+		},
+		"whitelist-toggle": () => {
+			if (depth() < 1) return;
+			const id = drilledShowId();
+			if (!id) return;
+			const prefs = app.state().preferences;
+			if (prefs.autoDownloadScope !== "whitelist") return;
+			const cur = prefs.autoDownloadWhitelist ?? [];
+			const next = cur.includes(id)
+				? cur.filter((x) => x !== id)
+				: [...cur, id];
+			app.updatePreferences({ autoDownloadWhitelist: next });
+			feedStore.runAutoDownload();
 		},
 		refresh: () => {
 			const show = selectedShow();
@@ -421,7 +450,21 @@ export function MyShowsPage() {
 							{(ep().description?.length ?? 0) > 400 ? "…" : ""}
 						</text>
 						<box height={1} />
-						<text fg={muted()}>enter: play · space: select · h: back</text>
+						<text fg={muted()}>
+							enter: play · d: download
+							{downloadStore.getDownloadStatus(ep().id) !==
+							DownloadStatus.NONE
+								? " · D: delete"
+								: ""}
+							{app.state().preferences.autoDownloadScope === "whitelist"
+								? (app.state().preferences.autoDownloadWhitelist ?? []).includes(
+										drilledShowId(),
+									)
+									? " · w: un-whitelist"
+									: " · w: whitelist"
+								: ""}{" "}
+							· space: select · h: back
+						</text>
 					</box>
 				)}
 			</Show>

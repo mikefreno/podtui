@@ -171,6 +171,18 @@ function FeedPage() {
 			const item = focusedItem();
 			if (item) nav.toggleSelected(item.episode.id);
 		},
+		download: () => {
+			const item = focusedItem();
+			if (item) downloadStore.startDownload(item.episode, item.feed.id);
+		},
+		"delete-download": () => {
+			const item = focusedItem();
+			if (!item) return;
+			const id = item.episode.id;
+			if (downloadStore.getDownloadStatus(id) === DownloadStatus.NONE) return;
+			downloadStore.cancelDownload(id);
+			downloadStore.removeDownload(id).catch(() => {});
+		},
 		refresh: () => {
 			feedStore.refreshAllFeeds().catch(() => {});
 		},
@@ -378,7 +390,14 @@ function FeedPage() {
 								{(item().episode.description?.length ?? 0) > 400 ? "…" : ""}
 							</text>
 							<box height={1} />
-							<text fg={muted()}>enter: play · space: select · h back</text>
+							<text fg={muted()}>
+								enter: play · d: download
+								{downloadStore.getDownloadStatus(item().episode.id) !==
+								DownloadStatus.NONE
+									? " · D: delete"
+									: ""}{" "}
+								· space: select · h back
+							</text>
 						</box>
 					)}
 				</Show>

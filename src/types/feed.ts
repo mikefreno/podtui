@@ -33,10 +33,6 @@ export interface Feed {
   isPinned: boolean
   /** Feed color for UI */
   color?: string
-  /** Whether auto-download is enabled for this feed */
-  autoDownload?: boolean
-  /** Number of newest episodes to auto-download (0 = all new) */
-  autoDownloadCount?: number
 }
 
 /** Feed item for display in lists */

@@ -65,6 +65,10 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
 	"toggle-hidden": ["."],
 	refresh: ["r"],
 	unsubscribe: ["x"],
+	// downloads
+	download: ["d"],
+	"delete-download": ["D"],
+	"whitelist-toggle": ["w"],
 	// audio transport (preserved; shifted single keys, no collisions)
 	"audio-toggle": ["P"],
 	"audio-next": ["N"],

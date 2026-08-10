@@ -36,6 +36,9 @@ const defaultSettings: AppSettings = {
 const defaultPreferences: UserPreferences = {
 	showExplicit: false,
 	autoDownload: false,
+	autoDownloadCount: 2,
+	autoDownloadScope: "all",
+	autoDownloadWhitelist: [],
 	autoJumpToPlayer: true,
 	fetchMoreMode: "manual",
 };

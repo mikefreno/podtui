@@ -18,6 +18,7 @@ import {
 	saveSourcesToFile,
 } from "../utils/feeds-persistence";
 import { useDownloadStore } from "./download";
+import { useAppStore } from "./app";
 import { DownloadStatus } from "../types/episode";
 
 /** Max episodes to load per page/chunk */
@@ -209,29 +210,41 @@ function createFeedStore() {
 			saveFeeds(updated);
 			return updated;
 		});
+		// Global auto-download: newly subscribed shows join the next pass.
+		runAutoDownload();
 		return newFeed;
 	};
 
-	/** Auto-download newest episodes for a feed */
-	const autoDownloadEpisodes = (
-		feedId: string,
-		newEpisodes: Episode[],
-		count: number,
-	) => {
+	/** Download the N most recent episodes of every in-scope show, per the
+	 *  global auto-download preferences (master toggle + scope + whitelist +
+	 *  count). Skips episodes already downloaded, queued, or in flight;
+	 *  retries failed ones. Idempotent — safe to run after any settings
+	 *  change, feed refresh, or subscribe. */
+	const runAutoDownload = (): void => {
+		const app = useAppStore();
+		const prefs = app.state().preferences;
+		if (!prefs.autoDownload || prefs.autoDownloadScope === "none") return;
+		const whitelist = prefs.autoDownloadWhitelist ?? [];
+		const count = Math.max(1, prefs.autoDownloadCount ?? 2);
 		const dlStore = useDownloadStore();
-		// Sort by pubDate descending (newest first)
-		const sorted = [...newEpisodes].sort(
-			(a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
-		);
-		// count = 0 means download all new episodes
-		const toDownload = count > 0 ? sorted.slice(0, count) : sorted;
-		for (const ep of toDownload) {
-			const status = dlStore.getDownloadStatus(ep.id);
+		for (const feed of feeds()) {
 			if (
-				status === DownloadStatus.NONE ||
-				status === DownloadStatus.FAILED
+				prefs.autoDownloadScope === "whitelist" &&
+				!whitelist.includes(feed.id)
 			) {
-				dlStore.startDownload(ep, feedId);
+				continue;
+			}
+			const sorted = [...feed.episodes].sort(
+				(a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
+			);
+			for (const ep of sorted.slice(0, count)) {
+				const status = dlStore.getDownloadStatus(ep.id);
+				if (
+					status === DownloadStatus.NONE ||
+					status === DownloadStatus.FAILED
+				) {
+					dlStore.startDownload(ep, feed.id);
+				}
 			}
 		}
 	};
@@ -240,7 +253,6 @@ function createFeedStore() {
 	const refreshFeed = async (feedId: string) => {
 		const feed = getFeed(feedId);
 		if (!feed) return;
-		const oldEpisodeIds = new Set(feed.episodes.map((e) => e.id));
 		const episodes = await fetchEpisodes(
 			feed.podcast.feedUrl,
 			MAX_EPISODES_REFRESH,
@@ -254,13 +266,9 @@ function createFeedStore() {
 			return updated;
 		});
 
-		// Auto-download new episodes if enabled for this feed
-		if (feed.autoDownload) {
-			const newEpisodes = episodes.filter((e) => !oldEpisodeIds.has(e.id));
-			if (newEpisodes.length > 0) {
-				autoDownloadEpisodes(feedId, newEpisodes, feed.autoDownloadCount ?? 0);
-			}
-		}
+		// Global auto-download: ensure the N most recent episodes of in-scope
+		// shows are available offline after every refresh (idempotent).
+		runAutoDownload();
 	};
 
 	/** Refresh all feeds */
@@ -477,13 +485,9 @@ function createFeedStore() {
 		}
 	};
 
-	/** Set auto-download settings for a feed */
-	const setAutoDownload = (
-		feedId: string,
-		enabled: boolean,
-		count: number = 0,
-	) => {
-		updateFeed(feedId, { autoDownload: enabled, autoDownloadCount: count });
+	/** Run the global auto-download pass (see runAutoDownload above). */
+	const runAutoDownloadNow = (): void => {
+		runAutoDownload();
 	};
 
 	return {
@@ -520,7 +524,7 @@ function createFeedStore() {
 		removeSource,
 		toggleSource,
 		updateSource,
-		setAutoDownload,
+		runAutoDownload: runAutoDownloadNow,
 	};
 }
 

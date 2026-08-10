@@ -66,6 +66,11 @@
   "refresh":        ["r"],
   "unsubscribe":    ["x"],   // unsubscribe focused show in My Shows
 
+  // ── Downloads & auto-download whitelist ───────────────────────────────────
+  "download":          ["d"],   // download the focused episode (detail pane)
+  "delete-download":   ["D"],   // delete the focused episode's download (if any)
+  "whitelist-toggle":  ["w"],   // add/remove the focused show from the auto-download whitelist (My Shows)
+
   // ── Audio transport (preserved) ──────────────────────────────────────────
   // Kept on shifted single keys so they never collide with the yazi core
   // (space=select, s=search, f=filter, etc.). Edit freely in this file.

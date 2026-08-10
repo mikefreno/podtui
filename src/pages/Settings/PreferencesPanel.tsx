@@ -2,10 +2,33 @@
  * PreferencesPanel — exposes theme/font/speed/explicit/auto-download as
  * SettingItems for the yazi depth-stack. No own useKeyboard; all movement is
  * driven by the Shell router via nav.action.
+ *
+ * Auto-download (global setting, see stores/feed.ts runAutoDownload):
+ *   • Auto Download        — master toggle (default: off)
+ *   • Auto Download Count  — X most recent episodes per show (default: 2,
+ *                            any positive integer — type it in the editor)
+ *   • Auto Download Scope  — which shows: all / none / whitelist (default: all)
+ *   • Auto Download Whitelist — shown only when scope is "whitelist": search
+ *                            field over subscribed shows; suggestions toggle
+ *                            in/out with Space (j/k to move, Esc to browse).
  */
 
+import { createSignal, Show, For, onMount, onCleanup } from "solid-js";
+import { RenderableEvents, type InputRenderable } from "@opentui/core";
 import { useAppStore } from "@/stores/app";
-import type { ThemeName } from "@/types/settings";
+import { useFeedStore } from "@/stores/feed";
+import { useTheme } from "@/context/ThemeContext";
+import { useInputFocusNav } from "@/hooks/useInputFocusNav";
+import {
+	NavMode,
+	DEPTH_CENTER_PANE,
+	type PaneId,
+} from "@/context/NavigationContext";
+import { on } from "@/utils/event-bus";
+import type { KeybindActionName } from "@/context/KeybindContext";
+import { TABS } from "@/utils/navigation";
+import type { AutoDownloadScope, ThemeName } from "@/types/settings";
+import type { Feed } from "@/types/feed";
 import type { SettingItem } from "./types";
 
 const THEME_LABELS: Array<{ value: ThemeName; label: string }> = [
@@ -17,13 +40,24 @@ const THEME_LABELS: Array<{ value: ThemeName; label: string }> = [
 	{ value: "custom", label: "Custom" },
 ];
 
+const SCOPE_LABELS: Array<{ value: AutoDownloadScope; label: string }> = [
+	{ value: "all", label: "All" },
+	{ value: "none", label: "None" },
+	{ value: "whitelist", label: "Whitelist" },
+];
+
+function scopeLabel(scope: AutoDownloadScope): string {
+	return SCOPE_LABELS.find((s) => s.value === scope)?.label ?? scope;
+}
+
 export function usePreferencesItems(): SettingItem[] {
 	const app = useAppStore();
+	const feedStore = useFeedStore();
 
 	const settings = () => app.state().settings;
 	const prefs = () => app.state().preferences;
 
-	return [
+	const items: SettingItem[] = [
 		{
 			id: "theme",
 			label: "Theme",
@@ -97,11 +131,52 @@ export function usePreferencesItems(): SettingItem[] {
 			kind: "toggle",
 			display: () => (prefs().autoDownload ? "On" : "Off"),
 			help: () =>
-				`Download new episodes automatically.\nType: toggle\nDefault: false\nCurrent: ${prefs().autoDownload}\nSpace/Enter to toggle.`,
-			toggle: () =>
-				app.updatePreferences({
-					autoDownload: !prefs().autoDownload,
-				}),
+				`Download the ${prefs().autoDownloadCount} most recent episodes of your shows automatically (see Count/Scope below).\nType: toggle\nDefault: false\nCurrent: ${prefs().autoDownload ? "On" : "Off"}\nSpace/Enter to toggle.`,
+			toggle: () => {
+				app.updatePreferences({ autoDownload: !prefs().autoDownload });
+				feedStore.runAutoDownload();
+			},
+		},
+		{
+			id: "autoDownloadCount",
+			label: "Auto Download Count",
+			kind: "number",
+			display: () => `${prefs().autoDownloadCount} per show`,
+			help: () =>
+				`How many of the most recent episodes to auto-download per in-scope show.\nType: number (any positive integer)\nDefault: 2\nCurrent: ${prefs().autoDownloadCount}\nj/k to −/+1 · Enter to type a value.`,
+			cycle: (dir) => {
+				const next = Math.max(1, prefs().autoDownloadCount + dir);
+				app.updatePreferences({ autoDownloadCount: next });
+				feedStore.runAutoDownload();
+			},
+			renderEditor: () => (
+				<NumberInputEditor
+					label="Auto Download Count"
+					value={() => prefs().autoDownloadCount}
+					commit={(n) => {
+						app.updatePreferences({ autoDownloadCount: n });
+						feedStore.runAutoDownload();
+					}}
+				/>
+			),
+		},
+		{
+			id: "autoDownloadScope",
+			label: "Auto Download Scope",
+			kind: "select",
+			display: () => scopeLabel(prefs().autoDownloadScope),
+			help: () =>
+				`Which shows auto-download applies to.\nAll: every subscribed show.\nNone: nothing.\nWhitelist: only the shows you add (in My Shows press ${"w"} on an episode; or open the Whitelist item below).\nType: select\nDefault: all\nCurrent: ${scopeLabel(prefs().autoDownloadScope)}\nCycle with j/k; Enter to apply.`,
+			cycle: (dir) => {
+				const idx = SCOPE_LABELS.findIndex(
+					(s) => s.value === prefs().autoDownloadScope,
+				);
+				const next =
+					SCOPE_LABELS[(idx + dir + SCOPE_LABELS.length) % SCOPE_LABELS.length]
+						.value;
+				app.updatePreferences({ autoDownloadScope: next });
+				feedStore.runAutoDownload();
+			},
 		},
 		{
 			id: "autoJumpToPlayer",
@@ -130,4 +205,225 @@ export function usePreferencesItems(): SettingItem[] {
 			},
 		},
 	];
+
+	// Whitelist management only appears while scope is set to "whitelist".
+	if (prefs().autoDownloadScope === "whitelist") {
+		items.push({
+			id: "autoDownloadWhitelist",
+			label: "Auto Download Whitelist",
+			kind: "editor",
+			display: () => `${prefs().autoDownloadWhitelist.length} shows`,
+			help: () =>
+				`Shows included in auto-download (scope: whitelist).\nSearch your subscribed shows; suggestions toggle in/out with Space.\nType: editor\nCurrent: ${prefs().autoDownloadWhitelist.length} shows`,
+			renderEditor: () => <WhitelistEditor />,
+		});
+	}
+
+	return items;
+}
+
+// ── Number editor ────────────────────────────────────────────────────────────
+// Lets the user type any positive integer (Enter commits; Esc defocuses and
+// j/k ±1 cycling takes over — SettingsPage's depth-2 step handler).
+
+function NumberInputEditor(props: {
+	label: string;
+	value: () => number;
+	commit: (n: number) => void;
+}) {
+	const { theme } = useTheme();
+	const ref = useInputFocusNav();
+	const [draft, setDraft] = createSignal(String(props.value()));
+	const [error, setError] = createSignal<string | null>(null);
+
+	const submit = () => {
+		const n = Number(draft().trim());
+		if (!Number.isInteger(n) || n < 1) {
+			setError("Enter a whole number ≥ 1");
+			return;
+		}
+		props.commit(n);
+		setError(null);
+	};
+
+	return (
+		<box flexDirection="column" padding={1} gap={1}>
+			<text fg={theme.text}>
+				<strong>{props.label}</strong>
+			</text>
+			<box flexDirection="row" gap={1} alignItems="center">
+				<text fg={theme.textMuted}>Episodes per show:</text>
+				<input
+					ref={ref}
+					value={draft()}
+					onInput={(v) => {
+						setDraft(v);
+						setError(null);
+					}}
+					onSubmit={submit}
+					focused
+					width={8}
+					textColor={theme.text}
+					focusedTextColor={theme.accent}
+				/>
+			</box>
+			<Show when={error()}>
+				<text fg={theme.error}>{error()}</text>
+			</Show>
+			<text fg={theme.muted ?? theme.textMuted}>
+				Type a number, Enter to apply · Esc to browse (j/k ±1) · h back
+			</text>
+		</box>
+	);
+}
+
+// ── Whitelist editor ─────────────────────────────────────────────────────────
+// Search field over subscribed shows + a navigable suggestion list. Space
+// (toggle-select) toggles the focused show in/out of the whitelist; Enter
+// does the same. While the input is focused, keys type; Esc (handled in the
+// Shell) defocuses so j/k move the list.
+//
+// Transient UI state lives at module level so preference updates (which
+// rebuild the item list) never reset the search or yank focus back into the
+// input mid-browse.
+//
+// The nav.action listener is registered ONCE at module level, not per
+// component instance: toggling a show updates preferences, which remounts
+// the editor (SettingsPage re-resolves the item's renderEditor), and
+// re-registering the listener via onMount/onCleanup during a bus emit
+// mutates the handler set mid-iteration — the event bus then re-delivers to
+// the fresh listener forever. A single stable listener guarded by an active
+// flag sidesteps that entirely.
+
+const [wlQuery, setWlQuery] = createSignal("");
+const [wlCursor, setWlCursor] = createSignal(0);
+const [wlTyping, setWlTyping] = createSignal(true);
+let wlEditorActive = false;
+
+function wlSuggestions(): Feed[] {
+	const q = wlQuery().trim().toLowerCase();
+	const all = useFeedStore().getFilteredFeeds();
+	if (!q) return all;
+	return all.filter((f) =>
+		(f.customName || f.podcast.title).toLowerCase().includes(q),
+	);
+}
+
+/** Keep the cursor inside the (possibly shrinking) suggestion list. */
+function wlCursorClamped(): number {
+	return Math.min(wlCursor(), Math.max(wlSuggestions().length - 1, 0));
+}
+
+function wlToggle(feedId: string): void {
+	const app = useAppStore();
+	const cur = app.state().preferences.autoDownloadWhitelist ?? [];
+	const next = cur.includes(feedId)
+		? cur.filter((id) => id !== feedId)
+		: [...cur, feedId];
+	app.updatePreferences({ autoDownloadWhitelist: next });
+	useFeedStore().runAutoDownload();
+}
+
+const wlOnAction = (data: {
+	action: KeybindActionName;
+	tab: TABS;
+	pane: PaneId;
+	mode: NavMode;
+}) => {
+	// Fire at most once per dispatch: the editor is only ever open inside the
+	// Settings tab's depth-2 pane, so scope on tab + pane and gate on the
+	// mount flag (which flips during remounts without re-registering).
+	if (!wlEditorActive) return;
+	if (data.tab !== TABS.SETTINGS) return;
+	if (data.pane !== DEPTH_CENTER_PANE) return;
+	const list = wlSuggestions();
+	if (list.length === 0) return;
+	switch (data.action) {
+		case "move-down":
+			setWlCursor((c) => Math.min(c + 1, list.length - 1));
+			break;
+		case "move-up":
+			setWlCursor((c) => Math.max(c - 1, 0));
+			break;
+		case "toggle-select":
+		case "open":
+			wlToggle(list[wlCursorClamped()].id);
+			break;
+	}
+};
+on("nav.action", wlOnAction);
+
+function WhitelistEditor() {
+	const { theme } = useTheme();
+	const feedStore = useFeedStore();
+	const app = useAppStore();
+
+	const whitelist = () => app.state().preferences.autoDownloadWhitelist ?? [];
+	const inList = (feedId: string) => whitelist().includes(feedId);
+
+	onMount(() => {
+		wlEditorActive = true;
+		onCleanup(() => {
+			wlEditorActive = false;
+		});
+	});
+
+	const focusNavRef = useInputFocusNav();
+	const inputRef = (el: InputRenderable | null | undefined) => {
+		focusNavRef(el);
+		if (el) {
+			el.on(RenderableEvents.FOCUSED, () => setWlTyping(true));
+			el.on(RenderableEvents.BLURRED, () => setWlTyping(false));
+		}
+	};
+
+	return (
+		<box flexDirection="column" padding={1} gap={1}>
+			<text fg={theme.text}>
+				<strong>Auto Download Whitelist</strong>
+			</text>
+			<box flexDirection="row" gap={1} alignItems="center">
+				<text fg={theme.textMuted}>Search:</text>
+				<input
+					ref={inputRef}
+					value={wlQuery()}
+					onInput={setWlQuery}
+					focused={wlTyping()}
+					placeholder="Type to filter shows…"
+					width={30}
+					textColor={theme.text}
+					focusedTextColor={theme.accent}
+				/>
+			</box>
+			<Show when={wlSuggestions().length === 0}>
+				<text fg={theme.muted ?? theme.textMuted}>
+					No subscribed shows match.
+				</text>
+			</Show>
+			<For each={wlSuggestions()}>
+				{(feed, index) => {
+					const focused = index() === wlCursorClamped();
+					const bg = () => (focused ? theme.primary : undefined);
+					const fg = () => (focused ? theme.surface : theme.text);
+					return (
+						<box
+							flexDirection="row"
+							gap={1}
+							paddingLeft={1}
+							backgroundColor={bg()}
+						>
+							<text fg={fg()}>{focused ? "❯" : " "}</text>
+							<text fg={fg()}>{inList(feed.id) ? "●" : "○"}</text>
+							<text fg={fg()}>
+								{feed.customName || feed.podcast.title}
+							</text>
+						</box>
+					);
+				}}
+			</For>
+			<text fg={theme.muted ?? theme.textMuted}>
+				Type to search · Esc to browse · j/k move · Space toggles · h back
+			</text>
+		</box>
+	);
 }
