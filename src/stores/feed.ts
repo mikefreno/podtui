@@ -288,7 +288,15 @@ function createFeedStore() {
 		const loadedFeeds = await loadFeedsFromFile();
 		if (loadedFeeds.length > 0) setFeeds(loadedFeeds);
 		const loadedSources = await loadSourcesFromFile<PodcastSource>();
-		if (loadedSources && loadedSources.length > 0) setSources(loadedSources);
+		// The default "rss" placeholder source fabricated fake search results
+		// and was removed from DEFAULT_SOURCES; drop it from persisted configs
+		// too. User-added custom feeds keep their own ids and are untouched.
+		const migratedSources =
+			loadedSources?.filter((source) => source.id !== "rss") ?? [];
+		if (migratedSources.length > 0) {
+			setSources(migratedSources);
+			saveSources(migratedSources);
+		}
 		await refreshAllFeeds();
 	})();
 
@@ -367,7 +375,7 @@ function createFeedStore() {
 	/** Remove a source */
 	const removeSource = (sourceId: string) => {
 		// Don't remove default sources
-		if (sourceId === "itunes" || sourceId === "rss") return false;
+		if (sourceId === "itunes") return false;
 
 		setSources((prev) => {
 			const updated = prev.filter((s) => s.id !== sourceId);

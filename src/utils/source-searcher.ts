@@ -4,94 +4,11 @@ import type { PodcastSource, SearchResult } from "../types/source"
 
 type SearcherResult = SearchResult[]
 
-const delay = async (min = 200, max = 500) =>
-  new Promise((resolve) => setTimeout(resolve, min + Math.random() * max))
-
-const hashString = (input: string): number => {
-  let hash = 0
-  for (let i = 0; i < input.length; i += 1) {
-    hash = (hash << 5) - hash + input.charCodeAt(i)
-    hash |= 0
-  }
-  return Math.abs(hash)
-}
-
 const slugify = (input: string): string =>
   input
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-
-const sourceLabel = (source: PodcastSource): string =>
-  source.name || source.id
-
-const buildPodcast = (
-  idBase: string,
-  title: string,
-  description: string,
-  author: string,
-  categories: string[],
-  source: PodcastSource
-): Podcast => ({
-  id: idBase,
-  title,
-  description,
-  feedUrl: `https://example.com/${slugify(title)}/feed.xml`,
-  author,
-  categories,
-  lastUpdated: new Date(),
-  isSubscribed: false,
-})
-
-const makeResults = (query: string, source: PodcastSource, seedOffset = 0): SearcherResult => {
-  const seed = hashString(`${source.id}:${query}`) + seedOffset
-  const baseTitles = [
-    "Daily Briefing",
-    "Studio Sessions",
-    "Signal & Noise",
-    "The Long Play",
-    "Off the Record",
-  ]
-  const descriptors = [
-    "Deep dives into",
-    "A fast-paced look at",
-    "Smart conversations about",
-    "A weekly roundup of",
-    "Curated stories on",
-  ]
-  const categories = ["Technology", "Business", "Science", "Culture", "News"]
-
-  return baseTitles.map((base, index) => {
-    const title = `${query} ${base}`
-    const desc = `${descriptors[index % descriptors.length]} ${query.toLowerCase()} from ${sourceLabel(source)}.`
-    const author = `${sourceLabel(source)} Network`
-    const cat = [categories[(seed + index) % categories.length]]
-    const podcast = buildPodcast(
-      `search-${source.id}-${seed + index}`,
-      title,
-      desc,
-      author,
-      cat,
-      source
-    )
-
-    return {
-      sourceId: source.id,
-      sourceName: source.name,
-      sourceType: source.type,
-      podcast,
-      score: 1 - index * 0.08,
-    }
-  })
-}
-
-const searchRSSSource = async (
-  query: string,
-  source: PodcastSource
-): Promise<SearcherResult> => {
-  await delay(200, 450)
-  return makeResults(query, source, 1)
-}
 
 type ItunesResult = {
   collectionId?: number
@@ -173,23 +90,28 @@ const searchAPISource = async (
   }))
 }
 
-const searchCustomSource = async (
-  query: string,
-  source: PodcastSource
-): Promise<SearcherResult> => {
-  await delay(300, 650)
-  return makeResults(query, source, 13)
-}
+/**
+ * RSS-type sources have no directory search backend: a feed URL identifies one
+ * show, and no API exists to search across "the RSS directory". Return no
+ * results rather than fabricating them.
+ */
+const searchRSSSource = async (): Promise<SearcherResult> => []
+
+/**
+ * Custom sources are RSS feeds added by URL (SourceManager) — same
+ * no-backend story, so they contribute nothing to directory search.
+ */
+const searchCustomSource = async (): Promise<SearcherResult> => []
 
 export const searchSourceByType = async (
   query: string,
   source: PodcastSource
 ): Promise<SearcherResult> => {
   if (source.type === SourceType.RSS) {
-    return searchRSSSource(query, source)
+    return searchRSSSource()
   }
   if (source.type === SourceType.CUSTOM) {
-    return searchCustomSource(query, source)
+    return searchCustomSource()
   }
   return searchAPISource(query, source)
 }

@@ -105,12 +105,4 @@ export const DEFAULT_SOURCES: PodcastSource[] = [
     language: "en_us",
     allowExplicit: true,
   },
-  {
-    id: "rss",
-    name: "RSS Feed",
-    type: SourceType.RSS,
-    baseUrl: "",
-    enabled: true,
-    description: "Add podcasts via RSS feed URL",
-  },
 ]
