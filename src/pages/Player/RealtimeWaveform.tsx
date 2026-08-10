@@ -15,6 +15,7 @@ import {
 	type CavaCoreConfig,
 } from "@/utils/cavacore";
 import { AudioStreamReader } from "@/utils/audio-stream-reader";
+import { BAR_LEVELS, barChars, createBarScaler } from "@/utils/bar-mapping";
 import { useAudio } from "@/hooks/useAudio";
 import { useTheme } from "@/context/ThemeContext";
 import { PANE_RATIO } from "@/utils/navigation";
@@ -24,19 +25,6 @@ import { PANE_RATIO } from "@/utils/navigation";
 export type RealtimeWaveformProps = {
 	visualizerConfig?: Partial<CavaCoreConfig>;
 };
-
-/** Unicode lower block elements: space (silence) through full block (max) */
-const BARS = [
-	" ",
-	"\u2581",
-	"\u2582",
-	"\u2583",
-	"\u2584",
-	"\u2585",
-	"\u2586",
-	"\u2587",
-	"\u2588",
-];
 
 /** Target frame interval in ms (~30 fps) */
 const FRAME_INTERVAL = 33;
@@ -52,6 +40,11 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 
 	// Frequency bar values (0.0–1.0 per bar)
 	const [barData, setBarData] = createSignal<number[]>([]);
+
+	// Peak-follower scaler replaces cava's autosens: normalizes each FFT
+	// frame against the running peak so a loud start can't pin every bar
+	// at full height and quiet content still gets normalized up.
+	const scaler = createBarScaler();
 
 	let cava: CavaCore | null = null;
 	let reader: AudioStreamReader | null = null;
@@ -91,10 +84,10 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 	// ── Smooth position clock ──────────────────────────────────────────
 	//
 	// audio.position() updates at the useAudio poll rate (~150ms). Between
-	// polls, interpolate the position from wall time so the FFT window (and
-	// the played/future split) tracks the audio continuously instead of
-	// stepping. The 0.5s cap prevents extrapolating far beyond reality when
-	// the player stalls (e.g. network re-buffering).
+	// polls, interpolate the position from wall time so the FFT window
+	// tracks the audio continuously instead of stepping. The 0.5s cap
+	// prevents extrapolating far beyond reality when the player stalls
+	// (e.g. network re-buffering).
 
 	let lastPolledPosition = 0;
 	let lastPolledAt = 0;
@@ -121,13 +114,25 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		// Initialize cavacore with current resolution + any overrides.
 		// bars is width-derived (see numBars); visualizerConfig supplies the
 		// audio-processing params (noise reduction, cutoffs, etc.).
+		// autosens is disabled (after the spread so it always wins): cava's
+		// autosens gain-ramps during silence then clips everything to 1.0
+		// when audio arrives — the JS peak scaler handles dynamics instead.
 		const config: CavaCoreConfig = {
 			bars: numBars(),
 			sampleRate: 44100,
 			channels: 1,
 			...props.visualizerConfig,
+			autosens: 0,
 		};
 		cava.init(config);
+
+		// Pre-warm the FFT window: libcavacore's window is malloc'd
+		// uninitialized, so the first real frame would FFT garbage and
+		// render full-scale bars. One zero frame the size of the whole
+		// input buffer clears it (at 44.1kHz mono the window is 8192
+		// samples — FFTbassbufferSize × channels; a 512-sample frame would
+		// leave the tail garbage).
+		cava.execute(new Float64Array(8192));
 
 		// Pre-allocate sample read buffer
 		sampleBuffer = new Float64Array(SAMPLES_PER_FRAME);
@@ -167,16 +172,13 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		// ties the bars to what's actually playing.
 		const target = smoothPosition();
 		const count = reader.read(sampleBuffer, target);
-		if (count === 0) return;
+		// Never feed a partial FFT window to cava.
+		if (count < sampleBuffer.length) return;
 
-		const input =
-			count < sampleBuffer.length
-				? sampleBuffer.subarray(0, count)
-				: sampleBuffer;
-		const output = cava.execute(input);
+		const output = cava.execute(sampleBuffer);
 
-		// Copy bar values to a new array for the signal
-		setBarData(Array.from(output as Float64Array));
+		// Normalize against the running peak and copy to a new array
+		setBarData(scaler(output));
 	};
 
 	createEffect(
@@ -236,11 +238,6 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 
 	// ── Rendering ──────────────────────────────────────────────────────
 
-	const playedRatio = () =>
-		audio.duration() <= 0
-			? 0
-			: Math.min(1, smoothPosition() / audio.duration());
-
 	const renderLine = () => {
 		const bars = barData();
 		const count = numBars();
@@ -248,51 +245,27 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		if (bars.length === 0) {
 			const placeholder = ".".repeat(count);
 			return (
-				<box flexDirection="row" gap={0}>
-					<text fg="#3b4252">{placeholder}</text>
+				<box flexDirection="column" gap={0}>
+					<text fg={theme.primary}>{placeholder}</text>
+					<text fg={theme.primary}>{placeholder}</text>
 				</box>
 			);
 		}
 
-		const played = Math.floor(count * playedRatio());
-		const playedColor = audio.isPlaying() ? "#6fa8ff" : "#7d8590";
-		const futureColor = "#3b4252";
-
-		const playedChars = bars
-			.slice(0, played)
-			.map((v) => BARS[Math.min(BARS.length - 1, Math.floor(v * BARS.length))])
-			.join("");
-
-		const futureChars = bars
-			.slice(played)
-			.map((v) => BARS[Math.min(BARS.length - 1, Math.floor(v * BARS.length))])
-			.join("");
+		const pairs = bars.map((v) => barChars(Math.floor(v * BAR_LEVELS)));
+		const top = pairs.map((pair) => pair.top).join("");
+		const bottom = pairs.map((pair) => pair.bottom).join("");
 
 		return (
-			<box flexDirection="row" gap={0}>
-				<text fg={playedColor}>{playedChars || " "}</text>
-				<text fg={futureColor}>{futureChars || " "}</text>
+			<box flexDirection="column" gap={0}>
+				<text fg={theme.primary}>{top}</text>
+				<text fg={theme.primary}>{bottom}</text>
 			</box>
 		);
 	};
 
-	const handleClick = (event: { x: number }) => {
-		const count = numBars();
-		const ratio = event.x / count;
-		const next = Math.max(
-			0,
-			Math.min(audio.duration(), Math.round(audio.duration() * ratio)),
-		);
-		audio.seek(next);
-	};
-
 	return (
-		<box
-			border
-			borderColor={theme.border}
-			padding={1}
-			onMouseDown={handleClick}
-		>
+		<box border borderColor={theme.border} padding={1}>
 			{renderLine()}
 		</box>
 	);

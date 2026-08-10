@@ -12,6 +12,7 @@
 
 import { Show } from "solid-js";
 import { PlaybackControls } from "./PlaybackControls";
+import { ProgressBar } from "./ProgressBar";
 import { RealtimeWaveform } from "./RealtimeWaveform";
 import { useAudio } from "@/hooks/useAudio";
 import { useAppStore } from "@/stores/app";
@@ -78,6 +79,8 @@ export function PlayerPage() {
 						<text fg={muted()}>
 							{ep().description?.slice(0, 500) ?? "No description available."}
 						</text>
+
+						<ProgressBar />
 
 						<RealtimeWaveform
 							visualizerConfig={(() => {
