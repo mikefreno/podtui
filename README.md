@@ -54,6 +54,14 @@ Linux (arm64/x64). Pick whichever fits your platform.
 brew install mikefreno/tap/podtui
 ```
 
+On macOS the tarball also ships a `PodTui.app` bundle. PodTui plays audio
+through a copy of mpv that lives **inside the bundle**, so macOS attributes
+the Now Playing session to PodTui — the Control Center / lock-screen entry
+shows the PodTui name and icon, and podcast cover art as its artwork —
+rather than a blank placeholder for an unbundled binary. Installers can drop
+`PodTui.app` into `/Applications`; the `podtui` entry point should point at
+`PodTui.app/Contents/MacOS/podtui` so the bundled mpv is used.
+
 ### 2. Standalone tarball (all platforms)
 
 Grab `podtui-<platform>-<arch>.tar.gz` from the latest

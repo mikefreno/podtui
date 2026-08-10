@@ -11,7 +11,7 @@
 import { platform } from "os";
 import { existsSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import type { Socket, Subprocess } from "bun";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -48,6 +48,7 @@ export interface PlayOptions {
 	volume?: number;
 	speed?: number;
 	mediaTitle?: string;
+	coverArtPath?: string;
 }
 
 // ── Utilities ────────────────────────────────────────────────────────
@@ -72,6 +73,23 @@ function which(cmd: string): string | null {
 
 function mpvSocketPath(): string {
 	return join(tmpdir(), `podtui-mpv-${process.pid}.sock`);
+}
+
+/**
+ * mpv executable to use. Prefers a sibling `mpv` inside the app bundle
+ * (macOS PodTui.app/Contents/MacOS/mpv): running mpv from inside the bundle
+ * makes macOS attribute its Now Playing session to PodTui — source-app icon
+ * and name in Control Center — instead of a blank placeholder for an
+ * unbundled binary. Falls back to PATH so dev runs and Linux keep working.
+ */
+function resolveMpvBinary(): string | null {
+	try {
+		const bundled = join(dirname(process.execPath), "mpv");
+		if (existsSync(bundled)) return bundled;
+	} catch {
+		/* process.execPath unusable — fall through to PATH */
+	}
+	return which("mpv");
 }
 
 // ── mpv Backend ──────────────────────────────────────────────────────
@@ -101,7 +119,7 @@ export class MpvBackend implements AudioBackend {
 		}
 
 		const args = [
-			"mpv",
+			resolveMpvBinary() ?? "mpv",
 			"--no-video",
 			"--no-terminal",
 			"--really-quiet",
@@ -112,6 +130,12 @@ export class MpvBackend implements AudioBackend {
 
 		if (opts?.mediaTitle) {
 			args.push(`--force-media-title=${opts.mediaTitle}`);
+		}
+
+		if (opts?.coverArtPath) {
+			// Explicit cover file → albumart track → macOS Now Playing artwork
+			// (works for remote streams, not just local downloads).
+			args.push(`--cover-art-files=${opts.coverArtPath}`);
 		}
 
 		if (opts?.startPosition && opts.startPosition > 0) {
@@ -376,7 +400,7 @@ export interface DetectedPlayer {
 export function detectPlayers(): DetectedPlayer[] {
 	const players: DetectedPlayer[] = [];
 
-	const mpvPath = which("mpv");
+	const mpvPath = resolveMpvBinary();
 	if (mpvPath) {
 		players.push({
 			name: "mpv",
@@ -410,13 +434,13 @@ export function createAudioBackend(preferred?: BackendName): AudioBackend {
 		if (backend) return backend;
 	}
 
-	return which("mpv") ? new MpvBackend() : new NoopBackend();
+	return resolveMpvBinary() ? new MpvBackend() : new NoopBackend();
 }
 
 function createBackendByName(name: BackendName): AudioBackend | null {
 	switch (name) {
 		case "mpv":
-			return which("mpv") ? new MpvBackend() : null;
+			return resolveMpvBinary() ? new MpvBackend() : null;
 		case "none":
 			return new NoopBackend();
 	}

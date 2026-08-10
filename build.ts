@@ -131,6 +131,91 @@ if (COMPILE) {
 		}
 	}
 
+	// macOS app bundle: PodTui.app. We run our audio backend (mpv) from
+	// INSIDE the bundle (Contents/MacOS/mpv) so macOS attributes its Now
+	// Playing session to PodTui — the source-app icon + name in Control
+	// Center / lock screen — instead of a blank placeholder for an
+	// unbundled binary. AudioPlayer's resolver prefers this sibling.
+	if (platform === "darwin") {
+		const appRoot = join(tarRoot, "PodTui.app");
+		const macosDir = join(appRoot, "Contents", "MacOS");
+		const resDir = join(appRoot, "Contents", "Resources");
+		mkdirSync(macosDir, { recursive: true });
+		mkdirSync(resDir, { recursive: true });
+
+		copyFileSync(outfile, join(macosDir, "podtui"));
+		for (const lib of [`libopentui.${libExt}`, cavacoreLib]) {
+			const s = join("dist", lib);
+			if (existsSync(s)) copyFileSync(s, join(macosDir, lib));
+		}
+
+		const mpvResolve = Bun.spawnSync(["which", "mpv"]);
+		const mpvPath =
+			mpvResolve.exitCode === 0 ? mpvResolve.stdout.toString().trim() : "";
+		if (mpvPath) {
+			copyFileSync(mpvPath, join(macosDir, "mpv"));
+		} else {
+			console.warn(
+				"Warning: mpv not found in PATH — skipping bundle mpv (Now Playing attribution won't work)",
+			);
+		}
+
+		const icnsSrc = join("assets", "App Icon", "AppIcon.icns");
+		if (existsSync(icnsSrc)) {
+			copyFileSync(icnsSrc, join(resDir, "AppIcon.icns"));
+		} else {
+			console.warn(
+				"Warning: assets/App Icon/AppIcon.icns missing — app bundle has no icon",
+			);
+		}
+
+		// Keep CFBundleShortVersionString in sync with src/index.tsx VERSION.
+		Bun.write(
+			join(appRoot, "Contents", "Info.plist"),
+			`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>PodTui</string>
+	<key>CFBundleDisplayName</key>
+	<string>PodTui</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.mikefreno.podtui</string>
+	<key>CFBundleExecutable</key>
+	<string>podtui</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.3.1</string>
+	<key>CFBundleVersion</key>
+	<string>0.3.1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+</dict>
+</plist>
+`,
+		);
+
+		// Ad-hoc sign so the bundle launches cleanly on fresh machines.
+		const sign = Bun.spawnSync([
+			"codesign",
+			"--force",
+			"--deep",
+			"-s",
+			"-",
+			appRoot,
+		]);
+		if (sign.exitCode !== 0) {
+			console.warn(
+				`Warning: codesign failed (${sign.stderr.toString().trim()}) — app bundle unsigned`,
+			);
+		}
+		console.log(`App bundle: ${appRoot}`);
+	}
+
 	const tar = Bun.spawnSync([
 		"tar",
 		"-czf",
