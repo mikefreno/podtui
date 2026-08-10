@@ -47,6 +47,7 @@ export interface PlayOptions {
 	startPosition?: number;
 	volume?: number;
 	speed?: number;
+	mediaTitle?: string;
 }
 
 // ── Utilities ────────────────────────────────────────────────────────
@@ -108,6 +109,10 @@ export class MpvBackend implements AudioBackend {
 			`--volume=${Math.round((opts?.volume ?? 1) * 100)}`,
 			`--speed=${opts?.speed ?? 1}`,
 		];
+
+		if (opts?.mediaTitle) {
+			args.push(`--force-media-title=${opts.mediaTitle}`);
+		}
 
 		if (opts?.startPosition && opts.startPosition > 0) {
 			args.push(`--start=${opts.startPosition}`);

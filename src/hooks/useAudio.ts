@@ -189,6 +189,10 @@ async function play(episode: Episode): Promise<void> {
 		const vol = volume();
 		const spd = storeSpeed || speed();
 
+		const feedStore = useFeedStore();
+		const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
+		const podcastTitle = feed?.customName || feed?.podcast.title || "";
+
 		// Resume from saved progress if available and not completed
 		const savedProgress = progressStore.get(episode.id);
 		let startPos = 0;
@@ -200,6 +204,7 @@ async function play(episode: Episode): Promise<void> {
 			volume: vol,
 			speed: spd,
 			startPosition: startPos > 0 ? startPos : undefined,
+			mediaTitle: podcastTitle ? `${podcastTitle} — ${episode.title}` : episode.title,
 		});
 
 		setCurrentEpisode(episode);
@@ -212,7 +217,7 @@ async function play(episode: Episode): Promise<void> {
 		const media = useMediaRegistry();
 		media.setNowPlaying({
 			title: episode.title,
-			artist: episode.podcastId,
+			artist: podcastTitle || episode.podcastId,
 			duration: episode.duration,
 		});
 		media.setPlaybackState(true);
@@ -363,10 +368,18 @@ async function switchBackend(name: BackendName): Promise<void> {
 	// Resume playback if we were playing
 	if (wasPlaying && ep && ep.audioUrl) {
 		try {
+			const feedStore = useFeedStore();
+			const feed = feedStore
+				.feeds()
+				.find((f) => f.podcast.id === ep.podcastId);
+			const podcastTitle = feed?.customName || feed?.podcast.title || "";
 			await backend.play(ep.audioUrl, {
 				startPosition: pos,
 				volume: vol,
 				speed: spd,
+				mediaTitle: podcastTitle
+					? `${podcastTitle} — ${ep.title}`
+					: ep.title,
 			});
 			setIsPlaying(true);
 			startPolling();

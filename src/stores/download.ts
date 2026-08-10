@@ -12,6 +12,7 @@ import type { DownloadedEpisode } from "../types/episode";
 import type { Episode } from "../types/episode";
 import { downloadEpisode } from "../utils/episode-downloader";
 import { ensureConfigDir, getConfigFilePath } from "../utils/config-dir";
+import { useFeedStore } from "./feed";
 
 const DOWNLOADS_FILE = "downloads.json";
 const MAX_CONCURRENT = 2;
@@ -201,6 +202,27 @@ function createDownloadStore() {
 				speed: 0,
 				error: null,
 			});
+
+			// Write the podcast cover beside the audio so mpv's
+			// --cover-art-auto=exact picks it up for Now Playing art.
+			const coverUrl = useFeedStore()
+				.feeds()
+				.find((f) => f.id === item.feedId)?.podcast.coverUrl;
+			if (coverUrl && result.filePath) {
+				const dot = result.filePath.lastIndexOf(".");
+				if (dot > 0) {
+					const coverPath = result.filePath.slice(0, dot) + ".jpg";
+					fetch(coverUrl)
+						.then(async (r) => {
+							if (!r.ok) return;
+							await Bun.write(
+								coverPath,
+								new Uint8Array(await r.arrayBuffer()),
+							);
+						})
+						.catch(() => {});
+				}
+			}
 		} else {
 			updateDownload(item.episodeId, {
 				status: DownloadStatus.FAILED,
@@ -306,6 +328,11 @@ function createDownloadStore() {
 			try {
 				const { unlink } = await import("fs/promises");
 				await unlink(dl.filePath);
+				const dot = dl.filePath.lastIndexOf(".");
+				if (dot > 0) {
+					const coverPath = dl.filePath.slice(0, dot) + ".jpg";
+					await unlink(coverPath);
+				}
 			} catch {
 				// File may already be gone
 			}
