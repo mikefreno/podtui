@@ -178,11 +178,11 @@ export function MyShowsPage() {
 			downloadStore.removeDownload(id).catch(() => {});
 		},
 		"whitelist-toggle": () => {
-			if (depth() < 1) return;
-			const id = drilledShowId();
-			if (!id) return;
 			const prefs = app.state().preferences;
 			if (prefs.autoDownloadScope !== "whitelist") return;
+			// depth 0: the focused show; depth ≥1: the drilled show.
+			const id = depth() >= 1 ? drilledShowId() : selectedShow()?.id;
+			if (!id) return;
 			const cur = prefs.autoDownloadWhitelist ?? [];
 			const next = cur.includes(id)
 				? cur.filter((x) => x !== id)
@@ -289,6 +289,11 @@ export function MyShowsPage() {
 						{(feed, index) => {
 							const lf = () => focusedShowIdx();
 							const ref = useScrollIntoView(() => index() === lf());
+							const wlScope =
+								app.state().preferences.autoDownloadScope === "whitelist";
+							const wlInList = (
+								app.state().preferences.autoDownloadWhitelist ?? []
+							).includes(feed.id);
 							return (
 								<box
 									ref={ref}
@@ -311,6 +316,19 @@ export function MyShowsPage() {
 									<text fg={index() === lf() ? theme.surface : muted()}>
 										({feed.episodes.length})
 									</text>
+									<Show when={wlScope}>
+										<text
+											fg={
+												index() === lf()
+													? theme.surface
+													: wlInList
+														? theme.warning
+														: muted()
+											}
+										>
+											{wlInList ? "●" : "○"}
+										</text>
+									</Show>
 								</box>
 							);
 						}}
@@ -410,7 +428,16 @@ export function MyShowsPage() {
 							{show().podcast.description?.slice(0, 400) ?? "No description."}
 						</text>
 						<box height={1} />
-						<text fg={muted()}>enter/l: open · h: back · x: unsubscribe</text>
+						<text fg={muted()}>
+							enter/l: open · h: back · x: unsubscribe
+							{app.state().preferences.autoDownloadScope === "whitelist"
+								? (app.state().preferences.autoDownloadWhitelist ??
+									[]
+								  ).includes(show().id)
+									? " · w: un-whitelist"
+									: " · w: whitelist"
+								: ""}
+						</text>
 					</box>
 				)}
 			</Show>

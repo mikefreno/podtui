@@ -19,8 +19,10 @@ import { useAppStore } from "@/stores/app";
 import { useFeedStore } from "@/stores/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { useInputFocusNav } from "@/hooks/useInputFocusNav";
+import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import {
 	NavMode,
+	useNavigation,
 	DEPTH_CENTER_PANE,
 	type PaneId,
 } from "@/context/NavigationContext";
@@ -166,7 +168,7 @@ export function usePreferencesItems(): SettingItem[] {
 			kind: "select",
 			display: () => scopeLabel(prefs().autoDownloadScope),
 			help: () =>
-				`Which shows auto-download applies to.\nAll: every subscribed show.\nNone: nothing.\nWhitelist: only the shows you add (in My Shows press ${"w"} on an episode; or open the Whitelist item below).\nType: select\nDefault: all\nCurrent: ${scopeLabel(prefs().autoDownloadScope)}\nCycle with j/k; Enter to apply.`,
+				`Which shows auto-download applies to.\nAll: every subscribed show.\nNone: nothing.\nWhitelist: only the shows you add (in My Shows press ${"w"} on the focused show; or open the Whitelist item below).\nType: select\nDefault: all\nCurrent: ${scopeLabel(prefs().autoDownloadScope)}\nCycle with j/k; Enter to apply.`,
 			cycle: (dir) => {
 				const idx = SCOPE_LABELS.findIndex(
 					(s) => s.value === prefs().autoDownloadScope,
@@ -299,6 +301,9 @@ const [wlQuery, setWlQuery] = createSignal("");
 const [wlCursor, setWlCursor] = createSignal(0);
 const [wlTyping, setWlTyping] = createSignal(true);
 let wlEditorActive = false;
+// Indirection for refocusing the search input from the module-level nav.action
+// listener (which cannot call useNavigation — that needs the provider).
+let wlFocusInput: (() => void) | null = null;
 
 function wlSuggestions(): Feed[] {
 	const q = wlQuery().trim().toLowerCase();
@@ -349,12 +354,17 @@ const wlOnAction = (data: {
 		case "open":
 			wlToggle(list[wlCursorClamped()].id);
 			break;
+		case "search":
+			// `s` while browsing re-enters typing mode (mirrors SearchPage).
+			wlFocusInput?.();
+			break;
 	}
 };
 on("nav.action", wlOnAction);
 
 function WhitelistEditor() {
 	const { theme } = useTheme();
+	const nav = useNavigation();
 	const feedStore = useFeedStore();
 	const app = useAppStore();
 
@@ -363,8 +373,16 @@ function WhitelistEditor() {
 
 	onMount(() => {
 		wlEditorActive = true;
+		// Restore the last typing/browsing mode across the remounts that
+		// preference updates trigger. nav.inputFocused() drives the input's
+		// focused prop (deterministic Esc-to-blur, same as SearchPage), so
+		// keep the store in sync with the persisted module mode.
+		nav.setInputFocused(wlTyping());
+		wlFocusInput = () => nav.setInputFocused(true);
 		onCleanup(() => {
 			wlEditorActive = false;
+			nav.setInputFocused(false);
+			wlFocusInput = null;
 		});
 	});
 
@@ -372,6 +390,8 @@ function WhitelistEditor() {
 	const inputRef = (el: InputRenderable | null | undefined) => {
 		focusNavRef(el);
 		if (el) {
+			// Sync the persisted mode with real focus changes so remounts
+			// (e.g. after a toggle) restore the right state.
 			el.on(RenderableEvents.FOCUSED, () => setWlTyping(true));
 			el.on(RenderableEvents.BLURRED, () => setWlTyping(false));
 		}
@@ -388,7 +408,7 @@ function WhitelistEditor() {
 					ref={inputRef}
 					value={wlQuery()}
 					onInput={setWlQuery}
-					focused={wlTyping()}
+					focused={nav.inputFocused()}
 					placeholder="Type to filter shows…"
 					width={30}
 					textColor={theme.text}
@@ -402,17 +422,30 @@ function WhitelistEditor() {
 			</Show>
 			<For each={wlSuggestions()}>
 				{(feed, index) => {
-					const focused = index() === wlCursorClamped();
-					const bg = () => (focused ? theme.primary : undefined);
-					const fg = () => (focused ? theme.surface : theme.text);
+					// While the input is focused (typing), no row shows the
+					// accent highlight or `❯` — only the input is "in focus".
+					const focused = () =>
+						!nav.inputFocused() && index() === wlCursorClamped();
+					const ref = useScrollIntoView(focused);
+					const bg = () => (focused() ? theme.primary : undefined);
+					const fg = () => (focused() ? theme.surface : theme.text);
 					return (
 						<box
+							ref={ref}
 							flexDirection="row"
 							gap={1}
 							paddingLeft={1}
+							paddingRight={1}
 							backgroundColor={bg()}
+							onMouseDown={() => {
+								nav.setActivePane(DEPTH_CENTER_PANE);
+								setWlCursor(index());
+								// Click toggles membership directly (works even
+								// while typing, where Space is input text).
+								wlToggle(feed.id);
+							}}
 						>
-							<text fg={fg()}>{focused ? "❯" : " "}</text>
+							<text fg={fg()}>{focused() ? "❯" : " "}</text>
 							<text fg={fg()}>{inList(feed.id) ? "●" : "○"}</text>
 							<text fg={fg()}>
 								{feed.customName || feed.podcast.title}
@@ -422,7 +455,8 @@ function WhitelistEditor() {
 				}}
 			</For>
 			<text fg={theme.muted ?? theme.textMuted}>
-				Type to search · Esc to browse · j/k move · Space toggles · h back
+				Type to search · Esc to browse · j/k move · Space toggles · s to
+				type · h back
 			</text>
 		</box>
 	);

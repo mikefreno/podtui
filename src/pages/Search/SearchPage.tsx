@@ -280,6 +280,9 @@ function SearchPage() {
 							{(query, index) => {
 								const lf = () => focus(0);
 								const ref = useScrollIntoView(() => index() === lf());
+								// While the input is focused (typing), the list is not
+								// in focus: no bg, no accent fg, no `❯` on any entry.
+								const typing = () => inputActive();
 								return (
 									<box
 										ref={ref}
@@ -287,7 +290,11 @@ function SearchPage() {
 										gap={1}
 										paddingLeft={1}
 										paddingRight={1}
-										backgroundColor={focusBg(index(), lf(), isActive())}
+										backgroundColor={
+											typing()
+												? undefined
+												: focusBg(index(), lf(), isActive())
+										}
 										onMouseDown={() => {
 											nav.setActivePane(DEPTH_CENTER_PANE);
 											nav.setDepthFocus(index(), 0);
@@ -297,10 +304,24 @@ function SearchPage() {
 											selectRecent(query);
 										}}
 									>
-										<text fg={focusFg(index(), lf(), isActive())}>
-											{index() === lf() ? "❯" : " "}
+										<text
+											fg={
+												typing()
+													? theme.text
+													: focusFg(index(), lf(), isActive())
+											}
+										>
+											{index() === lf() && !typing() ? "❯" : " "}
 										</text>
-										<text fg={focusFg(index(), lf(), isActive())}>{query}</text>
+										<text
+											fg={
+												typing()
+													? theme.text
+													: focusFg(index(), lf(), isActive())
+											}
+										>
+											{query}
+										</text>
 									</box>
 								);
 							}}
