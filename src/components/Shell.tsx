@@ -11,8 +11,8 @@
  * event bus. There is no sidebar pane.
  */
 
-import { createSignal, Show, For } from "solid-js";
-import { useKeyboard, useRenderer } from "@opentui/solid";
+import { createEffect, createSignal, onCleanup, Show, For } from "solid-js";
+import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid";
 import { useTheme } from "@/context/ThemeContext";
 import { useKeybinds, type KeybindActionName } from "@/context/KeybindContext";
 import { useNavigation, NavMode } from "@/context/NavigationContext";
@@ -216,11 +216,18 @@ export function Shell() {
 	);
 
 	// ── Status bar fragments ──────────────────────────────────────────────────
-	const nowPlaying = () => {
+	// Now-playing text carries the podcast name (custom name when set) when
+	// the episode's feed is resolvable, mirroring advanceEpisode's lookup.
+	const nowPlayingText = () => {
 		const ep = audio.currentEpisode();
 		if (!ep) return null;
-		const title = ep.title.length > 40 ? ep.title.slice(0, 38) + "…" : ep.title;
-		return `♪ ${title}`;
+		const feeds = feedStore.getFilteredFeeds();
+		const feed =
+			feeds.find((f) => f.podcast.id === ep.podcastId) ??
+			feeds.find((f) => f.episodes.some((e) => e.id === ep.id));
+		return feed
+			? `♪ ${feed.customName || feed.podcast.title} — ${ep.title}`
+			: `♪ ${ep.title}`;
 	};
 	const modeLabel = () =>
 		nav.mode() === NavMode.NORMAL ? "" : `-- ${nav.mode()} --`;
@@ -229,6 +236,45 @@ export function Shell() {
 			.pending()
 			.map((s) => s.key)
 			.join(" ");
+
+	// ── Now-playing marquee ────────────────────────────────────────────────────
+	// The now-playing segment takes the full remaining status-bar width and
+	// marquee-scrolls on a 300ms timer when its text overflows; when it fits
+	// (or the bar is too narrow to show anything) it renders statically.
+	const dims = useTerminalDimensions();
+	const GAP = 3;
+	const [scrollOffset, setScrollOffset] = createSignal(0);
+	const leftFixed = () =>
+		modeLabel().length +
+		(nav.selectedIds().length > 0
+			? 4 + String(nav.selectedIds().length).length
+			: 0);
+	const rightFixed = () => k.pending().map((p) => p.key).join(" ").length + 3;
+	const availableWidth = () =>
+		Math.max(0, dims().width - leftFixed() - rightFixed() - 2);
+	const visible = () => {
+		const text = nowPlayingText();
+		const avail = availableWidth();
+		if (!text || avail <= 0) return "";
+		if (text.length <= avail) return text;
+		// Double the text with a gap so the wrap is seamless: the window
+		// slides over text + gap + text without ever hitting the tail.
+		return (text + " ".repeat(GAP) + text).slice(
+			scrollOffset(),
+			scrollOffset() + avail,
+		);
+	};
+	createEffect(() => {
+		const text = nowPlayingText();
+		const avail = availableWidth();
+		setScrollOffset(0);
+		if (!text || avail <= 0 || text.length <= avail) return;
+		const cycle = text.length + GAP - avail;
+		const id = setInterval(() => {
+			setScrollOffset((o) => (o + 1) % cycle);
+		}, 150);
+		onCleanup(() => clearInterval(id));
+	});
 
 	return (
 		<box
@@ -290,12 +336,14 @@ export function Shell() {
 									● {nav.selectedIds().length}
 								</text>
 							</Show>
-							<Show when={nowPlaying()}>
-								<text fg={t.primary} paddingLeft={1}>
-									{nowPlaying()}
-								</text>
+							<Show when={nowPlayingText()}>
+								<box flexGrow={1} paddingLeft={1}>
+									{/* content prop (not a text child): the babel-preset-solid JSX
+									 *  transform HTML-escapes static string children (`<` → `&lt;`),
+									 *  which opentui renders verbatim; content bypasses that. */}
+									<text fg={t.primary} content={visible()} />
+								</box>
 							</Show>
-							<box flexGrow={1} />
 							<text fg={t.textMuted} paddingRight={1}>
 								{pendingLabel()}
 							</text>
