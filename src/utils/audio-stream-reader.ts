@@ -4,10 +4,13 @@
  * Spawns a separate ffmpeg process that decodes the same audio URL
  * the player is using and outputs raw PCM data (signed 16-bit LE, mono,
  * 44100 Hz) to a pipe. The reader accumulates samples in a ring buffer
- * and provides them to the caller on demand.
+ * and serves windows *at a requested playback position* to the caller.
  *
  * This is independent from the actual playback backend — it's a
- * read-only "tap" on the audio for FFT analysis purposes.
+ * read-only "tap" on the audio for FFT analysis purposes. Because it is a
+ * separate decoder, sync with the player is maintained by pacing decode at
+ * the player's clock rate (`-readrate <speed>`) and sampling the window at
+ * the position the player reports, never at the decode head.
  */
 
 /** PCM output format constants */
@@ -15,8 +18,14 @@ const SAMPLE_RATE = 44100;
 const CHANNELS = 1;
 const BYTES_PER_SAMPLE = 2; // s16le
 
-/** How many samples to buffer (~1 second) */
-const RING_BUFFER_SAMPLES = SAMPLE_RATE;
+/**
+ * How many samples to buffer (~10 seconds).
+ * Large enough to absorb the gap between mpv's startup latency (0.5–3s,
+ * more for network streams at speed) and the reader's decode head, plus
+ * short player stalls. Samples older than the ring window are never needed
+ * again — the renderer only samples at the current playback position.
+ */
+const RING_BUFFER_SAMPLES = SAMPLE_RATE * 10;
 
 export interface AudioStreamReaderOptions {
 	/** Audio URL or file path to decode */
@@ -32,11 +41,14 @@ export interface AudioStreamReaderOptions {
  */
 let globalGeneration = 0;
 
+import type { Subprocess } from "bun";
+
 export class AudioStreamReader {
-	private proc: ReturnType<typeof Bun.spawn> | null = null;
+	private proc: Subprocess | null = null;
 	private ringBuffer: Float64Array;
 	private writePos = 0;
 	private totalSamplesWritten = 0;
+	private startPosition = 0;
 	private _running = false;
 	private generation = 0;
 	readonly url: string;
@@ -81,24 +93,40 @@ export class AudioStreamReader {
 		// Increment generation so any lingering read loop from a previous
 		// start() will see a mismatch and exit.
 		this.generation = ++globalGeneration;
+		this.startPosition = Math.max(0, startPosition);
+
+		const readRate = Math.max(0.25, speed > 0 ? speed : 1);
 
 		const args = [
 			"ffmpeg",
 			"-loglevel",
 			"quiet",
-			// Read input at native frame rate so decoded PCM stays in sync with
-			// real-time playback. Without -re, ffmpeg greedily decodes the whole
-			// file as fast as possible: the ring buffer fills with audio seconds
-			// ahead of the player (laggy bars), then the process exits when it
-			// hits EOF (bars freeze ~10s in).
-			"-re",
-			"-reconnect",
-			"1",
-			"-reconnect_streamed",
-			"1",
-			"-reconnect_delay_max",
-			"5",
+			// Pace input at the player's advance rate (speed× native) rather
+			// than native rate. Decoding slower than the player makes the
+			// decoded position fall behind the playback position linearly
+			// (bars drift away at (speed-1)s per second); decoding unthrottled
+			// fills the ring with audio seconds ahead of the player (laggy
+			// bars) and hits EOF early (bars freeze). `-readrate speed` keeps
+			// the decode head just ahead of the position the renderer samples,
+			// tracking the player clock with only mpv's startup latency as a
+			// constant offset — absorbed by the ring buffer.
+			"-readrate",
+			String(readRate),
 		];
+
+		// `-reconnect*` are http-protocol options: ffmpeg rejects them at
+		// input-open when the input is a local file, killing the process
+		// before any PCM is produced. Only pass them for network URLs.
+		if (/^https?:\/\//i.test(this.url)) {
+			args.push(
+				"-reconnect",
+				"1",
+				"-reconnect_streamed",
+				"1",
+				"-reconnect_delay_max",
+				"5",
+			);
+		}
 
 		// Seek before input for network efficiency
 		if (startPosition > 0) {
@@ -107,12 +135,9 @@ export class AudioStreamReader {
 
 		args.push("-i", this.url);
 
-		// Apply speed via atempo filter if not 1x.
-		// ffmpeg atempo only supports 0.5–100.0; chain multiple for extremes.
-		if (speed !== 1 && speed > 0) {
-			args.push("-af", buildAtempoChain(speed));
-		}
-
+		// No atempo filter: the renderer samples the *source* audio at the
+		// player's current position, so output samples map 1:1 to input time
+		// (stream index = (targetSeconds - startPosition) * sampleRate).
 		args.push(
 			"-ac",
 			String(CHANNELS),
@@ -155,31 +180,48 @@ export class AudioStreamReader {
 	}
 
 	/**
-	 * Read available samples into the provided buffer.
-	 * Returns the number of samples actually copied.
+	 * Read the visualization window ending at `targetSeconds` of playback.
+	 *
+	 * The player (mpv) and this decoder are independent processes, so the
+	 * decode head and the actual playback position drift apart (startup skew,
+	 * stalls, speed changes). Instead of sampling the decode head, we select
+	 * the window *at* the position the player reports, clamped to the nearest
+	 * available samples when the target hasn't been decoded yet (decode head
+	 * behind) or has already wrapped out of the ring (long stall).
 	 *
 	 * @param out - Float64Array to fill with samples (scaled ~+/-32768 for cavacore).
+	 * @param targetSeconds - Playback position (input seconds) to sample.
 	 * @returns Number of samples written to `out`.
 	 */
-	read(out: Float64Array): number {
-		const available = Math.min(
-			out.length,
-			this.totalSamplesWritten,
-			this.ringBuffer.length,
+	read(out: Float64Array, targetSeconds: number): number {
+		if (this.totalSamplesWritten <= 0 || out.length === 0) return 0;
+
+		const headSample = this.totalSamplesWritten - 1;
+		const coveredStart = Math.max(
+			0,
+			this.totalSamplesWritten - this.ringBuffer.length,
 		);
+
+		const targetSample = Math.max(
+			0,
+			Math.round((targetSeconds - this.startPosition) * this.sampleRate),
+		);
+
+		// Window end: the target, clamped to what's been decoded so far.
+		const endSample = Math.min(targetSample, headSample);
+		// Window start: at most out.length samples back, clamped to what the
+		// ring still holds (target older than the ring -> serve the oldest
+		// available window, which is the closest to the target).
+		const startSample = Math.max(
+			coveredStart,
+			Math.min(endSample, endSample - out.length + 1),
+		);
+		const available = endSample - startSample + 1;
 		if (available <= 0) return 0;
 
-		// Read the most recent `available` samples from the ring buffer
-		const readStart =
-			(this.writePos - available + this.ringBuffer.length) %
-			this.ringBuffer.length;
-
-		if (readStart + available <= this.ringBuffer.length) {
-			out.set(this.ringBuffer.subarray(readStart, readStart + available));
-		} else {
-			const firstChunk = this.ringBuffer.length - readStart;
-			out.set(this.ringBuffer.subarray(readStart, this.ringBuffer.length));
-			out.set(this.ringBuffer.subarray(0, available - firstChunk), firstChunk);
+		const ringLen = this.ringBuffer.length;
+		for (let i = 0; i < available; i++) {
+			out[i] = this.ringBuffer[(startSample + i) % ringLen];
 		}
 
 		return available;
@@ -254,26 +296,4 @@ export class AudioStreamReader {
 			}
 		}
 	}
-}
-
-/**
- * Build an ffmpeg atempo filter chain for a given speed.
- * atempo only accepts values in [0.5, 100.0], so we chain
- * multiple filters for extreme values (e.g. 0.25 = atempo=0.5,atempo=0.5).
- */
-function buildAtempoChain(speed: number): string {
-	const parts: string[] = [];
-	let remaining = Math.max(0.25, Math.min(4, speed));
-
-	while (remaining > 100) {
-		parts.push("atempo=100.0");
-		remaining /= 100;
-	}
-	while (remaining < 0.5) {
-		parts.push("atempo=0.5");
-		remaining /= 0.5;
-	}
-	parts.push(`atempo=${remaining}`);
-
-	return parts.join(",");
 }

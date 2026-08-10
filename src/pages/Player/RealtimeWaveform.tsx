@@ -88,6 +88,29 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		return true;
 	};
 
+	// ── Smooth position clock ──────────────────────────────────────────
+	//
+	// audio.position() updates at the useAudio poll rate (~150ms). Between
+	// polls, interpolate the position from wall time so the FFT window (and
+	// the played/future split) tracks the audio continuously instead of
+	// stepping. The 0.5s cap prevents extrapolating far beyond reality when
+	// the player stalls (e.g. network re-buffering).
+
+	let lastPolledPosition = 0;
+	let lastPolledAt = 0;
+	const smoothPosition = () => {
+		const pos = audio.position();
+		const now = performance.now();
+		if (pos !== lastPolledPosition) {
+			lastPolledPosition = pos;
+			lastPolledAt = now;
+			return pos;
+		}
+		if (lastPolledAt === 0) return pos;
+		const elapsed = Math.min((now - lastPolledAt) / 1000, 0.5);
+		return lastPolledPosition + elapsed * (audio.speed() ?? 1);
+	};
+
 	// ── Start/stop the visualization pipeline ──────────────────────────
 
 	const startVisualization = (url: string, position: number, speed: number) => {
@@ -139,7 +162,11 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 	const renderFrame = () => {
 		if (!cava?.isReady || !reader?.running || !sampleBuffer) return;
 
-		const count = reader.read(sampleBuffer);
+		// Sample the FFT window at the player's position, not the decode
+		// head — the reader decodes independently and only the position clock
+		// ties the bars to what's actually playing.
+		const target = smoothPosition();
+		const count = reader.read(sampleBuffer, target);
 		if (count === 0) return;
 
 		const input =
@@ -212,7 +239,7 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 	const playedRatio = () =>
 		audio.duration() <= 0
 			? 0
-			: Math.min(1, audio.position() / audio.duration());
+			: Math.min(1, smoothPosition() / audio.duration());
 
 	const renderLine = () => {
 		const bars = barData();

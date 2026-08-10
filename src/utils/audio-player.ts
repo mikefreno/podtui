@@ -12,6 +12,7 @@ import { platform } from "os";
 import { existsSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import type { Socket, Subprocess } from "bun";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -77,14 +78,13 @@ function mpvSocketPath(): string {
 
 export class MpvBackend implements AudioBackend {
 	readonly name: BackendName = "mpv";
-	private proc: ReturnType<typeof Bun.spawn> | null = null;
+	private proc: Subprocess | null = null;
 	private socketPath = mpvSocketPath();
 	private _playing = false;
 	private _position = 0;
 	private _duration = 0;
 	private _volume = 100;
 	private _speed = 1;
-	private pollTimer: ReturnType<typeof setInterval> | null = null;
 
 	async play(url: string, opts?: PlayOptions): Promise<void> {
 		await this.stop();
@@ -129,14 +129,13 @@ export class MpvBackend implements AudioBackend {
 		// Wait for socket to appear (mpv creates it async)
 		await this.waitForSocket(2000);
 
-		// Start polling position
-		this.startPolling();
+		// Position is fetched live from mpv on each getPosition() call (see
+		// below) — the UI polls it, so no internal poll timer is needed.
 
 		// Detect process exit
 		this.proc.exited
 			.then(() => {
 				this._playing = false;
-				this.stopPolling();
 			})
 			.catch(() => {});
 	}
@@ -146,79 +145,6 @@ export class MpvBackend implements AudioBackend {
 		while (Date.now() - start < timeoutMs) {
 			if (existsSync(this.socketPath)) return;
 			await new Promise((r) => setTimeout(r, 50));
-		}
-	}
-
-	private async ipc(command: unknown[]): Promise<unknown> {
-		try {
-			const socket = await Bun.connect({
-				unix: this.socketPath,
-				socket: {
-					data(_socket, data) {
-						// Response handling is done by reading below
-					},
-					error(_socket, err) {},
-					close() {},
-					open() {},
-				},
-			});
-
-			const payload = JSON.stringify({ command }) + "\n";
-			socket.write(payload);
-
-			// Read response with timeout
-			const response = await new Promise<string>((resolve) => {
-				let buf = "";
-				const reader = setInterval(() => {
-					// Check if we got a response already
-					if (buf.includes("\n")) {
-						clearInterval(reader);
-						resolve(buf);
-					}
-				}, 10);
-				setTimeout(() => {
-					clearInterval(reader);
-					resolve(buf);
-				}, 200);
-			});
-
-			socket.end();
-			if (response) {
-				try {
-					return JSON.parse(response.split("\n")[0]);
-				} catch {
-					return null;
-				}
-			}
-			return null;
-		} catch {
-			return null;
-		}
-	}
-
-	/** Send a command over mpv's IPC and get the parsed response data. */
-	private async ipcCommand(command: unknown[]): Promise<unknown> {
-		try {
-			const conn = await Bun.connect({
-				unix: this.socketPath,
-				socket: {
-					data() {},
-					error() {},
-					close() {},
-					open() {},
-				},
-			});
-
-			const payload = JSON.stringify({ command }) + "\n";
-			conn.write(payload);
-
-			// Give mpv a moment to process, then read via a fresh connection
-			await new Promise((r) => setTimeout(r, 30));
-			conn.end();
-
-			return null;
-		} catch {
-			return null;
 		}
 	}
 
@@ -246,65 +172,85 @@ export class MpvBackend implements AudioBackend {
 		}
 	}
 
-	/** Get a property value from mpv via IPC */
-	private async getProperty(name: string): Promise<number> {
+	/**
+	 * Get a property value from mpv via IPC.
+	 *
+	 * Resolves the parsed numeric value, or `undefined` when the read fails
+	 * (socket error, timeout, unparseable response, or the property being
+	 * unavailable — e.g. `time-pos` before playback starts). Failure is
+	 * distinct from a legitimate `0` so callers can keep the last known
+	 * value instead of snapping the position clock to zero on a transient
+	 * error; the next poll retries.
+	 *
+	 * mpv multiplexes unsolicited events (audio-reconfig, file-loaded, ...)
+	 * onto the same connection, so we line-buffer and only settle on the
+	 * line that carries the command response (`request_id` set). The socket
+	 * is closed once the response is handled — leaving it open leaks an fd
+	 * per poll, while closing it before mpv processes the request drops the
+	 * reply.
+	 */
+	private async getProperty(name: string): Promise<number | undefined> {
 		try {
-			return await new Promise<number>((resolve) => {
-				let result = 0;
-				const timeout = setTimeout(() => resolve(result), 300);
+			return await new Promise<number | undefined>((resolve) => {
+				let settled = false;
+				let sock: Socket | null = null;
+				let buf = "";
+				const done = (value: number | undefined) => {
+					if (settled) return;
+					settled = true;
+					clearTimeout(timeout);
+					try {
+						sock?.end();
+					} catch {
+						/* ignore */
+					}
+					resolve(value);
+				};
+				const timeout = setTimeout(() => done(undefined), 300);
 
 				Bun.connect({
 					unix: this.socketPath,
 					socket: {
-						data(_socket, data) {
-							try {
-								const text = Buffer.from(data).toString();
-								const parsed = JSON.parse(text.split("\n")[0]);
-								if (parsed?.data !== undefined) {
-									result = Number(parsed.data) || 0;
-								}
-							} catch {
-								/* ignore parse errors */
-							}
-							clearTimeout(timeout);
-							resolve(result);
-						},
-						error() {
-							clearTimeout(timeout);
-							resolve(0);
-						},
-						close() {},
 						open(socket) {
+							sock = socket;
 							socket.write(
 								JSON.stringify({ command: ["get_property", name] }) + "\n",
 							);
 						},
+						data(_socket, data) {
+							buf += Buffer.from(data).toString();
+							let nl = buf.indexOf("\n");
+							while (nl !== -1) {
+								const line = buf.slice(0, nl);
+								buf = buf.slice(nl + 1);
+								nl = buf.indexOf("\n");
+								try {
+									const parsed = JSON.parse(line);
+									// Events carry no request_id; only settle on
+									// the actual command response.
+									if (parsed?.request_id === undefined) continue;
+									if (parsed?.data !== undefined) {
+										done(Number(parsed.data) || 0);
+									} else {
+										done(undefined);
+									}
+									return;
+								} catch {
+									/* skip malformed lines */
+								}
+							}
+						},
+						error() {
+							done(undefined);
+						},
+						close() {
+							done(undefined);
+						},
 					},
-				}).catch(() => {
-					clearTimeout(timeout);
-					resolve(0);
-				});
+				}).catch(() => done(undefined));
 			});
 		} catch {
-			return 0;
-		}
-	}
-
-	private startPolling(): void {
-		this.stopPolling();
-		this.pollTimer = setInterval(async () => {
-			if (!this._playing || !this.proc) return;
-			this._position = await this.getProperty("time-pos");
-			if (this._duration <= 0) {
-				this._duration = await this.getProperty("duration");
-			}
-		}, 500);
-	}
-
-	private stopPolling(): void {
-		if (this.pollTimer) {
-			clearInterval(this.pollTimer);
-			this.pollTimer = null;
+			return undefined;
 		}
 	}
 
@@ -319,7 +265,6 @@ export class MpvBackend implements AudioBackend {
 	}
 
 	async stop(): Promise<void> {
-		this.stopPolling();
 		if (this.proc) {
 			try {
 				this.proc.kill();
@@ -359,12 +304,20 @@ export class MpvBackend implements AudioBackend {
 	}
 
 	async getPosition(): Promise<number> {
+		// Live-fetch `time-pos` so the position clock is as fresh as the
+		// UI's poll rate (the hook polls this at ~150ms). On a transient IPC
+		// failure, keep the last known value rather than returning 0.
+		if (this._playing && this.proc) {
+			const pos = await this.getProperty("time-pos");
+			if (pos !== undefined) this._position = pos;
+		}
 		return this._position;
 	}
 
 	async getDuration(): Promise<number> {
 		if (this._duration <= 0) {
-			this._duration = await this.getProperty("duration");
+			const dur = await this.getProperty("duration");
+			if (dur !== undefined && dur > 0) this._duration = dur;
 		}
 		return this._duration;
 	}

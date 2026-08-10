@@ -122,17 +122,21 @@ function registerExitTeardown(): void {
 function startPolling(): void {
 	stopPolling();
 	pollCount = 0;
+	// Guard against overlapping ticks if a socket read ever outlives the
+	// interval (getPosition opens a fresh mpv IPC connection per call).
+	let pollInFlight = false;
 	pollTimer = setInterval(async () => {
-		if (!backend || !isPlaying()) return;
+		if (!backend || !isPlaying() || pollInFlight) return;
+		pollInFlight = true;
 		try {
 			const pos = await backend.getPosition();
 			const dur = await backend.getDuration();
 			setPosition(pos);
 			if (dur > 0) setDuration(dur);
 
-			// Save progress every ~5 seconds (10 ticks * 500ms)
+			// Save progress every ~5 seconds (33 ticks * 150ms)
 			pollCount++;
-			if (pollCount % 10 === 0) {
+			if (pollCount % 33 === 0) {
 				const ep = currentEpisode();
 				if (ep) {
 					const progressStore = useProgressStore();
@@ -156,8 +160,10 @@ function startPolling(): void {
 			}
 		} catch {
 			// Backend may have been disposed
+		} finally {
+			pollInFlight = false;
 		}
-	}, 500);
+	}, 150);
 }
 
 function stopPolling(): void {
