@@ -30,6 +30,7 @@ const defaultSettings: AppSettings = {
 	playbackSpeed: 1,
 	downloadPath: "",
 	transparentBackground: false,
+	showSelectionMarker: false,
 	visualizer: defaultVisualizerSettings,
 };
 

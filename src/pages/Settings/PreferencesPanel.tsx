@@ -20,6 +20,7 @@ import { useFeedStore } from "@/stores/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { useInputFocusNav } from "@/hooks/useInputFocusNav";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
+import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 import {
 	NavMode,
 	useNavigation,
@@ -86,6 +87,18 @@ export function usePreferencesItems(): SettingItem[] {
 			toggle: () =>
 				app.updateSettings({
 					transparentBackground: !settings().transparentBackground,
+				}),
+		},
+		{
+			id: "showSelectionMarker",
+			label: "Selection Marker",
+			kind: "toggle",
+			display: () => (settings().showSelectionMarker ? "On" : "Off"),
+			help: () =>
+				`Show the ❯ marker on the focused row of every list (tabs, shows, episodes, results).\nType: toggle\nDefault: off\nCurrent: ${settings().showSelectionMarker ? "On" : "Off"}\nSpace/Enter to toggle.`,
+			toggle: () =>
+				app.updateSettings({
+					showSelectionMarker: !settings().showSelectionMarker,
 				}),
 		},
 		{
@@ -427,6 +440,7 @@ function WhitelistEditor() {
 					const focused = () =>
 						!nav.inputFocused() && index() === wlCursorClamped();
 					const ref = useScrollIntoView(focused);
+					const marker = useSelectionMarker();
 					const bg = () => (focused() ? theme.primary : undefined);
 					const fg = () => (focused() ? theme.surface : theme.text);
 					return (
@@ -434,7 +448,6 @@ function WhitelistEditor() {
 							ref={ref}
 							flexDirection="row"
 							gap={1}
-							paddingLeft={1}
 							paddingRight={1}
 							backgroundColor={bg()}
 							onMouseDown={() => {
@@ -445,7 +458,7 @@ function WhitelistEditor() {
 								wlToggle(feed.id);
 							}}
 						>
-							<text fg={fg()}>{focused() ? "❯" : " "}</text>
+							<text fg={fg()}>{focused() ? marker() : " "}</text>
 							<text fg={fg()}>{inList(feed.id) ? "●" : "○"}</text>
 							<text fg={fg()}>
 								{feed.customName || feed.podcast.title}

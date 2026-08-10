@@ -38,6 +38,7 @@ import { useDownloadItems } from "./DownloadManager";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
+import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 
 export const SettingsPaneCount = 1;
 
@@ -436,17 +437,17 @@ function Row(props: {
 				? theme.selectedListItemText ?? theme.text
 				: theme.text;
 	const ref = useScrollIntoView(() => props.focused);
+	const marker = useSelectionMarker();
 	return (
 		<box
 			ref={ref}
 			flexDirection="row"
 			gap={1}
-			paddingLeft={1}
 			paddingRight={1}
 			backgroundColor={bg()}
 			onMouseDown={props.onMouseDown}
 		>
-			<text fg={fg()}>{props.focused ? "❯" : " "}</text>
+			<text fg={fg()}>{props.focused ? marker() : " "}</text>
 			{props.icon && nerd && <text fg={fg()}>{props.icon}</text>}
 			<text fg={fg()}>{props.label}</text>
 			<Show when={props.value}>

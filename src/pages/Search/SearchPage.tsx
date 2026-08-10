@@ -42,6 +42,7 @@ import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
+import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 
 export const SearchPaneCount = 1;
 
@@ -52,6 +53,7 @@ function SearchPage() {
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
 	const nav = useNavigation();
+	const marker = useSelectionMarker();
 
 	const stack = nav.depthStack;
 	const depth = nav.currentDepth;
@@ -288,7 +290,6 @@ function SearchPage() {
 										ref={ref}
 										flexDirection="row"
 										gap={1}
-										paddingLeft={1}
 										paddingRight={1}
 										backgroundColor={
 											typing()
@@ -311,7 +312,7 @@ function SearchPage() {
 													: focusFg(index(), lf(), isActive())
 											}
 										>
-											{index() === lf() && !typing() ? "❯" : " "}
+											{index() === lf() && !typing() ? marker() : " "}
 										</text>
 										<text
 											fg={
@@ -365,7 +366,6 @@ function SearchPage() {
 									ref={ref}
 									flexDirection="column"
 									gap={0}
-									paddingLeft={1}
 									paddingRight={1}
 									backgroundColor={focusBg(index(), fi(), isActive())}
 									onMouseDown={() => {
@@ -375,7 +375,7 @@ function SearchPage() {
 								>
 									<box flexDirection="row" gap={1}>
 										<text fg={focusFg(index(), fi(), isActive())}>
-											{index() === fi() ? "❯" : " "}
+											{index() === fi() ? marker() : " "}
 										</text>
 										<text fg={focusFg(index(), fi(), isActive())}>
 											{result.podcast.title}

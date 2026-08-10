@@ -81,6 +81,8 @@ export type AppSettings = {
 	downloadPath: string;
 	/** Render the app background transparent (let the terminal's own bg show). */
 	transparentBackground: boolean;
+	/** Show the `❯` cursor marker on the focused row of every list (default: off). */
+	showSelectionMarker: boolean;
 	visualizer: VisualizerSettings;
 };
 

@@ -19,6 +19,7 @@ import { For } from "solid-js";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation } from "@/context/NavigationContext";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
+import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 import { TABS } from "@/utils/navigation";
 import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
 
@@ -51,6 +52,7 @@ export function TabListPane(props: { muted?: boolean }) {
 	const nerd = supportsNerdFonts();
 	const { theme } = useTheme();
 	const nav = useNavigation();
+	const marker = useSelectionMarker();
 
 	const cursor = () => nav.tabCursor();
 	const activeTab = () => nav.activeTab();
@@ -104,7 +106,7 @@ export function TabListPane(props: { muted?: boolean }) {
 						}}
 					>
 						{/* ── selection marker (j/k cursor) ─────────────────────────── */}
-						<text fg={focusFg(tab)}>{isCursor() ? "❯" : " "}</text>
+						<text fg={focusFg(tab)}>{isCursor() ? marker() : " "}</text>
 						{nerd && (
 							<text fg={focusFg(tab)} paddingRight={1}>
 								{TAB_ICON[tab]}

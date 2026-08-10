@@ -35,6 +35,7 @@ import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
+import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 
 export const MyShowsPaneCount = 1;
 
@@ -47,6 +48,7 @@ export function MyShowsPage() {
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
 	const nav = useNavigation();
+	const marker = useSelectionMarker();
 
 	const stack = nav.depthStack;
 	const depth = nav.currentDepth;
@@ -254,12 +256,11 @@ export function MyShowsPage() {
 							ref={ref}
 							flexDirection="row"
 							gap={1}
-							paddingLeft={1}
 							paddingRight={1}
 							backgroundColor={focusBg(index(), lf(), false)}
 						>
 							<text fg={focusFg(index(), lf(), false)}>
-								{index() === lf() ? "❯" : " "}
+								{index() === lf() ? marker() : " "}
 							</text>
 							<text fg={focusFg(index(), lf(), false)}>{showTitle(feed)}</text>
 							<text fg={muted()}>({feed.episodes.length})</text>
@@ -299,7 +300,6 @@ export function MyShowsPage() {
 									ref={ref}
 									flexDirection="row"
 									gap={1}
-									paddingLeft={1}
 									paddingRight={1}
 									backgroundColor={focusBg(index(), lf(), isActive())}
 									onMouseDown={() => {
@@ -308,7 +308,7 @@ export function MyShowsPage() {
 									}}
 								>
 									<text fg={focusFg(index(), lf(), isActive())}>
-										{index() === lf() ? "❯" : " "}
+										{index() === lf() ? marker() : " "}
 									</text>
 									<text fg={focusFg(index(), lf(), isActive())}>
 										{showTitle(feed)}
@@ -354,7 +354,6 @@ export function MyShowsPage() {
 									ref={ref}
 									flexDirection="column"
 									gap={0}
-									paddingLeft={1}
 									paddingRight={1}
 									backgroundColor={focusBg(index(), lf(), isActive())}
 									onMouseDown={() => {
@@ -364,7 +363,7 @@ export function MyShowsPage() {
 								>
 									<box flexDirection="row" gap={1}>
 										<text fg={focusFg(index(), lf(), isActive())}>
-											{index() === lf() ? "❯" : " "}
+											{index() === lf() ? marker() : " "}
 										</text>
 										<text fg={focusFg(index(), lf(), isActive())}>
 											{ep.episodeNumber ? `#${ep.episodeNumber} ` : ""}

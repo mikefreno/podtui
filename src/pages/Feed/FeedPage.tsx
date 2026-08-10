@@ -40,6 +40,7 @@ import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
+import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 
 export const FeedPaneCount = 1;
 
@@ -55,6 +56,7 @@ function FeedPage() {
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
 	const nav = useNavigation();
+	const marker = useSelectionMarker();
 
 	// ── flat episode list (depth 0 — the only depth Feed has) ────────────────
 	const episodes = createMemo<EpItem[]>(
@@ -257,7 +259,6 @@ function FeedPage() {
 							ref={ref}
 							flexDirection="column"
 							gap={0}
-							paddingLeft={1}
 							paddingRight={1}
 							backgroundColor={focusBg(index(), fi(), isActive())}
 							onMouseDown={() => {
@@ -267,7 +268,7 @@ function FeedPage() {
 						>
 							<box flexDirection="row" gap={1}>
 								<text fg={focusFg(index(), fi(), isActive())}>
-									{index() === fi() ? "❯" : " "}
+									{index() === fi() ? marker() : " "}
 								</text>
 								<text fg={focusFg(index(), fi(), isActive())}>
 									{item.episode.episodeNumber
@@ -304,7 +305,6 @@ function FeedPage() {
 					ref={moreRef}
 					flexDirection="row"
 					gap={1}
-					paddingLeft={1}
 					paddingRight={1}
 					backgroundColor={focusBg(episodes().length, focusedRow(), isActive())}
 					onMouseDown={() => {
@@ -313,7 +313,7 @@ function FeedPage() {
 					}}
 				>
 					<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
-						{focusedOnMore() ? "❯" : " "}
+						{focusedOnMore() ? marker() : " "}
 					</text>
 					{nerd && (
 						<text fg={focusFg(episodes().length, focusedRow(), isActive())}>

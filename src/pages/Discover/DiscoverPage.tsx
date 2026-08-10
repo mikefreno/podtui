@@ -33,6 +33,7 @@ import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
+import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 
 export const DiscoverPaneCount = 1;
 
@@ -43,6 +44,7 @@ function DiscoverPage() {
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
 	const nav = useNavigation();
+	const marker = useSelectionMarker();
 
 	const depth = nav.currentDepth;
 	const focus = (d: number = depth()) => nav.depthFocus(d);
@@ -182,12 +184,11 @@ function DiscoverPage() {
 								ref={ref}
 								flexDirection="row"
 								gap={1}
-								paddingLeft={1}
 								paddingRight={1}
 								backgroundColor={focusBg(index(), lf(), false)}
 							>
 								<text fg={focusFg(index(), nav.depthFocus(0), false)}>
-									{index() === nav.depthFocus(0) ? "❯" : " "}
+									{index() === nav.depthFocus(0) ? marker() : " "}
 								</text>
 								{nerd && (
 									<text fg={focusFg(index(), nav.depthFocus(0), false)}>
@@ -219,7 +220,6 @@ function DiscoverPage() {
 								ref={ref}
 								flexDirection="row"
 								gap={1}
-								paddingLeft={1}
 								paddingRight={1}
 								backgroundColor={focusBg(index(), lf(), isActive())}
 								onMouseDown={() => {
@@ -229,7 +229,7 @@ function DiscoverPage() {
 								}}
 							>
 								<text fg={focusFg(index(), lf(), isActive())}>
-									{index() === lf() ? "❯" : " "}
+									{index() === lf() ? marker() : " "}
 								</text>
 								{nerd && (
 									<text fg={focusFg(index(), lf(), isActive())}>
@@ -268,7 +268,6 @@ function DiscoverPage() {
 									ref={ref}
 									flexDirection="column"
 									gap={0}
-									paddingLeft={1}
 									paddingRight={1}
 									backgroundColor={focusBg(index(), lf(), isActive())}
 									onMouseDown={() => {
@@ -278,7 +277,7 @@ function DiscoverPage() {
 								>
 									<box flexDirection="row" gap={1}>
 										<text fg={focusFg(index(), lf(), isActive())}>
-											{index() === lf() ? "❯" : " "}
+											{index() === lf() ? marker() : " "}
 										</text>
 										<text fg={focusFg(index(), lf(), isActive())}>
 											{podcast.title}
