@@ -7,10 +7,12 @@
  * and serves windows *at a requested playback position* to the caller.
  *
  * This is independent from the actual playback backend — it's a
- * read-only "tap" on the audio for FFT analysis purposes. Because it is a
- * separate decoder, sync with the player is maintained by pacing decode at
- * the player's clock rate (`-readrate <speed>`) and sampling the window at
- * the position the player reports, never at the decode head.
+ * read-only "tap" on the audio for FFT analysis purposes. Sync with the
+ * player is maintained by pacing decode at the player's clock rate
+ * (`-readrate <speed>`) while front-loading a burst of LEAD_SECONDS
+ * (`-readrate_initial_burst`) so the decode head leads the player
+ * position by a stable lead — read() samples at the exact position the
+ * player reports, never at the decode head.
  */
 
 /** PCM output format constants */
@@ -26,6 +28,26 @@ const BYTES_PER_SAMPLE = 2; // s16le
  * again — the renderer only samples at the current playback position.
  */
 const RING_BUFFER_SAMPLES = SAMPLE_RATE * 10;
+
+/**
+ * Decode-head lead over the player position, in seconds.
+ *
+ * `-readrate_initial_burst LEAD_SECONDS` makes ffmpeg emit this much audio
+ * immediately on start, then pace at realtime (`-readrate speed`) after.
+ * The decode head thus leads the player by ~LEAD_SECONDS from the very
+ * first frame. read() samples at the player's current position, which is
+ * always behind the head — so it finds freshly decoded samples there
+ * instead of clamping to stale data.
+ *
+ * Bare `-readrate speed` (no burst) starts ffmpeg ε behind mpv (input-open
+ * + first-packet latency) and, since both advance at the same rate, never
+ * catches up — the bars lag by ε (up to several seconds on network
+ * streams). The burst eliminates that constant offset.
+ *
+ * Must stay within the ring window (RING_BUFFER_SAMPLES ~10s) so the
+ * lead audio hasn't wrapped out by the time the player reaches it.
+ */
+const LEAD_SECONDS = 3;
 
 export interface AudioStreamReaderOptions {
 	/** Audio URL or file path to decode */
@@ -79,8 +101,10 @@ export class AudioStreamReader {
 	 * immediately.
 	 *
 	 * @param startPosition Seek position in seconds (default: 0).
-	 * @param speed Playback speed multiplier (default: 1). Applies ffmpeg
-	 *              atempo filter so visualization stays in sync with audio.
+	 * @param speed Playback speed multiplier (default: 1). Paces ffmpeg
+	 *              at the player's advance rate so decode tracks the
+	 *              player clock; `-readrate_initial_burst` front-loads
+	 *              a LEAD_SECONDS head start.
 	 */
 	start(startPosition = 0, speed = 1): void {
 		// Always kill the previous process first — no early return on _running
@@ -101,17 +125,18 @@ export class AudioStreamReader {
 			"ffmpeg",
 			"-loglevel",
 			"quiet",
-			// Pace input at the player's advance rate (speed× native) rather
-			// than native rate. Decoding slower than the player makes the
-			// decoded position fall behind the playback position linearly
-			// (bars drift away at (speed-1)s per second); decoding unthrottled
-			// fills the ring with audio seconds ahead of the player (laggy
-			// bars) and hits EOF early (bars freeze). `-readrate speed` keeps
-			// the decode head just ahead of the position the renderer samples,
-			// tracking the player clock with only mpv's startup latency as a
-			// constant offset — absorbed by the ring buffer.
+			// Pace input at the player's advance rate (speed× native). Combined
+			// with -readrate_initial_burst below, the decode head starts
+			// LEAD_SECONDS ahead of the player and advances at the same rate —
+			// read() samples at the player position and always finds fresh data.
 			"-readrate",
 			String(readRate),
+			// Front-load LEAD_SECONDS of audio immediately so the decode head
+			// leads the player from the very first frame. Without this, ffmpeg
+			// starts ε behind mpv (input-open + first-packet latency) and,
+			// pacing at the same rate, never catches up — bars lag by ε.
+			"-readrate_initial_burst",
+			String(LEAD_SECONDS),
 		];
 
 		// `-reconnect*` are http-protocol options: ffmpeg rejects them at

@@ -168,8 +168,9 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		if (!cava?.isReady || !reader?.running || !sampleBuffer) return;
 
 		// Sample the FFT window at the player's position, not the decode
-		// head — the reader decodes independently and only the position clock
-		// ties the bars to what's actually playing.
+		// head — the reader decodes independently (paced at the player's
+		// clock rate with a LEAD_SECONDS burst head start) and only the
+		// position clock ties the bars to what's actually playing.
 		const target = smoothPosition();
 		const count = reader.read(sampleBuffer, target);
 		// Never feed a partial FFT window to cava.

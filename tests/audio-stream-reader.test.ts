@@ -170,3 +170,70 @@ test.skipIf(!hasFfmpeg)(
 		}
 	},
 );
+
+test.skipIf(!hasFfmpeg)(
+	"sustained render loop: ffmpeg stays alive and decode head maintains a lead over the player",
+	async () => {
+		// Real wall-clock time is required here: this test validates ffmpeg's
+		// actual decode pacing (-readrate + -readrate_initial_burst) against
+		// the platform clock. Deterministic time control cannot reproduce the
+		// race where ffmpeg exits early and the bars freeze — that only
+		// surfaces when a real process writes to a real pipe.
+		//
+		// Simulates the actual render loop: for ~5s of wall time, advance a
+		// simulated player position at 1× realtime and call read() each frame.
+		// The decode head must stay ahead of the player position so read()
+		// always returns 512 samples, and ffmpeg must not exit early (which
+		// would freeze the bars). This test would have caught the
+		// backpressure-pacing failure where ffmpeg decoded all data into the
+		// pipe buffer instantly, exited, and the readLoop stopped.
+		const wav = join(
+			tmpdir(),
+			`podtui-reader-${process.pid}-${Date.now()}.wav`,
+		);
+		writeSineWav(wav, 30);
+		const reader = new AudioStreamReader({ url: wav });
+		try {
+			reader.start(0, 1);
+
+			const FRAME_MS = 33;
+			const DURATION_MS = 5000;
+			const out = new Float64Array(512);
+			let successes = 0;
+			let failures = 0;
+			let minLead = Infinity;
+
+			const start = Date.now();
+			for (let frame = 0; Date.now() - start < DURATION_MS; frame++) {
+				const playerPos = (Date.now() - start) / 1000;
+				const count = reader.read(out, playerPos);
+				if (count === 512) successes++;
+				else failures++;
+
+				// The decode head should stay ahead of the player position.
+				const headPos = reader.samplesWritten / SAMPLE_RATE;
+				const lead = headPos - playerPos;
+				if (frame > 3) minLead = Math.min(minLead, lead);
+
+				await Bun.sleep(FRAME_MS);
+			}
+
+			// ffmpeg must still be running — it must not have exited early.
+			expect(reader.running).toBe(true);
+
+			// The vast majority of frames should return a full window.
+			// A few early failures during ffmpeg startup are acceptable.
+			expect(failures).toBeLessThan(5);
+			expect(successes).toBeGreaterThan(100);
+
+			// The decode head must maintain a positive lead over the player.
+			// Without -readrate_initial_burst, the head would lag behind by
+			// the ffmpeg startup latency and never catch up.
+			expect(minLead).toBeGreaterThan(0);
+		} finally {
+			reader.stop();
+			await Bun.$`rm -f ${wav}`.quiet();
+		}
+	},
+	{ timeout: 15000 },
+);
