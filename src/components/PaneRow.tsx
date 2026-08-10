@@ -10,25 +10,26 @@
  * Column semantics (per the yazi depth model):
  *   parent  — the previous-depth list. Renders a muted `—` placeholder and
  *             KEEPS its 1/5 slot when blank (never collapses to width 0).
- *             Borderless (no left/right/top/bottom edge).
+ *             Borderless (no left/right/top/bottom edge). Carries the single
+ *             header row: the CURRENT column's title renders top-left in the
+ *             parent's slot (the panes above current/preview were removed).
  *   current — the current-depth list. The only focusable content column; it
- *             is the ONLY bordered column (full border, always muted — no
- *             active-border highlight).
- *   preview — detail of the hovered item in `current`. Borderless.
+ *             is the ONLY bordered column — left/right edges only, always
+ *             muted (no active-border highlight, focused or not).
+ *   preview — detail of the hovered item in `current`. Borderless, no header.
  *
  * The primitive is purely structural: callers pass their own JSX per column
- * (static elements or accessors) plus header labels. Theme colors are resolved
- * internally via `useTheme()`. Only the current column's `<scrollbox>` receives
- * `focused`, so scroll focus follows the cursor (j/k stay in the current pane).
+ * (static elements or accessors) plus the current-column title. Theme colors
+ * are resolved internally via `useTheme()`. Only the current column's
+ * `<scrollbox>` receives `focused`, so scroll focus follows the cursor (j/k
+ * stay in the current pane).
  *
  * Example:
  *   <PaneRow
  *     parent={parentList}
  *     current={currentList}
  *     preview={detail}
- *     parentLabel="Up"
  *     currentLabel="List · 42"
- *     previewLabel="Detail"
  *     focused={isActive}
  *   />
  */
@@ -52,9 +53,9 @@ export type PaneRowProps = {
 	/** Preview column content (detail of the hovered item). Omit/undefined
 	 *  together with `panes={2}` to render a 2-pane parent|current row. */
 	preview?: PaneContent;
-	parentLabel?: PaneLabel;
+	/** Title of the current column — rendered once, top-left in the parent
+	 *  pane's header slot (the per-pane Up/Detail headers are gone). */
 	currentLabel?: PaneLabel;
-	previewLabel?: PaneLabel;
 	/** Whether the current column's `<scrollbox>` receives scroll focus. Defaults to
 	 *  true; pass `false` (or a signal) when the row is inactive. Does NOT change
 	 *  border colors — the current column's border is always muted. */
@@ -116,23 +117,32 @@ function Pane(props: {
 			flexBasis={0}
 			height="100%"
 		>
-			{/* ── slim header label row ─────────────────────────────────────────── */}
-			<box
-				height={1}
-				paddingLeft={1}
-				backgroundColor={
-					themeContext.transparentBackground()
-						? "transparent"
-						: theme.background
-				}
-			>
-				<text fg={theme.textSecondary}>{props.label()}</text>
-			</box>
-			{/* ── bordered scrollbox ────────────────────────────────────────────── */}
+			{/* ── title row: rendered only when the pane carries a label ────────── */}
+			<Show when={props.label() !== ""}>
+				<box
+					height={1}
+					paddingLeft={1}
+					backgroundColor={
+						themeContext.transparentBackground()
+							? "transparent"
+							: theme.background
+					}
+				>
+					<text fg={theme.textSecondary}>{props.label()}</text>
+				</box>
+			</Show>
+			{/* ── scrollbox; border always muted (focused or not) ──────────────── */}
 			<scrollbox
 				height="100%"
 				focused={scrollFocused()}
 				border={props.border}
+				// Only supply colors when a border is requested — opentui flips a
+				// borderless box to bordered when borderColor/focusedBorderColor
+				// are passed, which would frame the parent/preview panes too.
+				borderColor={props.border === false ? undefined : theme.border}
+				focusedBorderColor={
+					props.border === false ? undefined : theme.border
+				}
 				backgroundColor={
 					themeContext.transparentBackground()
 						? "transparent"
@@ -159,9 +169,9 @@ export function PaneRow(props: PaneRowProps) {
 	const currentContent = normalizeContent(props.current);
 	const previewContent = normalizeContent(props.preview);
 
-	const parentLabel = createMemo(() => resolveLabel(props.parentLabel));
+	// The single title: the CURRENT column's label, rendered in the parent
+	// pane's header slot (top-left). Current/preview panes have no headers.
 	const currentLabel = createMemo(() => resolveLabel(props.currentLabel));
-	const previewLabel = createMemo(() => resolveLabel(props.previewLabel));
 
 	// 2-pane mode (parent|current) grows the current column to fill the
 	// preview slot. Defaults to 3 (parent|current|preview).
@@ -174,27 +184,27 @@ export function PaneRow(props: PaneRowProps) {
 
 	return (
 		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
-			{/* ── parent (1/5) — previous-depth list; always muted ─────────────── */}
+			{/* ── parent (1/5) — previous-depth list; title row top-left ───────── */}
 			<Pane
 				grow={PANE_RATIO.parent}
-				label={parentLabel}
+				label={currentLabel}
 				content={parentContent}
 				border={false}
 				scrollFocused={() => false}
 			/>
-			{/* ── current — the focused list; no border, no highlight ─────────── */}
+			{/* ── current — the focused list; left/right borders only ─────────── */}
 			<Pane
 				grow={currentGrow()}
-				label={currentLabel}
+				label={() => ""}
 				content={currentContent}
-				border={false}
+				border={["left", "right"]}
 				scrollFocused={() => focused()}
 			/>
-			{/* ── preview (2/5) — hovered-item detail; always muted ────────────── */}
+			{/* ── preview (2/5) — hovered-item detail; no border, no header ────── */}
 			<Show when={panes() === 3}>
 				<Pane
 					grow={PANE_RATIO.preview}
-					label={previewLabel}
+					label={() => ""}
 					content={previewContent}
 					border={false}
 					scrollFocused={() => false}

@@ -23,19 +23,10 @@ import { useAppStore } from "@/stores/app";
 import { useToast } from "@/ui/toast";
 import { emit, on } from "@/utils/event-bus";
 import { LayerGraph } from "@/utils/layer-graph";
-import { TABS, TabPaneCount } from "@/utils/navigation";
+import { TABS } from "@/utils/navigation";
 import { createDispatcher } from "@/utils/dispatch";
 import { TabListPane } from "@/components/TabPanel";
 import { PaneRow } from "@/components/PaneRow";
-
-const TAB_LABEL: Record<TABS, string> = {
-	[TABS.FEED]: "Feed",
-	[TABS.MYSHOWS]: "My Shows",
-	[TABS.DISCOVER]: "Discover",
-	[TABS.SEARCH]: "Search",
-	[TABS.PLAYER]: "Player",
-	[TABS.SETTINGS]: "Settings",
-};
 
 export function Shell() {
 	const theme = useTheme();
@@ -271,9 +262,7 @@ export function Shell() {
 								<text fg={t.textMuted}>j/k move · l/Enter open a tab</text>
 							</box>
 						}
-						parentLabel="Up"
 						currentLabel="Tabs"
-						previewLabel=""
 						focused
 					/>
 				</Show>
@@ -295,15 +284,6 @@ export function Shell() {
 						<>
 							<text fg={t.accent} paddingLeft={1}>
 								{modeLabel()}
-							</text>
-							<text fg={t.textMuted} paddingLeft={1}>
-								{nav.atRootTab()
-									? "Tabs · root"
-									: `${TAB_LABEL[nav.activeTab()]} · ${
-											nav.isDepthTab()
-												? `depth ${nav.currentDepth()}`
-												: `pane ${nav.activePane()}/${TabPaneCount[nav.activeTab()]}`
-										}`}
 							</text>
 							<Show when={nav.selectedIds().length > 0}>
 								<text fg={t.warning} paddingLeft={1}>

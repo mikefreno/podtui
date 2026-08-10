@@ -431,9 +431,7 @@ function SearchPage() {
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}
-			parentLabel={() => (depth() >= 1 ? "Query" : "Up")}
 			currentLabel={currentLabel}
-			previewLabel="Detail"
 			focused={isActive}
 		/>
 	);

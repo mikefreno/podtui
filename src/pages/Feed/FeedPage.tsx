@@ -301,9 +301,7 @@ function FeedPage() {
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}
-			parentLabel="Up"
 			currentLabel={currentLabel}
-			previewLabel="Detail"
 			focused={isActive}
 		/>
 	);

@@ -432,9 +432,7 @@ export function MyShowsPage() {
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}
-			parentLabel={() => (depth() >= 1 ? "Shows" : "Up")}
 			currentLabel={currentLabel}
-			previewLabel="Detail"
 			focused={isActive}
 		/>
 	);

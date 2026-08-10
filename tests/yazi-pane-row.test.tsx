@@ -8,8 +8,9 @@
  *  • Unit: three columns render at 1:2:2 (e.g. 20/40/40 of 100) even when the
  *    parent and preview children are null, and the blank parent keeps its
  *    slot with a muted placeholder.
- *  • Integration: the panes are fully borderless — `focused` toggles
- *    scroll-following but never surfaces a border or accent ring.
+ *  • Integration: the current pane renders muted left/right border edges
+ *    only (no full box, no accent ring) — `focused` toggles scroll-following
+ *    but never changes the border; parent and preview stay borderless.
  *
  * Runs via `bun test`. The `[test] preload = "@opentui/solid/preload"` entry
  * in bunfig.toml registers the solid JSX transform for the test runner, so
@@ -24,29 +25,32 @@ import { PaneRow } from "../src/components/PaneRow";
 type Span = { text: string };
 type Frame = { cols: number; lines: { spans: Span[] }[] };
 
-/** Column of the first span whose text contains `label` in the given line. */
-function labelColumn(line: Frame["lines"][number], label: string): number {
+/** Positions of all `│` border glyphs in the first body line that has any. */
+function borderColumns(frame: Frame): number[] {
+	const line = frame.lines.find((l) =>
+		l.spans.some((s) => s.text.includes("│")),
+	);
+	if (!line) return [];
+	const cols: number[] = [];
 	let col = 0;
 	for (const sp of line.spans) {
-		if (sp.text.includes(label)) return col;
-		col += sp.text.length;
+		for (const ch of sp.text) {
+			if (ch === "│") cols.push(col);
+			col++;
+		}
 	}
-	return -1;
+	return cols;
 }
 
 /**
- * Column widths, measured from the header-label row (`Up|List|Detail`).
- * Each label box has a 1-col left padding, so a column's left edge is the
- * label start minus 1; the last column runs to the frame's right edge.
+ * Column widths, measured from the current pane's left/right border glyphs:
+ * the parent runs from column 0 to the left border, the current pane spans
+ * both borders, the preview runs from the right border to the frame's edge.
  */
 function columnWidths(spans: Frame): number[] {
-	const line = spans.lines[0];
-	if (!line) return [];
-	const up = labelColumn(line, "Up");
-	const list = labelColumn(line, "List");
-	const detail = labelColumn(line, "Detail");
-	if (up < 0 || list < 0 || detail < 0) return [];
-	return [list - up, detail - list, spans.cols - detail + 1];
+	const [a, b] = borderColumns(spans);
+	if (b === undefined) return [];
+	return [a, b - a + 1, spans.cols - b - 1];
 }
 
 /** Entire frame as plain text — used to assert no border glyphs remain. */
@@ -77,9 +81,7 @@ async function renderPaneRow(props: TestPaneProps): Promise<{
 					parent={props.parent as any}
 					current={props.current as any}
 					preview={props.preview as any}
-					parentLabel="Up"
 					currentLabel="List"
-					previewLabel="Detail"
 					focused={props.focused as any}
 				/>
 			</ThemeProvider>
@@ -87,14 +89,14 @@ async function renderPaneRow(props: TestPaneProps): Promise<{
 		{ width: props.width ?? 100, height: props.height ?? 8, useThread: false },
 	);
 	// ThemeProvider only mounts its children once the theme resolves (async
-	// palette/theme loading). Poll the header-label row until it renders, so
-	// the captured frame below is actually a mounted PaneRow.
+	// palette/theme loading). Poll the title row until it renders, so the
+	// captured frame below is actually a mounted PaneRow.
 	let spans: Frame | null = null;
 	for (let i = 0; i < 40 && !spans; i++) {
 		await setup.renderOnce();
 		const frame = setup.captureSpans() as unknown as Frame;
 		const head = frame.lines[0]?.spans.map((s) => s.text).join("") ?? "";
-		if (head.includes("Up")) spans = frame;
+		if (head.includes("List")) spans = frame;
 		else await new Promise((r) => setTimeout(r, 100));
 	}
 	if (!spans) throw new Error("PaneRow did not render before timeout");
@@ -163,14 +165,14 @@ describe("PaneRow layout", () => {
 	});
 });
 
-// ── Integration: the accent border was removed — no border or highlight ────
-describe("PaneRow focus ring (borderless)", () => {
-	// The current column no longer carries a focus ring: whatever `focused`
-	// resolves to, no pane renders a border or an accent color. `focused`
-	// still gates scroll-following, but it must never surface a separator.
-	const borderGlyphs = /[┌┐└┘─│]/;
+// ── Integration: the current pane carries muted left/right borders only ────
+describe("PaneRow current-pane borders", () => {
+	// The current column renders left/right edge glyphs (│) only — never a
+	// full box. `focused` gates scroll-following but never changes the border
+	// (always muted — no accent ring), and parent/preview stay borderless.
+	const boxGlyphs = /[┌┐└┘─]/;
 
-	test("focused=true renders no borders and no accent ring", async () => {
+	test("focused=true renders left/right borders on the current pane only", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
 			current: () => <text>ITEM</text>,
@@ -179,10 +181,13 @@ describe("PaneRow focus ring (borderless)", () => {
 		});
 		cleanups.push(destroy);
 
-		expect(frameText(spans)).not.toMatch(borderGlyphs);
+		// 100-wide row splits as 20 / 40 / 40: the current pane's edges sit at
+		// columns 20 and 59. No horizontal or corner glyphs — edges only.
+		expect(borderColumns(spans)).toEqual([20, 59]);
+		expect(frameText(spans)).not.toMatch(boxGlyphs);
 	});
 
-	test("focused=false renders no borders and no accent ring", async () => {
+	test("focused=false renders the same muted borders (no accent ring)", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
 			current: () => <text>ITEM</text>,
@@ -191,7 +196,8 @@ describe("PaneRow focus ring (borderless)", () => {
 		});
 		cleanups.push(destroy);
 
-		expect(frameText(spans)).not.toMatch(borderGlyphs);
+		expect(borderColumns(spans)).toEqual([20, 59]);
+		expect(frameText(spans)).not.toMatch(boxGlyphs);
 	});
 
 	test("accepts an accessor for focused (reactive boolean)", async () => {
@@ -202,7 +208,8 @@ describe("PaneRow focus ring (borderless)", () => {
 			focused: () => true,
 		});
 		cleanups.push(destroy);
-		expect(frameText(spans)).not.toMatch(borderGlyphs);
+		expect(borderColumns(spans)).toEqual([20, 59]);
+		expect(frameText(spans)).not.toMatch(boxGlyphs);
 
 		const { spans: spans2, destroy: destroy2 } = await renderPaneRow({
 			parent: null,
@@ -211,16 +218,18 @@ describe("PaneRow focus ring (borderless)", () => {
 			focused: () => false,
 		});
 		cleanups.push(destroy2);
-		expect(frameText(spans2)).not.toMatch(borderGlyphs);
+		expect(borderColumns(spans2)).toEqual([20, 59]);
+		expect(frameText(spans2)).not.toMatch(boxGlyphs);
 	});
 
-	test("defaults to focused (still borderless, no accent ring)", async () => {
+	test("defaults to focused (same muted borders)", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
 			current: () => <text>ITEM</text>,
 			preview: null,
 		});
 		cleanups.push(destroy);
-		expect(frameText(spans)).not.toMatch(borderGlyphs);
+		expect(borderColumns(spans)).toEqual([20, 59]);
+		expect(frameText(spans)).not.toMatch(boxGlyphs);
 	});
 });

@@ -119,7 +119,6 @@ export function PlayerPage() {
 		<PaneRow
 			parent={parentContent}
 			current={currentContent}
-			parentLabel="Up"
 			currentLabel="Player"
 			panes={2}
 			focused={isActive}

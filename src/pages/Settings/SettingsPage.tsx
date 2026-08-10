@@ -267,12 +267,6 @@ export function SettingsPage() {
 		if (d === 1) return sectionForDepth1()?.label ?? "Items";
 		return editorItem()?.label ?? "Editor";
 	};
-	const parentLabel = () => {
-		const d = depth();
-		if (d === 1) return "Sections";
-		if (d === 2) return sectionForDepth1()?.label ?? "";
-		return "Up";
-	};
 
 	// ── parent pane: previous-depth list (blank at depth 0) ────────────────
 	// Sibling <Show> blocks per depth (mirrors the preview pane) so Solid
@@ -384,9 +378,7 @@ export function SettingsPage() {
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}
-			parentLabel={parentLabel}
 			currentLabel={currentLabel}
-			previewLabel="Detail"
 			focused={isActive}
 		/>
 	);

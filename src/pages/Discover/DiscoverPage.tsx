@@ -376,9 +376,7 @@ function DiscoverPage() {
 			parent={parentContent}
 			current={currentContent}
 			preview={previewContent}
-			parentLabel={() => (depth() >= 1 ? "Categories" : "Up")}
 			currentLabel={currentLabel}
-			previewLabel="Detail"
 			focused={isActive}
 		/>
 	);
