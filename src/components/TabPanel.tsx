@@ -20,6 +20,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useNavigation } from "@/context/NavigationContext";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { TABS } from "@/utils/navigation";
+import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
 
 const TAB_LABEL: Record<TABS, string> = {
 	[TABS.FEED]: "Feed",
@@ -30,12 +31,24 @@ const TAB_LABEL: Record<TABS, string> = {
 	[TABS.SETTINGS]: "Settings",
 };
 
+/** Nerd Font glyph per tab (rendered only when the terminal supports them). */
+const TAB_ICON: Record<TABS, string> = {
+	[TABS.FEED]: NF_ICONS.feed,
+	[TABS.MYSHOWS]: NF_ICONS.shows,
+	[TABS.DISCOVER]: NF_ICONS.discover,
+	[TABS.SEARCH]: NF_ICONS.search,
+	[TABS.PLAYER]: NF_ICONS.player,
+	[TABS.SETTINGS]: NF_ICONS.settings,
+};
+
 /** Numeric TABS values, in declaration order (1..TabsCount). */
 const TAB_ORDER = Object.values(TABS).filter(
 	(v): v is TABS => typeof v === "number",
 ) as TABS[];
 
 export function TabListPane(props: { muted?: boolean }) {
+	// Static: detection never changes mid-session.
+	const nerd = supportsNerdFonts();
 	const { theme } = useTheme();
 	const nav = useNavigation();
 
@@ -92,6 +105,11 @@ export function TabListPane(props: { muted?: boolean }) {
 					>
 						{/* ── selection marker (j/k cursor) ─────────────────────────── */}
 						<text fg={focusFg(tab)}>{isCursor() ? "❯" : " "}</text>
+						{nerd && (
+							<text fg={focusFg(tab)} paddingRight={1}>
+								{TAB_ICON[tab]}
+							</text>
+						)}
 						<text fg={isCursor() ? focusFg(tab) : theme.textMuted}>{tab}</text>
 						<text fg={labelFg()} paddingLeft={1}>
 							{TAB_LABEL[tab]}

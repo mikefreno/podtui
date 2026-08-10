@@ -27,6 +27,7 @@ import {
 	type PaneId,
 } from "@/context/NavigationContext";
 import { on, off } from "@/utils/event-bus";
+import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { SettingItem, SettingsSectionDef } from "./types";
 import { usePreferencesItems } from "./PreferencesPanel";
@@ -45,28 +46,37 @@ const SECTIONS: SettingsSectionDef[] = [
 		id: 0,
 		label: "Sync",
 		description: "Import/export subscriptions and sync status.",
+		icon: NF_ICONS.sync,
 	},
 	{
 		id: 1,
 		label: "Sources",
 		description: "Podcast search/RSS sources — add, enable, remove.",
+		icon: NF_ICONS.sources,
 	},
 	{
 		id: 2,
 		label: "Preferences",
 		description: "Theme, font, playback speed, explicit/auto-download.",
+		icon: NF_ICONS.preferences,
 	},
 	{
 		id: 3,
 		label: "Visualizer",
 		description: "Audio visualizer: bars, sensitivity, cutoffs.",
+		icon: NF_ICONS.visualizer,
 	},
 	{
 		id: 4,
 		label: "Downloads",
 		description: "Manage downloaded episodes — delete by show or individually.",
+		icon: NF_ICONS.downloads,
 	},
 ];
+
+// Static: detection never changes mid-session. Module-level because the Row
+// component below (a sibling module function) needs it too.
+const nerd = supportsNerdFonts();
 
 /** Resolve the items for a section id at render time. */
 function sectionItems(sectionId: number): SettingItem[] {
@@ -286,6 +296,7 @@ export function SettingsPage() {
 					{(section, index) => (
 						<Row
 							label={section.label}
+							icon={section.icon}
 							focused={index() === focusedSectionIdx()}
 							active={false}
 						/>
@@ -315,6 +326,7 @@ export function SettingsPage() {
 					{(section, index) => (
 						<Row
 							label={section.label}
+							icon={section.icon}
 							focused={index() === focusedSectionIdx()}
 							active={isActive()}
 							onMouseDown={() => {
@@ -407,6 +419,7 @@ function Row(props: {
 	focused: boolean;
 	active: boolean;
 	hint?: string;
+	icon?: string;
 	onMouseDown?: () => void;
 }) {
 	const { theme } = useTheme();
@@ -434,6 +447,7 @@ function Row(props: {
 			onMouseDown={props.onMouseDown}
 		>
 			<text fg={fg()}>{props.focused ? "❯" : " "}</text>
+			{props.icon && nerd && <text fg={fg()}>{props.icon}</text>}
 			<text fg={fg()}>{props.label}</text>
 			<Show when={props.value}>
 				<box flexGrow={1} />

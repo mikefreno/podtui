@@ -41,5 +41,7 @@ export interface SettingsSectionDef {
 	id: number;
 	label: string;
 	description: string;
+	/** Nerd Font glyph for the section row (rendered only when supported). */
+	icon: string;
 	items?: () => SettingItem[];
 }

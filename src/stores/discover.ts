@@ -20,17 +20,17 @@ export interface DiscoverCategory {
 }
 
 export const DISCOVER_CATEGORIES: DiscoverCategory[] = [
-	{ id: "all", name: "All", icon: "*" },
-	{ id: "technology", name: "Technology", icon: ">" },
-	{ id: "science", name: "Science", icon: "~" },
-	{ id: "comedy", name: "Comedy", icon: ")" },
-	{ id: "news", name: "News", icon: "!" },
-	{ id: "business", name: "Business", icon: "$" },
-	{ id: "health", name: "Health", icon: "+" },
-	{ id: "education", name: "Education", icon: "?" },
-	{ id: "sports", name: "Sports", icon: "#" },
-	{ id: "true-crime", name: "True Crime", icon: "%" },
-	{ id: "arts", name: "Arts", icon: "@" },
+	{ id: "all", name: "All", icon: "\uF0CA" },
+	{ id: "technology", name: "Technology", icon: "\uF2DB" },
+	{ id: "science", name: "Science", icon: "\uF0C3" },
+	{ id: "comedy", name: "Comedy", icon: "\uF118" },
+	{ id: "news", name: "News", icon: "\uF1EA" },
+	{ id: "business", name: "Business", icon: "\uF0B1" },
+	{ id: "health", name: "Health", icon: "\uF21E" },
+	{ id: "education", name: "Education", icon: "\uF19D" },
+	{ id: "sports", name: "Sports", icon: "\uF1E3" },
+	{ id: "true-crime", name: "True Crime", icon: "\uF00E" },
+	{ id: "arts", name: "Arts", icon: "\uF1FC" },
 ];
 
 // ── Remote featured-shows manifest ───────────────────────────────────────────

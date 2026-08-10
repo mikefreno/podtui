@@ -27,6 +27,7 @@ import {
 	type DepthFrame,
 } from "@/context/NavigationContext";
 import { on, off } from "@/utils/event-bus";
+import { supportsNerdFonts } from "@/utils/nerd-fonts";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
@@ -36,6 +37,8 @@ import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 export const DiscoverPaneCount = 1;
 
 function DiscoverPage() {
+	// Static: detection never changes mid-session.
+	const nerd = supportsNerdFonts();
 	const discoverStore = useDiscoverStore();
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
@@ -186,6 +189,11 @@ function DiscoverPage() {
 								<text fg={focusFg(index(), nav.depthFocus(0), false)}>
 									{index() === nav.depthFocus(0) ? "❯" : " "}
 								</text>
+								{nerd && (
+									<text fg={focusFg(index(), nav.depthFocus(0), false)}>
+										{cat.icon}
+									</text>
+								)}
 								<text fg={focusFg(index(), nav.depthFocus(0), false)}>
 									{cat.name}
 								</text>
@@ -223,6 +231,11 @@ function DiscoverPage() {
 								<text fg={focusFg(index(), lf(), isActive())}>
 									{index() === lf() ? "❯" : " "}
 								</text>
+								{nerd && (
+									<text fg={focusFg(index(), lf(), isActive())}>
+										{cat.icon}
+									</text>
+								)}
 								<text fg={focusFg(index(), lf(), isActive())}>{cat.name}</text>
 							</box>
 						);

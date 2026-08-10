@@ -32,6 +32,7 @@ import {
 } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { on, off } from "@/utils/event-bus";
+import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
@@ -45,6 +46,8 @@ export const FeedPaneCount = 1;
 type EpItem = { episode: Episode; feed: Feed };
 
 function FeedPage() {
+	// Static: detection never changes mid-session.
+	const nerd = supportsNerdFonts();
 	const feedStore = useFeedStore();
 	const downloadStore = useDownloadStore();
 	const audioNav = useAudioNavStore();
@@ -312,6 +315,11 @@ function FeedPage() {
 					<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
 						{focusedOnMore() ? "❯" : " "}
 					</text>
+					{nerd && (
+						<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
+							{NF_ICONS.more}
+						</text>
+					)}
 					<Show
 						when={!feedStore.isLoadingMore()}
 						fallback={<LoadingIndicator label="Fetching…" />}
