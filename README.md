@@ -26,18 +26,9 @@ external player with full transport control — all from your terminal.
 
 - A terminal with UTF-8 and modern color support (kitty, iTerm2, WezTerm,
   tmux, GNOME Terminal, etc.).
-- An **audio player** on `PATH`. PodTui auto-detects in priority order:
-
-  | Player   | Platforms      | Seek | Speed | Position tracking |
-  |----------|----------------|:----:|:-----:|:------------------|
-  | `mpv`     | any            | ✔    | ✔     | ✔ (recommended)   |
-  | `ffplay`  | any            | ✔    | ✘     | ✘                 |
-  | `afplay`  | macOS built-in | ✔    | ✔     | ✘                 |
-  | `open`/`xdg-open` | any    | ✘    | ✘     | ✘                 |
-
-  Install `mpv` for the best experience (`brew install mpv`,
-  `sudo apt install mpv`, `pacman -S mpv`). You can force a specific backend
-  with `PODTUI_AUDIO_BACKEND=mpv|ffplay|afplay|system|none`.
+- **mpv** on `PATH` for audio playback. PodTui drives mpv over JSON IPC, so
+  seek, speed, and position tracking all work. Without `mpv` on `PATH`,
+  playback is a silent no-op (the `none` backend).
 
 ## Installation
 
@@ -47,7 +38,7 @@ Linux (arm64/x64). Pick whichever fits your platform.
 ### 1. Homebrew (macOS)
 
 ```sh
-brew install mikefreno/tap/podtui   # requires mpv: brew install mpv
+brew install mikefreno/tap/podtui
 ```
 
 > The formula installs the standalone binary plus its two native libraries
@@ -98,8 +89,7 @@ symlink, and pulls in `mpv` (the sole audio backend) as a dependency.
 >
 > Publishing is on hold until [AUR account registrations](https://aur.archlinux.org)
 > reopen (suspended while the AUR team works on suspicious-package
-> moderation). Once a key can be registered, push `PKGBUILD` + `.SRCINFO`
-> with `git push ssh://aur@aur.archlinux.org/podtui-bin` and update this note.
+> moderation).
 
 ### 4. From source
 
@@ -177,11 +167,13 @@ default (`$XDG_CONFIG_HOME/podtui` if set).
 
 | File | Purpose |
 |------|---------|
-| `feeds.json` | Your subscribed feeds (RSS/podcast sources) |
-| `sources.json` | Custom feed sources |
+| `config.json` | Unified settings (theme, playback speed, download path), feeds, and custom feed sources |
 | `downloads.json` | Downloaded episode metadata |
 | `keybinds.jsonc` | Keybinding remaps (see above) |
 | `themes/` | Optional custom theme files |
+
+Legacy `feeds.json`, `sources.json`, and `app-state.json` are auto-migrated
+into `config.json` on first run.
 
 Env overrides: `PODTUI_AUDIO_BACKEND`, `XDG_CONFIG_HOME`. Startup also reads
 the same OpenTUI environment variables.
