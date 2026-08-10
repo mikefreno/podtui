@@ -200,17 +200,43 @@ if (COMPILE) {
 		);
 
 		// Ad-hoc sign so the bundle launches cleanly on fresh machines.
+		// Identity overridable via PODTUI_CODESIGN_IDENTITY (e.g. a Developer
+		// ID cert for release builds); default ad-hoc.
+		const signIdentity = process.env.PODTUI_CODESIGN_IDENTITY || "-";
 		const sign = Bun.spawnSync([
 			"codesign",
 			"--force",
 			"--deep",
 			"-s",
-			"-",
+			signIdentity,
 			appRoot,
 		]);
 		if (sign.exitCode !== 0) {
 			console.warn(
 				`Warning: codesign failed (${sign.stderr.toString().trim()}) — app bundle unsigned`,
+			);
+		}
+
+		// Sign the nested mpv LAST with our bundle identifier. mediaremoted
+		// resolves the Now Playing client from the registering process's
+		// code-signing identifier — without an explicit --identifier codesign
+		// stamps "mpv" (its basename) and the audio center shows a blank
+		// placeholder. Must run after the bundle sign above (a later bundle
+		// re-seal would re-derive the basename identifier).
+		const signMpv = Bun.spawnSync([
+			"codesign",
+			"--force",
+			"-s",
+			signIdentity,
+			"--identifier",
+			"com.mikefreno.podtui",
+			join(macosDir, "mpv"),
+		]);
+		if (signMpv.exitCode !== 0) {
+			console.warn(
+				`Warning: nested mpv signing failed (${signMpv.stderr
+					.toString()
+					.trim()}) — Now Playing attribution won't work`,
 			);
 		}
 		console.log(`App bundle: ${appRoot}`);
