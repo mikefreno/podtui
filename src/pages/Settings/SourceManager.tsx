@@ -103,6 +103,8 @@ function AddSourceForm() {
 					onInput={setName}
 					placeholder="My Custom Feed"
 					width={25}
+					textColor={theme.text}
+					focusedTextColor={theme.accent}
 				/>
 			</box>
 			<box flexDirection="row" gap={1}>
@@ -116,6 +118,8 @@ function AddSourceForm() {
 					}}
 					placeholder="https://example.com/feed.rss"
 					width={35}
+					textColor={theme.text}
+					focusedTextColor={theme.accent}
 				/>
 			</box>
 			<box

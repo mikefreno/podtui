@@ -159,34 +159,42 @@ function DiscoverPage() {
 			: `${focusedCategory()?.name ?? "Discover"} · ${podcasts().length}`;
 
 	// ── parent pane: previous-depth list (muted/blank at depth 0) ─────────────
-	// Stable <Show> gate (not a ternary root swap) so the parent list
-	// mounts/unmounts cleanly on depth change.
+	// Sibling <Show> blocks per depth (the known-good opentui disposal
+	// pattern, mirrors Settings): a STABLE fragment root whose inner <Show>
+	// children toggle on depth change, so the old subtree is disposed instead
+	// of left orphaned next to the new one (single <Show with fallback> and
+	// ternary root swaps both leak the previous root).
 	const parentContent = () => (
-		<Show when={depth() >= 1} fallback={<TabListPane muted />}>
-			<For each={categories()}>
-				{(cat, index) => {
-					const lf = () => nav.depthFocus(0);
-					const ref = useScrollIntoView(() => index() === lf());
-					return (
-						<box
-							ref={ref}
-							flexDirection="row"
-							gap={1}
-							paddingLeft={1}
-							paddingRight={1}
-							backgroundColor={focusBg(index(), lf(), false)}
-						>
-							<text fg={focusFg(index(), nav.depthFocus(0), false)}>
-								{index() === nav.depthFocus(0) ? "❯" : " "}
-							</text>
-							<text fg={focusFg(index(), nav.depthFocus(0), false)}>
-								{cat.name}
-							</text>
-						</box>
-					);
-				}}
-			</For>
-		</Show>
+		<>
+			<Show when={depth() === 0}>
+				<TabListPane muted />
+			</Show>
+			<Show when={depth() >= 1}>
+				<For each={categories()}>
+					{(cat, index) => {
+						const lf = () => nav.depthFocus(0);
+						const ref = useScrollIntoView(() => index() === lf());
+						return (
+							<box
+								ref={ref}
+								flexDirection="row"
+								gap={1}
+								paddingLeft={1}
+								paddingRight={1}
+								backgroundColor={focusBg(index(), lf(), false)}
+							>
+								<text fg={focusFg(index(), nav.depthFocus(0), false)}>
+									{index() === nav.depthFocus(0) ? "❯" : " "}
+								</text>
+								<text fg={focusFg(index(), nav.depthFocus(0), false)}>
+									{cat.name}
+								</text>
+							</box>
+						);
+					}}
+				</For>
+			</Show>
+		</>
 	);
 
 	// ── current pane ───────────────────────────────────────────────────────────

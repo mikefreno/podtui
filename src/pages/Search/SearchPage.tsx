@@ -74,12 +74,16 @@ function SearchPage() {
 	// j/k (yielding to a non-existent input) and only the scrollbox's native
 	// scroll responds.
 	//
-	// The effect only re-runs on a depth transition, so Escape (defocus) and
-	// `s` (refocus) at the same depth are not clobbered.
+	// The depth STACK signal is also written by focus moves (setDepthFocus),
+	// so gate the sync on the depth VALUE via a memo: the effect must re-run
+	// only on an actual depth transition. Without the memo every j/k at the
+	// query depth re-focuses the input (undoing Escape), which keeps the
+	// recents list unreachable by keyboard.
 	onMount(() => nav.setInputFocused(depth() === 0));
 	onCleanup(() => nav.setInputFocused(false));
+	const isQueryDepth = createMemo(() => depth() === 0);
 	createEffect(() => {
-		nav.setInputFocused(depth() === 0);
+		nav.setInputFocused(isQueryDepth());
 	});
 
 	// ── results (depth 1) ─────────────────────────────────────────────────────
@@ -213,15 +217,25 @@ function SearchPage() {
 				: theme.text;
 
 	// ── parent pane: previous-depth content (tab list at depth 0) ──────────────
+	// Sibling <Show> blocks per depth (the known-good opentui disposal
+	// pattern, mirrors Settings): a STABLE fragment root whose inner <Show>
+	// children toggle on depth change, so the old subtree is disposed instead
+	// of left orphaned next to the new one (single <Show with fallback> and
+	// ternary root swaps both leak the previous root).
 	const parentContent = () => (
-		<Show when={depth() >= 1} fallback={<TabListPane muted />}>
-			<box flexDirection="column" gap={1} padding={1}>
-				<text fg={theme.textSecondary}>Query</text>
-				<text fg={muted()}>{submittedQuery() || "(empty)"}</text>
-				<box height={1} />
-				<text fg={muted()}>h: back to query</text>
-			</box>
-		</Show>
+		<>
+			<Show when={depth() === 0}>
+				<TabListPane muted />
+			</Show>
+			<Show when={depth() >= 1}>
+				<box flexDirection="column" gap={1} padding={1}>
+					<text fg={theme.textSecondary}>Query</text>
+					<text fg={muted()}>{submittedQuery() || "(empty)"}</text>
+					<box height={1} />
+					<text fg={muted()}>h: back to query</text>
+				</box>
+			</Show>
+		</>
 	);
 
 	// ── current pane ────────────────────────────────────────────────────────────
@@ -239,6 +253,9 @@ function SearchPage() {
 							placeholder="Enter podcast name..."
 							focused={inputActive()}
 							width={28}
+							textColor={theme.text}
+							focusedTextColor={theme.accent}
+							cursorColor={theme.accent}
 						/>
 					</box>
 					<Show when={searchStore.isSearching()}>
@@ -274,6 +291,10 @@ function SearchPage() {
 										onMouseDown={() => {
 											nav.setActivePane(DEPTH_CENTER_PANE);
 											nav.setDepthFocus(index(), 0);
+											// A recent is an action, not an item: clicking
+											// it re-runs that search (focus-only would be
+											// invisible — the input still owns the keys).
+											selectRecent(query);
 										}}
 									>
 										<text fg={focusFg(index(), lf(), isActive())}>

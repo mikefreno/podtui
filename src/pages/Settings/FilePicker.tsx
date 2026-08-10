@@ -21,6 +21,9 @@ export function FilePicker(props: FilePickerProps) {
 				onInput={props.onChange}
 				placeholder="/path/to/sync-file.json"
 				style={{ width: 40 }}
+				textColor={theme.text}
+				focusedTextColor={theme.accent}
+				cursorColor={theme.accent}
 			/>
 			<text fg={theme.text}>Format: {format}</text>
 		</box>

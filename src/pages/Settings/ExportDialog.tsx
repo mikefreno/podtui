@@ -32,6 +32,9 @@ export function ExportDialog() {
 					value={filename[0]()}
 					onInput={filename[1]}
 					style={{ width: 30 }}
+					textColor={theme.text}
+					focusedTextColor={theme.accent}
+					cursorColor={theme.accent}
 				/>
 			</box>
 			<box style={{ flexDirection: "row", gap: 1 }}>
