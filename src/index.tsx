@@ -182,9 +182,18 @@ async function handlePlay(feeds: Feed[], arg: string): Promise<void> {
 
 	try {
 		const { createAudioBackend } = await import("./utils/audio-player")
+		const { fetchCoverArt } = await import("./utils/cover-art")
 		const backend = createAudioBackend()
 		if (episodeResult.audioUrl) {
-			await backend.play(episodeResult.audioUrl)
+			// Stage the podcast cover so the system Now Playing shows
+			// artwork (mpv --cover-art-files), like the UI path does.
+			const coverArtPath = feedResult.podcast.coverUrl
+				? await fetchCoverArt(feedResult.podcast.coverUrl)
+				: null
+			await backend.play(episodeResult.audioUrl, {
+				mediaTitle: `${feedResult.podcast.title} — ${episodeResult.title}`,
+				coverArtPath: coverArtPath ?? undefined,
+			})
 			console.log("Playback started (use the UI to control)")
 		} else {
 			console.log("No audio URL available for this episode")

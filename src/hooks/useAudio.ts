@@ -13,6 +13,8 @@
  */
 
 import { createSignal, onCleanup } from "solid-js";
+import { unlinkSync } from "fs";
+import { fetchCoverArt, coverTempPath } from "../utils/cover-art";
 import {
 	createAudioBackend,
 	detectPlayers,
@@ -109,6 +111,11 @@ function registerExitTeardown(): void {
 		} catch {
 			/* best-effort at exit */
 		}
+		try {
+			unlinkSync(coverTempPath());
+		} catch {
+			/* best-effort at exit */
+		}
 	};
 	process.on("exit", teardown);
 	for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
@@ -173,6 +180,11 @@ function stopPolling(): void {
 	}
 }
 
+// ── Cover art for system Now Playing ─────────────────────────────────────────
+// macOS shows the media session's albumart in the audio center; mpv reads it
+// from `--cover-art-files`. Shared helper (utils/cover-art.ts) fetches the
+// podcast cover to a temp file BEFORE playback starts, bounded to 3s.
+
 async function play(episode: Episode): Promise<void> {
 	const b = ensureBackend();
 	setError(null);
@@ -192,6 +204,9 @@ async function play(episode: Episode): Promise<void> {
 		const feedStore = useFeedStore();
 		const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
 		const podcastTitle = feed?.customName || feed?.podcast.title || "";
+		const coverArtPath = feed?.podcast.coverUrl
+			? await fetchCoverArt(feed.podcast.coverUrl)
+			: null;
 
 		// Resume from saved progress if available and not completed
 		const savedProgress = progressStore.get(episode.id);
@@ -205,6 +220,7 @@ async function play(episode: Episode): Promise<void> {
 			speed: spd,
 			startPosition: startPos > 0 ? startPos : undefined,
 			mediaTitle: podcastTitle ? `${podcastTitle} — ${episode.title}` : episode.title,
+			coverArtPath: coverArtPath ?? undefined,
 		});
 
 		setCurrentEpisode(episode);
@@ -373,6 +389,9 @@ async function switchBackend(name: BackendName): Promise<void> {
 				.feeds()
 				.find((f) => f.podcast.id === ep.podcastId);
 			const podcastTitle = feed?.customName || feed?.podcast.title || "";
+			const coverArtPath = feed?.podcast.coverUrl
+				? await fetchCoverArt(feed.podcast.coverUrl)
+				: null;
 			await backend.play(ep.audioUrl, {
 				startPosition: pos,
 				volume: vol,
@@ -380,6 +399,7 @@ async function switchBackend(name: BackendName): Promise<void> {
 				mediaTitle: podcastTitle
 					? `${podcastTitle} — ${ep.title}`
 					: ep.title,
+				coverArtPath: coverArtPath ?? undefined,
 			});
 			setIsPlaying(true);
 			startPolling();
