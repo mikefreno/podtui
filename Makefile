@@ -47,9 +47,8 @@ native:
 	scripts/build-cavacore.sh
 
 ## Standalone binary + native-libs tarball for the current platform.
-## Unaffected by bunfig.toml at build time. Note: the compiled runtime reads
-## the launching process's CWD bunfig.toml, so smoke tests must run the binary
-## from a bunfig-free dir (see release.yml).
+## Built with bunfig autoload disabled (build.ts sets autoloadBunfig: false),
+## so the embedded runtime ignores any bunfig.toml in the launching directory.
 dist:
 	bun run build.ts --compile
 

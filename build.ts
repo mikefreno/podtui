@@ -82,6 +82,12 @@ if (COMPILE) {
 		plugins: [solidPlugin],
 		compile: {
 			outfile,
+			// Don't let the embedded runtime autoload the launching CWD's
+			// bunfig.toml. A top-level `preload` there (common in Bun project
+			// dirs) resolves against the CWD, not the binary, so startup dies
+			// with "preload not found". With autoload disabled, the binary is
+			// config-independent and boots from any directory.
+			autoloadBunfig: false,
 		},
 	});
 	console.log(`Compiled standalone binary: ${outfile}`);

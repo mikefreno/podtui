@@ -1,9 +1,8 @@
-# NO top-level `preload` here — intentional. A compiled PodTUI binary's
-# embedded Bun runtime reads the launching process's CWD bunfig.toml, and a
-# top-level `preload` entry (e.g. "@opentui/solid/preload", which the
-# standalone cannot resolve) makes the binary die at startup with
-# "preload not found". Dev/test still get the solid transform via explicit
-# `--preload` flags in package.json and the [test] section below.
+# No top-level `preload` here — dev/test get the solid JSX transform via the
+# explicit `--preload` flags in package.json and the [test] section below.
+# Releases don't read this file at all: build.ts compiles the standalone with
+# `autoloadBunfig: false`, so its embedded runtime ignores any bunfig.toml in
+# the launching directory — no more "preload not found" from CWD bunfigs.
 
 [test]
 preload = "@opentui/solid/preload"

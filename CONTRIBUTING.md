@@ -38,6 +38,7 @@ The app is a TUI — it expects a real terminal (Ghostty, kitty, iTerm2,
 | `bun run lint`        | Type-check                                         |
 | `bun run build`    | Bundle JS into `dist/` + copy native libs (the `podtui` npm script path)  |
 | `make dist`        | Compile the standalone binary + make the current platform's tarball       |
+| `make dist-mac` / `make dist-linux` | Aliases for `dist` on their platform (CI runs these)          |
 | `make clean`       | Remove `dist/`                                                             |
 
 ## Repository layout
@@ -90,19 +91,21 @@ Cavacore smoke test: `bun tests/cavacore-smoke.ts`
 
 ## Gotchas (read before touching anything)
 
-1. **Never add a top-level `preload` to `bunfig.toml`.**
-   A compiled PodTui binary's embedded runtime reads the *launching process's*
-   CWD `bunfig.toml`, and a `preload` entry points at a module the standalone
-   can't resolve (`@opentui/solid/preload`) → the binary dies at startup with
-   `preload not found`. This is why `bunfig.toml` has **no** top-level
-   `preload`; dev-mode preloading happens via explicit `--preload` flags in
-   `package.json`. The `[test]` section *does* keep a preload — that only
-   affects `bun test`.
+1. **The compiled binary must keep bunfig autoload disabled.**
+   `build.ts` compiles the standalone with `autoloadBunfig: false`, so its
+   embedded runtime *never* reads the launching CWD's `bunfig.toml`. Without
+   that flag, a top-level `preload` in the CWD bunfig (common in Bun project
+   dirs) resolves against the CWD rather than the binary and kills startup
+   with `preload not found`. Don't remove the flag. Preloads for dev/test
+   belong in the explicit `--preload` flags in `package.json` and the
+   `[test]` section of `bunfig.toml` — not as a top-level entry.
 
-2. **Smoke-test the compiled binary from a bunfig-free dir.**
-   Because of (1), `./dist/podtui --version` run from the repo root launched
-   inside CI would fail. CI always unpacks the tarball into a `mktemp` dir
-   before booting. Do the same when testing a release build locally.
+2. **Smoke-test the binary from a dir with a poisoned bunfig.**
+   The CI smoke test unpacks the tarball into a `mktemp` dir, drops a
+   `bunfig.toml` containing an unresolvable top-level `preload` next to it,
+   and boots the binary — proving bunfig autoload stayed disabled. `./dist/
+   podtui --version` must work from any directory, including the repo root;
+   do the same check when testing a release build locally.
 
 3. **Homebrew's dylib-repair warning is benign.**
    `brew install` may print “load commands do not fit in the header … needs
@@ -166,7 +169,7 @@ Releases are built and published from **tags**
    test: `brew install mikefreno/tap/podtui`.
 5. **AUR packaging** (`packaging/aur/PKGBUILD`): the `podtui-bin` package is
    staged, not yet published (AUR account registrations are closed; see the
-   README note in section 3). On each release, keep the AUR sources in sync
+   README's Installation section). On each release, keep the AUR sources in sync
    with the new tag: bump `pkgver`, recompute the two tarball `sha256sums`
    entries, keep the `LICENSE` asset source (the workflow above uploads
    `LICENSE` to every release), and regenerate `packaging/aur/.SRCINFO` with
@@ -190,13 +193,36 @@ make dist          # builds the binary + tarball for THIS machine only
 
 Bun cannot cross-compile — the other platforms come from CI.
 
+## Distribution & packaging
+
+A release tarball is three files sitting side by side: the `podtui` binary
+plus its two FFI libraries (`libopentui.<dylib|so>`,
+`libcavacore.<dylib|so>`). The sibling rule above is why they ship together.
+
+PodTui deliberately ships **no** `.deb`, `.rpm`, Flatpak, or Snap packages:
+for a terminal app that's overwhelmingly installed through repositories or
+archives, those formats add desktop-sandboxing overhead and a packaging tax
+with little benefit. Instead:
+
+- **GitHub Release tarballs** are the universal path — one upload per
+  OS/arch, works on any distro with `curl` + `tar`.
+- **AUR (`podtui-bin`)** covers Arch/Manjaro with the same binary through the
+  native package manager.
+- **Nix / cross-distro** users build from source (or a Nix flake can be added
+  later).
+
+This keeps maintenance to a single build per OS/arch while still reaching the
+vast majority of desktop Linux users. The AUR PKGBUILD lives in
+`packaging/aur/` and can be built locally to test before publication:
+
+```bash
+cd packaging/aur && makepkg -si
+```
+
 ---
 
 ## Open items / things to sort out
 
-- **LICENSE**: `README.md` says "TBD — choose and document a license before
-  the first release". Pick one (MIT/BSD-3) and add `LICENSE` + update the
-  README footer.
 - **Native libs in `dist/` still need committing?** No — they're built from
   sources kept in the repo (`cava/`, `node_modules/@opentui/core-*`). Only
   `src/native/libcavacore.dylib` is a committed binary artifact; macOS arm64

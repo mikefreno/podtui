@@ -66,12 +66,14 @@ jobs:
         env:
           DIST_TAR: podtui-${{ matrix.plat }}-${{ matrix.arch }}.tar.gz
         run: |
-          # The embedded runtime reads the launching process's CWD bunfig.toml.
-          # This repo's bunfig lists a preload the standalone can't resolve
-          # ("preload not found"), so kicking the binary from the workspace root
-          # would falsely fail every build. cd into a clean dir first.
+          # The binary is compiled with bunfig autoload disabled
+          # (autoloadBunfig: false in build.ts), so it must boot even from a
+          # directory holding a bunfig.toml with a top-level preload the
+          # standalone can't resolve. Plant one to make this a real regression
+          # test for "preload not found".
           SMOKE_DIR=$(mktemp -d)
           tar -xzf "dist/$DIST_TAR" -C "$SMOKE_DIR"
+          printf 'preload = ["./definitely-missing.ts"]\n' > "$SMOKE_DIR/bunfig.toml"
           cd "$SMOKE_DIR"
           ./podtui-*/podtui --version
 
