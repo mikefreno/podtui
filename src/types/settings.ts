@@ -78,6 +78,8 @@ export type AppSettings = {
 	theme: ThemeName;
 	fontSize: number;
 	playbackSpeed: number;
+	/** Playback volume 0–1 (default: 1 = 100%). */
+	volume: number;
 	downloadPath: string;
 	/** Render the app background transparent (let the terminal's own bg show). */
 	transparentBackground: boolean;

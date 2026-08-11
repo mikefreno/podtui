@@ -32,6 +32,7 @@ const defaultSettings: AppSettings = {
 	theme: "system",
 	fontSize: 14,
 	playbackSpeed: 1,
+	volume: 1,
 	downloadPath: "",
 	transparentBackground: false,
 	showSelectionMarker: false,

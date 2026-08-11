@@ -28,6 +28,7 @@ const defaultSettings: AppSettings = {
 	theme: "system",
 	fontSize: 14,
 	playbackSpeed: 1,
+	volume: 1,
 	downloadPath: "",
 	transparentBackground: false,
 	showSelectionMarker: false,
@@ -55,12 +56,14 @@ function createAppStore() {
 	// Start with defaults; async load will update once ready
 	const [state, setState] = createSignal<AppState>(defaultState);
 
-	// Fire-and-forget async initialisation
+	// Fire-and-forget async initialisation; the promise is exposed via
+	// whenReady() so boot-time consumers (audio-level restore) can await
+	// the config read before reading settings.
 	const init = async () => {
 		const loaded = await loadAppStateFromFile();
 		setState(loaded);
 	};
-	init();
+	const appInit = init();
 
 	const saveState = (next: AppState) => {
 		saveAppStateToFile(next);
@@ -119,6 +122,8 @@ function createAppStore() {
 
 	return {
 		state,
+		/** Resolves once persisted settings are loaded from disk. */
+		whenReady: () => appInit,
 		updateSettings,
 		updatePreferences,
 		updateCustomTheme,

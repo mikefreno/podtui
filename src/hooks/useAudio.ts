@@ -74,7 +74,7 @@ let pollCount = 0; // Counts poll ticks for throttling progress saves
 const [isPlaying, setIsPlaying] = createSignal(false);
 const [position, setPosition] = createSignal(0);
 const [duration, setDuration] = createSignal(0);
-const [volume, setVolume] = createSignal(0.7);
+const [volume, setVolume] = createSignal(1);
 const [speed, setSpeed] = createSignal(1);
 const [backendName, setBackendName] = createSignal<BackendName>("none");
 const [error, setError] = createSignal<string | null>(null);
@@ -440,6 +440,10 @@ async function doSetVolume(vol: number): Promise<void> {
 		}
 	}
 	setVolume(clamped);
+
+	// Sync back to app store (persisted to config.json for the next launch).
+	const appStore = useAppStore();
+	appStore.updateSettings({ volume: clamped });
 }
 
 async function doSetSpeed(spd: number): Promise<void> {
@@ -555,13 +559,26 @@ export function useAudio(): AudioControls {
 	// Initialize backend on first use
 	ensureBackend();
 
-	// Sync initial speed from app store
+	// Sync initial speed/volume from app store (reuse the previous session's
+	// playback levels; defaults are 1x and 100%).
 	if (refCount === 0) {
 		const appStore = useAppStore();
 		const storeSpeed = appStore.state().settings.playbackSpeed;
 		if (storeSpeed && storeSpeed !== speed()) {
 			setSpeed(storeSpeed);
 		}
+
+		// Volume re-syncs once settings finish loading (async config read)
+		// so a level persisted last session is applied at boot.
+		appStore
+			.whenReady()
+			.then(() => {
+				const storeVolume = appStore.state().settings.volume;
+				if (storeVolume !== undefined && storeVolume !== volume()) {
+					setVolume(storeVolume);
+				}
+			})
+			.catch(() => {});
 
 		// Restore the last player session once at boot (loaded, not playing).
 		restoreLastSession().catch(() => {});
