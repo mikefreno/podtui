@@ -267,31 +267,55 @@ function FeedPage() {
 							}}
 						>
 							<box flexDirection="row" gap={1}>
-								<text fg={focusFg(index(), fi(), isActive())}>
+								<text
+									flexShrink={0}
+									fg={focusFg(index(), fi(), isActive())}
+								>
 									{index() === fi() ? marker() : " "}
 								</text>
-								<text fg={focusFg(index(), fi(), isActive())}>
+								<text
+									wrapMode="none"
+									truncate
+									fg={focusFg(index(), fi(), isActive())}
+								>
 									{item.episode.episodeNumber
 										? `#${item.episode.episodeNumber} `
 										: ""}
 									{item.episode.title}
 								</text>
 							</box>
-							<box flexDirection="row" gap={2} paddingLeft={2}>
-								<text fg={index() === fi() ? theme.surface : theme.info}>
-									{formatDate(item.episode.pubDate)}
-								</text>
-								<text fg={index() === fi() ? theme.surface : muted()}>
-									{formatDuration(item.episode.duration)}
-								</text>
-								<text fg={index() === fi() ? theme.surface : muted()}>
+							{/* podcast name on its own row — readable at a glance; the
+							    50% current pane fits it in full for typical names, and
+							    truncate keeps the row one line tall either way */}
+							<box paddingLeft={2}>
+								<text
+									wrapMode="none"
+									truncate
+									fg={index() === fi() ? theme.surface : theme.textSecondary}
+								>
 									{item.feed.customName || item.feed.podcast.title}
 								</text>
+							</box>
+							<box flexDirection="row" gap={2} paddingLeft={2}>
+								<text
+									flexShrink={0}
+									fg={index() === fi() ? theme.surface : theme.info}
+								>
+									{formatDate(item.episode.pubDate)}
+								</text>
+								<text
+									flexShrink={0}
+									fg={index() === fi() ? theme.surface : muted()}
+								>
+									{formatDuration(item.episode.duration)}
+								</text>
 								<Show when={nav.isSelected(item.episode.id)}>
-									<text fg={theme.warning}>●</text>
+									<text flexShrink={0} fg={theme.warning}>
+										●
+									</text>
 								</Show>
 								<Show when={downloadLabel(item.episode.id)}>
-									<text fg={downloadColor(item.episode.id)}>
+									<text flexShrink={0} fg={downloadColor(item.episode.id)}>
 										{downloadLabel(item.episode.id)}
 									</text>
 								</Show>

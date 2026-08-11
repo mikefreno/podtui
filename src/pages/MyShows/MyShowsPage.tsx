@@ -362,26 +362,41 @@ export function MyShowsPage() {
 									}}
 								>
 									<box flexDirection="row" gap={1}>
-										<text fg={focusFg(index(), lf(), isActive())}>
+										<text
+											flexShrink={0}
+											fg={focusFg(index(), lf(), isActive())}
+										>
 											{index() === lf() ? marker() : " "}
 										</text>
-										<text fg={focusFg(index(), lf(), isActive())}>
+										<text
+											wrapMode="none"
+											truncate
+											fg={focusFg(index(), lf(), isActive())}
+										>
 											{ep.episodeNumber ? `#${ep.episodeNumber} ` : ""}
 											{ep.title}
 										</text>
 									</box>
 									<box flexDirection="row" gap={2} paddingLeft={2}>
-										<text fg={index() === lf() ? theme.surface : theme.info}>
+										<text
+											flexShrink={0}
+											fg={index() === lf() ? theme.surface : theme.info}
+										>
 											{formatDate(ep.pubDate)}
 										</text>
-										<text fg={index() === lf() ? theme.surface : muted()}>
+										<text
+											flexShrink={0}
+											fg={index() === lf() ? theme.surface : muted()}
+										>
 											{formatDuration(ep.duration)}
 										</text>
 										<Show when={nav.isSelected(ep.id)}>
-											<text fg={theme.warning}>●</text>
+											<text flexShrink={0} fg={theme.warning}>
+												●
+											</text>
 										</Show>
 										<Show when={downloadLabel(ep.id)}>
-											<text fg={downloadColor(ep.id)}>
+											<text flexShrink={0} fg={downloadColor(ep.id)}>
 												{downloadLabel(ep.id)}
 											</text>
 										</Show>
