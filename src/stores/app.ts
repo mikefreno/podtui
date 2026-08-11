@@ -17,6 +17,7 @@ import {
 } from "../utils/app-persistence";
 
 const defaultVisualizerSettings: VisualizerSettings = {
+	enabled: true,
 	bars: 64,
 	sensitivity: 1,
 	noiseReduction: 0.77,

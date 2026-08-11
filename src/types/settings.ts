@@ -62,6 +62,8 @@ export type DesktopTheme = {
 };
 
 export type VisualizerSettings = {
+	/** Master on/off switch for the player's realtime waveform (default: on). */
+	enabled: boolean;
 	/** Number of frequency bars (8–128, default: 64) */
 	bars: number;
 	/** Automatic sensitivity: 1 = enabled, 0 = disabled (default: 1) */

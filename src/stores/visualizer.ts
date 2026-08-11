@@ -250,9 +250,10 @@ function createVisualizerStore(): VisualizerStore {
 				audioPlaybackSignals.speed,
 				barCount,
 				focused,
+				() => useAppStore().state().settings.visualizer.enabled,
 			],
-			([playing, url, speed]) => {
-				if (!playing || !url) {
+			([playing, url, speed, , , enabled]) => {
+				if (!playing || !url || !enabled) {
 					stopVisualization();
 					return;
 				}
@@ -289,6 +290,7 @@ function createVisualizerStore(): VisualizerStore {
 				if (
 					audioPlaybackSignals.isPlaying() &&
 					audioPlaybackSignals.currentEpisode()?.audioUrl &&
+					useAppStore().state().settings.visualizer.enabled &&
 					frameTimer === null
 				) {
 					startVisualization(

@@ -21,6 +21,7 @@ import { DEFAULT_THEME } from "../constants/themes";
 // --- Defaults ---
 
 const defaultVisualizerSettings: VisualizerSettings = {
+	enabled: true,
 	bars: 32,
 	sensitivity: 1,
 	noiseReduction: 0.77,
@@ -64,7 +65,18 @@ export async function loadAppStateFromFile(): Promise<AppState> {
 		const cfg = await loadConfig();
 		if (!cfg || typeof cfg !== "object") return defaultState;
 		return {
-			settings: { ...defaultSettings, ...cfg.settings },
+			settings: {
+				...defaultSettings,
+				...cfg.settings,
+				// Visualizer is nested: a plain spread would let a config
+				// saved before a field was added (e.g. `enabled`) clobber
+				// the whole object and leave the new field undefined.
+				// Deep-merge so defaults backfill missing nested keys.
+				visualizer: {
+					...defaultVisualizerSettings,
+					...cfg.settings?.visualizer,
+				},
+			},
 			preferences: { ...defaultPreferences, ...cfg.preferences },
 			customTheme: { ...DEFAULT_THEME, ...cfg.customTheme },
 		};

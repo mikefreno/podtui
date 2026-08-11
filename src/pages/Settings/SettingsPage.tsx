@@ -64,7 +64,7 @@ const SECTIONS: SettingsSectionDef[] = [
 	{
 		id: 3,
 		label: "Visualizer",
-		description: "Audio visualizer: bars, sensitivity, cutoffs.",
+		description: "Audio visualizer: on/off, bars, sensitivity, cutoffs.",
 		icon: NF_ICONS.visualizer,
 	},
 	{

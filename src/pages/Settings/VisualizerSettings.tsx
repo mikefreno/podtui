@@ -12,6 +12,15 @@ export function useVisualizerItems(): SettingItem[] {
 
 	return [
 		{
+			id: "enabled",
+			label: "Waveform",
+			kind: "toggle",
+			display: () => (viz().enabled ? "On" : "Off"),
+			help: () =>
+				`Realtime waveform visualizer in the player.\nType: toggle\nDefault: on\nCurrent: ${viz().enabled ? "on" : "off"}\nSpace/Enter to toggle.`,
+			toggle: () => app.updateVisualizer({ enabled: !viz().enabled }),
+		},
+		{
 			id: "bars",
 			label: "Bars",
 			kind: "number",

@@ -16,6 +16,7 @@ import { ProgressBar } from "./ProgressBar";
 import { RealtimeWaveform } from "./RealtimeWaveform";
 import { useAudio } from "@/hooks/useAudio";
 import { useVisualizer } from "@/stores/visualizer";
+import { useAppStore } from "@/stores/app";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation, DEPTH_CENTER_PANE } from "@/context/NavigationContext";
 import { PaneRow } from "@/components/PaneRow";
@@ -28,7 +29,11 @@ export function PlayerPage() {
 	const { theme } = useTheme();
 	const nav = useNavigation();
 	const viz = useVisualizer();
+	const app = useAppStore();
 	const muted = () => theme.muted || theme.text;
+	// Settings master switch: off hides the waveform entirely (the store
+	// also stops the decode+FFT pipeline, see stores/visualizer.ts).
+	const vizEnabled = () => app.state().settings.visualizer.enabled;
 
 	// The page is mounted exactly while the Player tab is in focus (Shell
 	// renders only the active tab), so mount ⇔ focused. Report it to the
@@ -90,7 +95,9 @@ export function PlayerPage() {
 
 						<ProgressBar />
 
-						<RealtimeWaveform />
+						<Show when={vizEnabled()}>
+							<RealtimeWaveform />
+						</Show>
 					</box>
 				)}
 			</Show>

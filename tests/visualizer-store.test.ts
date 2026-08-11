@@ -27,6 +27,7 @@ import { test, expect, afterAll } from "bun:test";
 import { tmpdir } from "os";
 import { join } from "path";
 import { setIsPlaying, setPosition, setCurrentEpisode } from "../src/utils/audio-signals";
+import { useAppStore } from "../src/stores/app";
 import type { Episode } from "../src/types/episode";
 
 // ── Sandbox (the app store reads config from XDG_CONFIG_HOME at first
@@ -212,6 +213,30 @@ test.skipIf(skip)(
 		expect(viz.isLoading()).toBe(false);
 	},
 	{ timeout: 45000 },
+);
+
+// Settings master switch: turning the visualizer off must tear the running
+// pipeline down (not just hide the component), and re-enabling restarts it
+// from the current position.
+test.skipIf(skip)(
+	"disabling the visualizer stops a running pipeline; re-enabling restarts it",
+	async () => {
+		const viz = useVisualizer();
+		const app = useAppStore();
+		await app.whenReady();
+		await startPlaying();
+		expect(viz.isRunning()).toBe(true);
+
+		app.updateVisualizer({ enabled: false });
+		await waitFor(() => !viz.isRunning(), 10000);
+		expect(viz.isLoading()).toBe(false);
+
+		app.updateVisualizer({ enabled: true });
+		await waitFor(() => viz.isRunning(), 10000);
+		await waitFor(() => !viz.isLoading() && viz.barData().length > 0, 10000);
+		expect(viz.barData().length).toBe(64);
+	},
+	{ timeout: 20000 },
 );
 
 // ── Teardown ─────────────────────────────────────────────────────────────
