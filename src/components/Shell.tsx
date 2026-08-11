@@ -239,10 +239,14 @@ export function Shell() {
 
 	// ── Now-playing marquee ────────────────────────────────────────────────────
 	// The now-playing segment takes the full remaining status-bar width and
-	// marquee-scrolls on a 300ms timer when its text overflows; when it fits
-	// (or the bar is too narrow to show anything) it renders statically.
+	// marquee-scrolls when its text overflows; when it fits (or the bar is too
+	// narrow to show anything) it renders statically. Each pass scrolls at
+	// SCROLL_STEP_MS per char, then holds at the start for SCROLL_HOLD_MS
+	// before scrolling again.
 	const dims = useTerminalDimensions();
 	const GAP = 3;
+	const SCROLL_STEP_MS = 150;
+	const SCROLL_HOLD_MS = 10_000;
 	const [scrollOffset, setScrollOffset] = createSignal(0);
 	const leftFixed = () =>
 		modeLabel().length +
@@ -270,10 +274,29 @@ export function Shell() {
 		setScrollOffset(0);
 		if (!text || avail <= 0 || text.length <= avail) return;
 		const cycle = text.length + GAP - avail;
-		const id = setInterval(() => {
-			setScrollOffset((o) => (o + 1) % cycle);
-		}, 150);
-		onCleanup(() => clearInterval(id));
+		// Hold at the start position for SCROLL_HOLD_MS, scroll one pass,
+		// then hold again before the next pass.
+		let holdId: ReturnType<typeof setTimeout> | null = null;
+		let scrollId: ReturnType<typeof setInterval> | null = null;
+		const startHold = () => {
+			setScrollOffset(0);
+			holdId = setTimeout(() => {
+				scrollId = setInterval(() => {
+					const next = scrollOffset() + 1;
+					if (next >= cycle) {
+						clearInterval(scrollId!);
+						startHold();
+					} else {
+						setScrollOffset(next);
+					}
+				}, SCROLL_STEP_MS);
+			}, SCROLL_HOLD_MS);
+		};
+		startHold();
+		onCleanup(() => {
+			if (holdId) clearTimeout(holdId);
+			if (scrollId) clearInterval(scrollId);
+		});
 	});
 
 	return (
