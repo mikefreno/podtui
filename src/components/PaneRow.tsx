@@ -1,15 +1,15 @@
 /**
  * PaneRow — the shared parent | current | preview 3-pane layout primitive.
  *
- * Implements yazi's `mgr.ratio = [1, 2, 2]` contract: three columns grow at
- * 1/5 : 2/5 : 2/5 of the row width via Yoga `flexGrow`, so every list tab
- * renders an identical, layout-stable shell. Columns use `flexBasis={0}` so
- * the ratio is exact regardless of content width — a column's content can
- * never stretch its slot.
+ * Implements yazi's `mgr.ratio` contract: three columns grow at
+ * 20% : 50% : 30% (PANE_RATIO 2:5:3) of the row width via Yoga `flexGrow`,
+ * so every list tab renders an identical, layout-stable shell. Columns use
+ * `flexBasis={0}` so the ratio is exact regardless of content width — a
+ * column's content can never stretch its slot.
  *
  * Column semantics (per the yazi depth model):
  *   parent  — the previous-depth list. Renders a muted `—` placeholder and
- *             KEEPS its 1/5 slot when blank (never collapses to width 0).
+ *             KEEPS its 20% slot when blank (never collapses to width 0).
  *             Borderless (no left/right/top/bottom edge). Carries the single
  *             header row: the CURRENT column's title renders top-left in the
  *             parent's slot (the panes above current/preview were removed).
@@ -184,7 +184,7 @@ export function PaneRow(props: PaneRowProps) {
 
 	return (
 		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
-			{/* ── parent (1/5) — previous-depth list; title row top-left ───────── */}
+			{/* ── parent (20%) — previous-depth list; title row top-left ────────── */}
 			<Pane
 				grow={PANE_RATIO.parent}
 				label={currentLabel}
@@ -200,7 +200,7 @@ export function PaneRow(props: PaneRowProps) {
 				border={["left", "right"]}
 				scrollFocused={() => focused()}
 			/>
-			{/* ── preview (2/5) — hovered-item detail; no border, no header ────── */}
+			{/* ── preview (30%) — hovered-item detail; no border, no header ────── */}
 			<Show when={panes() === 3}>
 				<Pane
 					grow={PANE_RATIO.preview}

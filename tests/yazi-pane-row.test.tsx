@@ -1,11 +1,11 @@
 /**
- * PaneRow tests — the 1:2:2 parent|current|preview layout primitive.
+ * PaneRow tests — the 2:5:3 (20/50/30) parent|current|preview layout primitive.
  *
  * Verified through the opentui test renderer's captured frames (the same
  * mechanism the `.harness` drive uses), since `flexGrow` ratios are only
- * observable as rendered column widths.
+ * observable in rendered output, not in unit-testable state.
  *
- *  • Unit: three columns render at 1:2:2 (e.g. 20/40/40 of 100) even when the
+ *  • Unit: three columns render at 2:5:3 (e.g. 20/50/30 of 100) even when the
  *    parent and preview children are null, and the blank parent keeps its
  *    slot with a muted placeholder.
  *  • Integration: the current pane renders muted left/right border edges
@@ -119,9 +119,9 @@ afterAll(async () => {
 	}
 });
 
-// ── Unit: three columns at 1:2:2 regardless of null children ───────────────
+// ── Unit: three columns at 2:5:3 regardless of null children ───────────────
 describe("PaneRow layout", () => {
-	test("renders three columns at 1:2:2 even with null parent/preview", async () => {
+	test("renders three columns at 2:5:3 even with null parent/preview", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
 			current: () => <text>ITEM</text>,
@@ -132,15 +132,15 @@ describe("PaneRow layout", () => {
 		const widths = columnWidths(spans);
 		expect(widths).toHaveLength(3);
 		const [p, c, v] = widths;
-		// 100-wide row splits as 20 / 40 / 40 (1/5 : 2/5 : 2/5).
+		// 100-wide row splits as 20 / 50 / 30 (2 : 5 : 3 of 10).
 		expect(p).toBe(20);
-		expect(c).toBe(40);
-		expect(v).toBe(40);
-		// Exact 1:2:2 proportion (within 1 col rounding).
-		expect(c).toBeGreaterThanOrEqual(p * 2 - 1);
-		expect(c).toBeLessThanOrEqual(p * 2 + 1);
-		expect(v).toBeGreaterThanOrEqual(p * 2 - 1);
-		expect(v).toBeLessThanOrEqual(p * 2 + 1);
+		expect(c).toBe(50);
+		expect(v).toBe(30);
+		// Exact 2:5:3 proportion (within 1 col rounding).
+		expect(c).toBeGreaterThanOrEqual(Math.round(p * 2.5) - 1);
+		expect(c).toBeLessThanOrEqual(Math.round(p * 2.5) + 1);
+		expect(v).toBeGreaterThanOrEqual(Math.round(p * 1.5) - 1);
+		expect(v).toBeLessThanOrEqual(Math.round(p * 1.5) + 1);
 		// Parent keeps a visibly non-zero slot and renders the muted placeholder.
 		expect(p).toBeGreaterThan(4);
 		const body = spans.lines
@@ -150,7 +150,7 @@ describe("PaneRow layout", () => {
 		expect(body).toContain("ITEM");
 	});
 
-	test("keeps the 1/5 parent slot across widths (ratio stable)", async () => {
+	test("keeps the 20% parent slot across widths (ratio stable)", async () => {
 		const { spans, destroy } = await renderPaneRow({
 			parent: null,
 			current: () => <text>x</text>,
@@ -159,9 +159,9 @@ describe("PaneRow layout", () => {
 		});
 		cleanups.push(destroy);
 		const [p, c, v] = columnWidths(spans);
-		expect(p).toBe(14); // 70 → 14 / 28 / 28
-		expect(c).toBe(28);
-		expect(v).toBe(28);
+		expect(p).toBe(14); // 70 → 14 / 35 / 21
+		expect(c).toBe(35);
+		expect(v).toBe(21);
 	});
 });
 
@@ -181,9 +181,9 @@ describe("PaneRow current-pane borders", () => {
 		});
 		cleanups.push(destroy);
 
-		// 100-wide row splits as 20 / 40 / 40: the current pane's edges sit at
-		// columns 20 and 59. No horizontal or corner glyphs — edges only.
-		expect(borderColumns(spans)).toEqual([20, 59]);
+		// 100-wide row splits as 20 / 50 / 30: the current pane's edges sit at
+		// columns 20 and 69. No horizontal or corner glyphs — edges only.
+		expect(borderColumns(spans)).toEqual([20, 69]);
 		expect(frameText(spans)).not.toMatch(boxGlyphs);
 	});
 
@@ -196,7 +196,7 @@ describe("PaneRow current-pane borders", () => {
 		});
 		cleanups.push(destroy);
 
-		expect(borderColumns(spans)).toEqual([20, 59]);
+		expect(borderColumns(spans)).toEqual([20, 69]);
 		expect(frameText(spans)).not.toMatch(boxGlyphs);
 	});
 
@@ -208,7 +208,7 @@ describe("PaneRow current-pane borders", () => {
 			focused: () => true,
 		});
 		cleanups.push(destroy);
-		expect(borderColumns(spans)).toEqual([20, 59]);
+		expect(borderColumns(spans)).toEqual([20, 69]);
 		expect(frameText(spans)).not.toMatch(boxGlyphs);
 
 		const { spans: spans2, destroy: destroy2 } = await renderPaneRow({
@@ -218,7 +218,7 @@ describe("PaneRow current-pane borders", () => {
 			focused: () => false,
 		});
 		cleanups.push(destroy2);
-		expect(borderColumns(spans2)).toEqual([20, 59]);
+		expect(borderColumns(spans2)).toEqual([20, 69]);
 		expect(frameText(spans2)).not.toMatch(boxGlyphs);
 	});
 
@@ -229,7 +229,7 @@ describe("PaneRow current-pane borders", () => {
 			preview: null,
 		});
 		cleanups.push(destroy);
-		expect(borderColumns(spans)).toEqual([20, 59]);
+		expect(borderColumns(spans)).toEqual([20, 69]);
 		expect(frameText(spans)).not.toMatch(boxGlyphs);
 	});
 });
