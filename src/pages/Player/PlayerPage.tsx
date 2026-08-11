@@ -112,9 +112,13 @@ export function PlayerPage() {
 			/>
 
 			<box height={1} />
-			<text fg={muted()}>
-				{"P play/pause  N next  B prev  < > seek  h back"}
-			</text>
+			{/* content prop (not a text child): the babel-preset-solid JSX
+			 *  transform HTML-escapes static string children (`<` → `&lt;`),
+			 *  which opentui renders verbatim; content bypasses that. */}
+			<text
+				fg={muted()}
+				content={"P play/pause  N next  B prev  < > seek  h back"}
+			/>
 		</box>
 	);
 
