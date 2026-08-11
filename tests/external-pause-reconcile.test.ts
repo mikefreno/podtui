@@ -28,7 +28,14 @@
  * identity bun loads from disk, bypassing the leaked mock.
  */
 import { test, expect, afterAll } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	writeFileSync,
+	rmSync,
+	readdirSync,
+	statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -102,9 +109,30 @@ const wavPath = join(tmpdir(), `podtui-extpause-${process.pid}.wav`);
 // loads the real file instead of a leaked mock.module from another test file.
 const { useAudio } = await import("../src/hooks/useAudio?external-pause-test");
 
-/** The pid-derived socket path the backend tells mpv to bind. */
-function mpvSocket(): string {
-	return join(tmpdir(), `podtui-mpv-${process.pid}.sock`);
+/**
+ * The socket path of the LIVE backend daemon in this process. The backend
+ * names sockets per-instance (`podtui-mpv-<pid>-<instance>.sock`), so scan
+ * tmpdir for this pid's sockets and take the newest (the one mpv actually
+ * bound — earlier instances may have been orphaned by a re-spawn).
+ */
+function mpvSocket(): string | null {
+	let newest: string | null = null;
+	let newestMtime = 0;
+	for (const name of readdirSync(tmpdir())) {
+		if (
+			!name.startsWith(`podtui-mpv-${process.pid}-`) ||
+			!name.endsWith(".sock")
+		) {
+			continue;
+		}
+		const candidate = join(tmpdir(), name);
+		const mtime = statSync(candidate).mtimeMs;
+		if (mtime > newestMtime) {
+			newest = candidate;
+			newestMtime = mtime;
+		}
+	}
+	return newest;
 }
 
 /**
@@ -112,6 +140,8 @@ function mpvSocket(): string {
  * media session pauses/resumes mpv without PodTUI's involvement.
  */
 async function mpvCommand(command: unknown[]): Promise<void> {
+	const socket = mpvSocket();
+	if (!socket) throw new Error("backend mpv socket not found");
 	const { promise, resolve, reject } = Promise.withResolvers<void>();
 	let settled = false;
 	const settle = (err: Error | null): void => {
@@ -121,7 +151,7 @@ async function mpvCommand(command: unknown[]): Promise<void> {
 		else resolve();
 	};
 	Bun.connect({
-		unix: mpvSocket(),
+		unix: socket,
 		socket: {
 			open(s) {
 				s.write(JSON.stringify({ command }) + "\n");
@@ -213,8 +243,16 @@ afterAll(async () => {
 	} catch {
 		/* best-effort */
 	}
+	// The resident daemon survives stop() by design — quit it so test
+	// workers don't leak idle mpv processes.
 	try {
-		rmSync(mpvSocket(), { force: true });
+		await mpvCommand(["quit"]);
+	} catch {
+		/* best-effort */
+	}
+	try {
+		const socket = mpvSocket();
+		if (socket) rmSync(socket, { force: true });
 	} catch {
 		/* best-effort */
 	}

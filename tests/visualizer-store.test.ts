@@ -15,7 +15,7 @@
  *
  * Uses a self-generated local WAV (a frequency chirp, so different playback
  * positions produce measurably different bar output) and the real ffmpeg +
- * native cavacore pipeline, mirroring audio-stream-reader.test.ts.
+ * native cavacore pipeline, mirroring audio-pcm-cache.test.ts.
  *
  * Timing note: this is an integration test of the store's real timers — the
  * unload path is a genuine `setTimeout` in the store, and bun 1.3.8 ships no

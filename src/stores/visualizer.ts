@@ -2,20 +2,29 @@
  * visualizer-store — module-level singleton owning the realtime waveform
  * pipeline (ffmpeg decode + cavacore FFT), shared across PlayerPage mounts.
  *
- * The pipeline lives here rather than in the Player page component so it can
- * outlive the page: Shell unmounts a tab's page the moment the tab loses
- * focus, which would otherwise kill the ffmpeg decode + FFT loop instantly.
- * Instead the store keeps the visualization warm for UNLOAD_DELAY_MS after
- * the Player tab stops being focused, then tears it down (kills ffmpeg,
- * destroys the cava plan). Returning to the tab within the delay resumes
- * seamlessly; after an unload, regaining focus restarts the pipeline from
- * the current playback position.
+ * Pipeline shape (see utils/audio-pcm-cache.ts for the rationale):
+ * an ffmpeg process decodes the episode at full speed into a
+ * position-indexed PCM cache; the render loop reads the window ending at
+ * the player's current position from that cache. Because reads are
+ * indexed by playback time, PAUSE/RESUME/SEEK/SPEED need no pipeline
+ * choreography at all — and cannot desync:
  *
- * The store subscribes to the module-level playback signals in
- * `utils/audio-signals.ts` (`audioPlaybackSignals`), so it reacts to
- * play/pause/seek/speed even while no Player page is mounted. `focused` is
- * fed by PlayerPage (mounted ⇔ Player tab visible), `barCount` by
- * RealtimeWaveform (terminal width).
+ * - Pause: stop the render loop and the decode pass; the PCM cache stays
+ *   resident. Bars freeze on the last rendered frame.
+ * - Resume: re-arm the render loop — bars render instantly from the cache
+ *   — and continue the tail decode in the background. No cold start, no
+ *   coverage guessing, no clamped-buffer freeze (the old bug: resume
+ *   re-armed the loop over a DEAD ffmpeg and the bars exhausted the ring
+ *   buffer, then froze on a repeated stale window forever).
+ * - Seek into decoded audio: nothing to do. Seek into a hole: kick off a
+ *   decode segment there; the last frame holds until data arrives.
+ * - Speed changes: nothing. The cache is position-indexed raw PCM.
+ *
+ * Focus lifecycle: Shell unmounts a tab's page when it loses focus, but the
+ * pipeline outlives the page so playback keeps visualizing; UNLOAD_DELAY_MS
+ * after the Player tab stops being focused it tears down. Reads outside
+ * decoded coverage return empty — the renderer simply holds the last frame
+ * until the decode frontier arrives.
  */
 
 import {
@@ -30,7 +39,7 @@ import {
 	type CavaCore,
 	type CavaCoreConfig,
 } from "@/utils/cavacore";
-import { AudioStreamReader } from "@/utils/audio-stream-reader";
+import { EpisodePcmCache, PCM_SAMPLE_RATE } from "@/utils/audio-pcm-cache";
 import { createBarScaler } from "@/utils/bar-mapping";
 import { audioPlaybackSignals } from "@/utils/audio-signals";
 import { useAppStore } from "@/stores/app";
@@ -83,7 +92,10 @@ function createVisualizerStore(): VisualizerStore {
 	const scaler = createBarScaler();
 
 	let cava: CavaCore | null = null;
-	let reader: AudioStreamReader | null = null;
+	// Position-indexed PCM cache for the current episode. Kept across
+	// pause/resume (segments survive; only the ffmpeg pass is killed) and
+	// dropped only on episode change, stop, disable, or unload.
+	let pcm: EpisodePcmCache | null = null;
 	let frameTimer: ReturnType<typeof setInterval> | null = null;
 	let sampleBuffer: Float64Array | null = null;
 	let unloadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -91,7 +103,6 @@ function createVisualizerStore(): VisualizerStore {
 	// What the running pipeline was started with — lets the playback effect
 	// tell "nothing changed, stay warm" from "must restart".
 	let activeUrl = "";
-	let activeSpeed = 1;
 	let activeBars = 64;
 
 	// ── Lifecycle helpers ──────────────────────────────────────────────
@@ -139,7 +150,7 @@ function createVisualizerStore(): VisualizerStore {
 
 	// ── Start/stop the visualization pipeline ──────────────────────────
 
-	const startVisualization = (url: string, position: number, speed: number) => {
+	const startVisualization = (url: string, position: number) => {
 		stopVisualization();
 
 		if (!url || !initCava() || !cava) return;
@@ -152,7 +163,7 @@ function createVisualizerStore(): VisualizerStore {
 		const viz = useAppStore().state().settings.visualizer;
 		const config: CavaCoreConfig = {
 			bars: barCount(),
-			sampleRate: 44100,
+			sampleRate: PCM_SAMPLE_RATE,
 			channels: 1,
 			noiseReduction: viz.noiseReduction,
 			lowCutOff: viz.lowCutOff,
@@ -164,32 +175,29 @@ function createVisualizerStore(): VisualizerStore {
 		// Pre-warm the FFT window: libcavacore's window is malloc'd
 		// uninitialized, so the first real frame would FFT garbage and
 		// render full-scale bars. One zero frame the size of the whole
-		// input buffer clears it (at 44.1kHz mono the window is 8192
-		// samples — FFTbassbufferSize × channels; a 512-sample frame would
-		// leave the tail garbage).
+		// input buffer clears it.
 		cava.execute(new Float64Array(8192));
 
 		// Pre-allocate sample read buffer
 		sampleBuffer = new Float64Array(SAMPLES_PER_FRAME);
 
-		// Start ffmpeg decode stream (reuse reader if same URL, else create new)
-		if (!reader || reader.url !== url) {
-			if (reader) reader.stop();
-			reader = new AudioStreamReader({ url });
+		// PCM cache per episode (reuse when the episode is unchanged)
+		if (!pcm || pcm.url !== url) {
+			if (pcm) pcm.stop();
+			pcm = new EpisodePcmCache({ url });
 		}
-		reader.start(position, speed);
+		// Decode from 1s before the position so the window ENDING at the
+		// position is covered as soon as the first PCM lands.
+		pcm.startDecode(Math.max(0, position - 1));
 
 		// Seed the smooth position clock with the start position. Without
 		// this, a fresh play at position 0 would sample the window ending at
-		// exactly 0 — a 1-sample slice the reader can never fill — so the
-		// bars would be starved until the first mpv poll advanced the
-		// position clock. Seeding makes the interpolated target advance
-		// immediately, so bars render as soon as ffmpeg has any audio.
+		// exactly 0 — a 1-sample slice — so bars would be starved until the
+		// first mpv poll advanced the position clock.
 		lastPolledPosition = position;
 		lastPolledAt = performance.now();
 
 		activeUrl = url;
-		activeSpeed = speed;
 		activeBars = barCount();
 		setIsLoading(true);
 		frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
@@ -201,9 +209,10 @@ function createVisualizerStore(): VisualizerStore {
 			clearInterval(frameTimer);
 			frameTimer = null;
 		}
-		if (reader) {
-			reader.stop();
-			// Don't null reader — we reuse it across start/stop cycles
+		if (pcm) {
+			pcm.stop();
+			// Keep the (now cache-less, url-tagged) object: a re-start of the
+			// same episode reuses it; segments re-decode in seconds at 80x.
 		}
 		if (cava?.isReady) {
 			cava.destroy();
@@ -212,17 +221,59 @@ function createVisualizerStore(): VisualizerStore {
 		setIsLoading(false);
 	};
 
+	// ── Pause: freeze the loop, keep the cache ──────────────────────────
+	//
+	// The render loop stops (bars hold their last frame) and the ffmpeg
+	// pass dies (no background CPU), but the decoded PCM stays: resume
+	// serves it instantly.
+
+	const suspendVisualization = () => {
+		clearUnloadTimer();
+		if (frameTimer) {
+			clearInterval(frameTimer);
+			frameTimer = null;
+		}
+		if (pcm) pcm.pauseDecode();
+		// Cava plan + sampleBuffer stay alive — cheap to reuse on resume.
+		// Clear the loading spinner: if the pipeline never produced bars
+		// (still cold-starting when paused), the component should fall back
+		// to the placeholder, not freeze on a spinner.
+		setIsLoading(false);
+	};
+
+	// ── Resume: re-arm the render loop, top up the cache ───────────────
+	//
+	// Returns true if the pipeline resumed, false if there was nothing to
+	// resume (no prior pipeline).
+
+	const resumeVisualization = (): boolean => {
+		// Already running — nothing to do.
+		if (frameTimer !== null) return true;
+		if (!pcm || !cava?.isReady || !sampleBuffer) return false;
+
+		const pos = untrack(audioPlaybackSignals.position);
+
+		// Bars come from the cache on the next frame tick (~33ms) whenever
+		// the position is covered; any gap (uncached region) restarts the
+		// decode pass in the background with the last frame holding.
+		pcm.ensureDecodeAround(pos);
+
+		lastPolledPosition = pos;
+		lastPolledAt = performance.now();
+		frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
+		return true;
+	};
+
 	// ── Render loop (called at ~30fps) ─────────────────────────────────
 
 	const renderFrame = () => {
-		if (!cava?.isReady || !reader?.running || !sampleBuffer) return;
+		if (!cava?.isReady || !sampleBuffer || !pcm) return;
 
-		// Sample the FFT window at the player's position, not the decode
-		// head — the reader decodes independently (paced at the player's
-		// clock rate with a LEAD_SECONDS burst head start) and only the
-		// position clock ties the bars to what's actually playing.
+		// Sample the FFT window at the player's position. Outside decoded
+		// coverage (decode cold start, seek into a hole) the read is empty
+		// and the LAST FRAME simply holds — never clamped/repeated junk.
 		const target = smoothPosition();
-		const count = reader.read(sampleBuffer, target);
+		const count = pcm.readWindow(sampleBuffer, target);
 		// Never feed a partial FFT window to cava.
 		if (count < sampleBuffer.length) return;
 
@@ -235,44 +286,53 @@ function createVisualizerStore(): VisualizerStore {
 
 	// ── Playback subscription ──────────────────────────────────────────
 	//
-	// Keeps the pipeline matched to playback. `focused` is a dep so focus
-	// regain re-evaluates (and can restart an unloaded pipeline), but the
-	// guard below makes a focus flip on an already-correct warm pipeline a
-	// no-op — no churn when flipping back to the Player tab within the
-	// unload delay. A real change (url/speed/barCount, stop/start, or a
-	// stale pipeline after an unload) restarts from the current position.
+	// Keeps the pipeline matched to playback. Pause suspends (render loop +
+	// decode pass die, cache survives) so resume is instant. Stop/track-end/
+	// disable fully tears down. `focused` is a dep so focus regain
+	// re-evaluates; the guards make a focus flip on an already-correct warm
+	// pipeline a no-op. Speed is deliberately NOT a dep — the PCM cache is
+	// position-indexed, so playback-rate changes need no pipeline restart.
 
 	createEffect(
 		on(
 			[
 				audioPlaybackSignals.isPlaying,
 				() => audioPlaybackSignals.currentEpisode()?.audioUrl ?? "",
-				audioPlaybackSignals.speed,
 				barCount,
 				focused,
 				() => useAppStore().state().settings.visualizer.enabled,
 			],
-			([playing, url, speed, , , enabled]) => {
-				if (!playing || !url || !enabled) {
+			([playing, url, , , enabled]) => {
+				if (!url || !enabled) {
 					stopVisualization();
 					return;
 				}
-				// Warm and already correct — nothing to do (e.g. focus
-				// regained within the unload delay).
+				if (!playing) {
+					// Pause: freeze the loop, keep the cache. Only if the
+					// pipeline is actually running — otherwise no-op.
+					if (frameTimer !== null) suspendVisualization();
+					return;
+				}
+
+				// Playing — try a fast resume first. If it succeeds and the
+				// pipeline matches, done.
 				if (
-					frameTimer !== null &&
+					frameTimer === null &&
+					pcm &&
+					cava?.isReady &&
 					url === activeUrl &&
-					speed === activeSpeed &&
 					barCount() === activeBars
 				) {
+					if (resumeVisualization()) return;
+				}
+
+				// Warm and already correct — nothing to do (e.g. focus
+				// regained within the unload delay while still playing).
+				if (frameTimer !== null && url === activeUrl && barCount() === activeBars) {
 					return;
 				}
 				if (!focused()) return; // playing away: stay warm; unload timer decides
-				startVisualization(
-					url,
-					untrack(audioPlaybackSignals.position),
-					speed,
-				);
+				startVisualization(url, untrack(audioPlaybackSignals.position));
 			},
 		),
 	);
@@ -296,7 +356,6 @@ function createVisualizerStore(): VisualizerStore {
 					startVisualization(
 						audioPlaybackSignals.currentEpisode()!.audioUrl,
 						untrack(audioPlaybackSignals.position),
-						audioPlaybackSignals.speed() ?? 1,
 					);
 				}
 			} else if (frameTimer !== null) {
@@ -308,17 +367,17 @@ function createVisualizerStore(): VisualizerStore {
 		}),
 	);
 
-	// ── Seek detection: lightweight effect for position jumps ──────────
+	// ── Seek detection: jump coverage, not pipeline restarts ───────────
 	//
-	// Watches position and restarts the reader (not the whole pipeline)
-	// only on significant jumps (>2s), which indicate a user seek.
-	// This is intentionally a separate effect — it should NOT trigger a
-	// full pipeline restart, just restart the ffmpeg stream at the new pos.
+	// Watches position for significant jumps (>2s = user seek). Decoded
+	// audio at the new position is served instantly with zero action; a
+	// jump into an undecoded hole kicks a background segment decode there
+	// while the last frame holds.
 
 	let lastSyncPosition = 0;
 	createEffect(
 		on(audioPlaybackSignals.position, (pos) => {
-			if (!audioPlaybackSignals.isPlaying() || !reader?.running) {
+			if (!audioPlaybackSignals.isPlaying() || !pcm) {
 				lastSyncPosition = pos;
 				return;
 			}
@@ -327,10 +386,21 @@ function createVisualizerStore(): VisualizerStore {
 			lastSyncPosition = pos;
 
 			if (delta > 2) {
-				reader.restart(pos, audioPlaybackSignals.speed() ?? 1);
+				pcm.ensureDecodeAround(pos);
 			}
 		}),
 	);
+	// ── Process-exit teardown ──────────────────────────────────────────
+	//
+	// The pipeline lives in a detached createRoot that is never disposed,
+	// so Solid's onCleanup never runs. `q`/`:quit` call process.exit(0)
+	// (bypassing onCleanup); SIGINT/TERM/HUP are caught by useAudio's
+	// handler. This handler runs synchronously on `exit` and kills the
+	// ffmpeg child + destroys the cava plan so they don't outlive the host.
+	// Without it, a warm pipeline leaks an orphaned ffmpeg process on quit.
+	process.on("exit", () => {
+		stopVisualization();
+	});
 
 	return {
 		// state

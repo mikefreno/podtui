@@ -13,8 +13,11 @@
  */
 
 import { onCleanup } from "solid-js";
-import { unlinkSync } from "fs";
-import { fetchCoverArt, coverTempPath } from "../utils/cover-art";
+import {
+	cachedCoverPath,
+	fetchCoverArt,
+	prefetchCoverArt,
+} from "../utils/cover-art";
 import {
 	createAudioBackend,
 	detectPlayers,
@@ -158,11 +161,6 @@ function registerExitTeardown(): void {
 		} catch {
 			/* best-effort at exit */
 		}
-		try {
-			unlinkSync(coverTempPath());
-		} catch {
-			/* best-effort at exit */
-		}
 	};
 	process.on("exit", teardown);
 	for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
@@ -231,6 +229,15 @@ function startPolling(): void {
 		try {
 			pollCount++;
 			if (isPlaying()) {
+				// Track ended (eof-reached observed) or process died. Check
+				// BEFORE pause reconciliation: mpv keeps the file open at EOF
+				// and reports pause=true there, which would otherwise be
+				// mistaken for an external pause and never finalize.
+				if (!backend.isPlaying()) {
+					finalizeTrackEnd();
+					return;
+				}
+
 				// mpv can pause itself outside PodTUI. Reconcile instead of
 				// staying stuck on "playing" with a frozen waveform
 				// (getPosition would just re-read the same frozen time-pos).
@@ -255,11 +262,6 @@ function startPolling(): void {
 						const media = useMediaRegistry();
 						media.setPosition(pos);
 					}
-				}
-
-				// Check if backend stopped playing (track ended)
-				if (!backend.isPlaying()) {
-					finalizeTrackEnd();
 				}
 			} else if (pollCount % PAUSE_WATCH_TICKS === 0) {
 				// Paused — watch for playback restarted from outside (AirPods,
@@ -314,9 +316,12 @@ async function play(episode: Episode): Promise<void> {
 		const feedStore = useFeedStore();
 		const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
 		const podcastTitle = feed?.customName || feed?.podcast.title || "";
-		const coverArtPath = feed?.podcast.coverUrl
-			? await fetchCoverArt(feed.podcast.coverUrl)
-			: null;
+		// Cover art must NEVER gate playback (it was a curl subprocess blocking
+		// play() by up to 8s). Serve the disk-cached file synchronously when it
+		// exists; on a miss, start playback bare and fetch in the background —
+		// the backend applies late art at runtime (mpv video-add).
+		const coverUrl = feed?.podcast.coverUrl;
+		const coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
 
 		// Resume from saved progress if available and not completed
 		const savedProgress = progressStore.get(episode.id);
@@ -332,6 +337,16 @@ async function play(episode: Episode): Promise<void> {
 			mediaTitle: podcastTitle ? `${podcastTitle} — ${episode.title}` : episode.title,
 			coverArtPath: coverArtPath ?? undefined,
 		});
+
+		if (coverUrl && !coverArtPath) {
+			fetchCoverArt(coverUrl)
+				.then((path) => {
+					if (path && currentEpisode()?.id === episode.id) {
+						b.addCoverArt(path).catch(() => {});
+					}
+				})
+				.catch(() => {});
+		}
 
 		setCurrentEpisode(episode);
 		setIsPlaying(true);
@@ -403,6 +418,29 @@ async function load(episode: Episode): Promise<void> {
 	});
 	media.setPlaybackState(false);
 	if (pos > 0) media.setPosition(pos);
+
+	// Preload the episode into the backend PAUSED: mpv opens the stream and
+	// fills its demuxer cache while parked, so the user's first Play flips
+	// `pause` off instead of paying the ~2s stream-open cold. Fire-and-forget
+	// — a failed preload just makes the first play take the cold path.
+	if (episode.audioUrl && backend) {
+		const coverUrl = feed?.podcast.coverUrl;
+		if (coverUrl) prefetchCoverArt(coverUrl);
+		const backendSnap = backend;
+		backendSnap
+			.preload(episode.audioUrl, {
+				volume: volume(),
+				speed: storeSpeed || speed(),
+				startPosition: pos > 0 ? pos : undefined,
+				mediaTitle: podcastTitle
+					? `${podcastTitle} — ${episode.title}`
+					: episode.title,
+				coverArtPath: coverUrl
+					? (cachedCoverPath(coverUrl) ?? undefined)
+					: undefined,
+			})
+			.catch(() => {});
+	}
 
 	saveLastPlayerToFile({ episodeId: episode.id, timestamp: new Date() });
 }
@@ -564,9 +602,8 @@ async function switchBackend(name: BackendName): Promise<void> {
 				.feeds()
 				.find((f) => f.podcast.id === ep.podcastId);
 			const podcastTitle = feed?.customName || feed?.podcast.title || "";
-			const coverArtPath = feed?.podcast.coverUrl
-				? await fetchCoverArt(feed.podcast.coverUrl)
-				: null;
+			const coverUrl = feed?.podcast.coverUrl;
+			const coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
 			await backend.play(ep.audioUrl, {
 				startPosition: pos,
 				volume: vol,
