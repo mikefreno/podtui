@@ -14,70 +14,81 @@ type PlaybackControlsProps = {
 	onSpeedChange: (value: number) => void;
 };
 
-const BACKEND_LABELS: Record<BackendName, string> = {
-	mpv: "mpv",
-	none: "none",
-};
-
 export function PlaybackControls(props: PlaybackControlsProps) {
 	const { theme } = useTheme();
 	return (
 		<box
 			flexDirection="row"
+			flexWrap="wrap"
 			gap={1}
 			alignItems="center"
+			justifyContent="center"
 			border
 			padding={1}
 			borderColor={theme.border}
 		>
-			<box
-				border
-				padding={0}
-				onMouseDown={props.onPrev}
-				borderColor={theme.border}
-			>
-				<text fg={theme.primary}>[Prev]</text>
+			{/* transport buttons — wrap as a unit, centered on their own line */}
+			<box flexDirection="row" gap={1} alignItems="center" flexShrink={0}>
+				<box
+					border
+					padding={0}
+					onMouseDown={props.onPrev}
+					borderColor={theme.border}
+				>
+					<text fg={theme.primary} wrapMode="none">[Prev]</text>
+				</box>
+				<box
+					border
+					padding={0}
+					onMouseDown={props.onToggle}
+					borderColor={theme.border}
+				>
+					<text fg={theme.primary} wrapMode="none">{props.isPlaying ? "[Pause]" : "[Play]"}</text>
+				</box>
+				<box
+					border
+					padding={0}
+					onMouseDown={props.onNext}
+					borderColor={theme.border}
+				>
+					<text fg={theme.primary} wrapMode="none">[Next]</text>
+				</box>
 			</box>
+			{/* status group — always follows the buttons; wrap point is here */}
 			<box
-				border
-				padding={0}
-				onMouseDown={props.onToggle}
-				borderColor={theme.border}
+				flexDirection="row"
+				gap={1}
+				alignItems="center"
+				marginLeft={2}
+				flexShrink={0}
 			>
-				<text fg={theme.primary}>{props.isPlaying ? "[Pause]" : "[Play]"}</text>
-			</box>
-			<box
-				border
-				padding={0}
-				onMouseDown={props.onNext}
-				borderColor={theme.border}
-			>
-				<text fg={theme.primary}>[Next]</text>
-			</box>
-			<box flexDirection="row" gap={1} marginLeft={2}>
 				<text fg={theme.textMuted}>Vol</text>
 				<text fg={theme.text}>{Math.round(props.volume * 100)}%</text>
 				<text fg={theme.textMuted}>↑↓</text>
-			</box>
-			<box flexDirection="row" gap={1} marginLeft={2}>
-				<text fg={theme.textMuted}>Speed</text>
-				<text fg={theme.text}>{props.speed}x</text>
-				<text fg={theme.textMuted}>s</text>
-			</box>
-			{props.backendName && props.backendName !== "none" && (
 				<box flexDirection="row" gap={1} marginLeft={2}>
-					<text fg={theme.textMuted}>via</text>
-					<text fg={theme.primary}>{BACKEND_LABELS[props.backendName]}</text>
+					<text fg={theme.textMuted}>Speed</text>
+					<text fg={theme.text}>{props.speed}x</text>
+					<text fg={theme.textMuted}>s</text>
 				</box>
-			)}
-			{props.backendName === "none" && (
-				<box marginLeft={2}>
-					<text fg={theme.warning}>No audio player found</text>
-				</box>
-			)}
-			{props.hasAudioUrl === false && (
-				<box marginLeft={2}>
-					<text fg={theme.warning}>No audio URL</text>
+			</box>
+			{/* audio warnings — wrap to their own (3rd) line when the row is tight */}
+			{(props.backendName === "none" || props.hasAudioUrl === false) && (
+				<box
+					flexDirection="row"
+					gap={1}
+					alignItems="center"
+					flexShrink={0}
+				>
+					{props.backendName === "none" && (
+						<box marginLeft={2}>
+							<text fg={theme.warning}>No audio player found</text>
+						</box>
+					)}
+					{props.hasAudioUrl === false && (
+						<box marginLeft={2}>
+							<text fg={theme.warning}>No audio URL</text>
+						</box>
+					)}
 				</box>
 			)}
 		</box>
