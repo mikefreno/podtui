@@ -29,6 +29,13 @@ const MAX_EPISODES_REFRESH = 50;
 /** Max episodes to fetch on initial subscribe */
 const MAX_EPISODES_SUBSCRIBE = 20;
 
+/** Per-feed fetch timeout — a hung feed must not stall a refresh batch or
+ *  the background refresh loop. */
+const FETCH_TIMEOUT_MS = 20_000;
+
+/** Default minutes between automatic background feed refreshes. */
+const DEFAULT_REFRESH_INTERVAL_MINUTES = 30;
+
 /** Cache of all parsed episodes per feed (feedId -> Episode[]) */
 const fullEpisodeCache = new Map<string, Episode[]>();
 
@@ -201,20 +208,27 @@ function createFeedStore() {
 		);
 	};
 
-	/** Fetch latest episodes from an RSS feed URL, caching all parsed episodes */
+	/** Fetch latest episodes from an RSS feed URL, caching all parsed episodes.
+	 *  Returns NULL when the feed could not be fetched (network error, non-OK
+	 *  response, timeout) — callers must treat null as "unchanged" and keep
+	 *  the previously loaded episodes. A failed refresh must never look like
+	 *  an empty feed, or the store would wipe a subscribed show's episodes. */
 	const fetchEpisodes = async (
 		feedUrl: string,
 		limit: number,
 		feedId?: string,
-	): Promise<Episode[]> => {
+	): Promise<Episode[] | null> => {
 		try {
 			const response = await fetch(feedUrl, {
 				headers: {
 					"Accept-Encoding": "identity",
 					Accept: "application/rss+xml, application/xml, text/xml, */*",
 				},
+				// Hung feeds must not stall a refresh batch (or the background
+				// refresh loop) indefinitely.
+				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
 			});
-			if (!response.ok) return [];
+			if (!response.ok) return null;
 			const xml = await response.text();
 			const parsed = parseRSSFeed(xml, feedUrl);
 			const allEpisodes = sortEpisodesReverseChronological(parsed.episodes);
@@ -227,7 +241,7 @@ function createFeedStore() {
 
 			return allEpisodes.slice(0, limit);
 		} catch {
-			return [];
+			return null;
 		}
 	};
 
@@ -267,7 +281,7 @@ function createFeedStore() {
 		const newFeed: Feed = {
 			id: feedId,
 			podcast,
-			episodes,
+			episodes: episodes ?? [],
 			visibility,
 			sourceId,
 			lastUpdated: new Date(),
@@ -346,6 +360,8 @@ function createFeedStore() {
 			MAX_EPISODES_REFRESH,
 			feedId,
 		);
+		// Fetch failed (null): keep the currently loaded episodes untouched.
+		if (!episodes) return;
 		setFeeds((prev) => {
 			const updated = applyRefreshedEpisodes(prev, feedId, episodes);
 			if (updated !== prev) saveFeeds(updated);
@@ -379,6 +395,8 @@ function createFeedStore() {
 			setFeeds((prev) => {
 				let updated = prev;
 				for (const [feedId, episodes] of results) {
+					// A failed fetch (null) leaves that feed untouched.
+					if (!episodes) continue;
 					updated = applyRefreshedEpisodes(updated, feedId, episodes);
 				}
 				if (updated !== prev) saveFeeds(updated);
@@ -421,6 +439,30 @@ function createFeedStore() {
 		}
 		await refreshAllFeeds();
 	})();
+
+	// ── Background refresh ──────────────────────────────────────────────────
+	// New episodes only reach the app while it runs if feeds are re-fetched
+	// on a schedule: startup and manual `r` alone leave a subscribed show's
+	// latest episode invisible until the user restarts (or presses r). A
+	// self-rescheduling timer re-reads the interval preference on every tick
+	// so a settings change takes effect without a restart, and skips a tick
+	// that would overlap an in-flight refresh (manual or background).
+	let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	const scheduleNextRefresh = () => {
+		if (refreshTimer) clearTimeout(refreshTimer);
+		const minutes = Math.max(
+			1,
+			useAppStore().state().preferences.refreshIntervalMinutes ??
+				DEFAULT_REFRESH_INTERVAL_MINUTES,
+		);
+		refreshTimer = setTimeout(() => {
+			if (!isLoadingFeeds()) {
+				refreshAllFeeds().catch(() => {});
+			}
+			scheduleNextRefresh();
+		}, minutes * 60_000);
+	};
+	scheduleNextRefresh();
 
 	/** Remove a feed */
 	const removeFeed = (feedId: string) => {

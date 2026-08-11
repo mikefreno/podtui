@@ -37,6 +37,8 @@ interface ServedEpisode {
 let server: ReturnType<typeof Bun.serve> | null = null;
 let servedEpisodes: ServedEpisode[] = [];
 let feedAId = "";
+/** When set, the server 503s this path — simulates a feed going down. */
+let failPath: string | null = null;
 
 /** XML for the current served episode list (episode ids = feedUrl#index). */
 function feedXml(episodes: ServedEpisode[], origin: string): string {
@@ -72,6 +74,9 @@ beforeAll(() => {
 		port: 0,
 		fetch(req) {
 			const url = new URL(req.url);
+			if (failPath && url.pathname === failPath) {
+				return new Response("feed unavailable", { status: 503 });
+			}
 			if (url.pathname.endsWith(".xml")) {
 				return new Response(feedXml(servedEpisodes, url.origin), {
 					headers: { "Content-Type": "application/rss+xml" },
@@ -128,6 +133,31 @@ test("refresh with a genuinely new episode bumps lastUpdated", async () => {
 	const after = store.getFeed(feedAId)!;
 	expect(after.lastUpdated.getTime()).toBeGreaterThan(before);
 	expect(after.episodes.length).toBe(4);
+});
+
+test("a failed refresh does not wipe the feed's episodes", async () => {
+	const store = useFeedStore();
+	servedEpisodes = [{ title: "Ep 1", date: "2026-08-01T00:00:00Z" }];
+	const feedUrl = `http://127.0.0.1:${server!.port}/flaky.xml`;
+	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
+	expect(feed).not.toBeNull();
+	const feedId = feed!.id;
+	expect(store.getFeed(feedId)!.episodes.length).toBe(1);
+
+	// The feed now 503s. fetchEpisodes returns null, and both refresh paths
+	// must leave the loaded episodes untouched — a failed refresh must never
+	// look like an empty feed (which would wipe the show's episodes).
+	failPath = "/flaky.xml";
+	vi.advanceTimersByTime(60_000);
+	await store.refreshFeed(feedId);
+	expect(store.getFeed(feedId)!.episodes.length).toBe(1);
+
+	vi.advanceTimersByTime(60_000);
+	await store.refreshAllFeeds();
+	expect(store.getFeed(feedId)!.episodes.length).toBe(1);
+
+	failPath = null;
+	store.removeFeed(feedId);
 });
 
 test("refreshAllFeeds keeps unchanged feeds' order and timestamps", async () => {

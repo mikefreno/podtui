@@ -105,6 +105,8 @@ export type UserPreferences = {
 	autoJumpToPlayer: boolean;
 	/** Load older episodes from the Feed list: manual button or automatic at the bottom (default: manual). */
 	fetchMoreMode: FetchMoreMode;
+	/** Minutes between automatic background feed refreshes (default: 30). */
+	refreshIntervalMinutes: number;
 };
 
 export type AppState = {

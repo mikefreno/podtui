@@ -219,6 +219,32 @@ export function usePreferencesItems(): SettingItem[] {
 				app.updatePreferences({ fetchMoreMode: next });
 			},
 		},
+		{
+			id: "refreshInterval",
+			label: "Feed Refresh Interval",
+			kind: "number",
+			display: () => `${prefs().refreshIntervalMinutes} min`,
+			help: () =>
+				`How often subscribed feeds are re-fetched in the background, so new episodes appear without a restart or manual refresh (r).\nType: number (1–120 minutes)\nDefault: 30\nCurrent: ${prefs().refreshIntervalMinutes} min\nj/k to −/+5 · Enter to type a value.`,
+			cycle: (dir) => {
+				const next = Math.min(
+					120,
+					Math.max(1, prefs().refreshIntervalMinutes + dir * 5),
+				);
+				app.updatePreferences({ refreshIntervalMinutes: next });
+			},
+			renderEditor: () => (
+				<NumberInputEditor
+					label="Feed Refresh Interval (minutes)"
+					value={() => prefs().refreshIntervalMinutes}
+					commit={(n) => {
+						app.updatePreferences({
+							refreshIntervalMinutes: Math.min(120, n),
+						});
+					}}
+				/>
+			),
+		},
 	];
 
 	// Whitelist management only appears while scope is set to "whitelist".

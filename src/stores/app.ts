@@ -42,6 +42,7 @@ const defaultPreferences: UserPreferences = {
 	autoDownloadWhitelist: [],
 	autoJumpToPlayer: true,
 	fetchMoreMode: "manual",
+	refreshIntervalMinutes: 30,
 };
 
 const defaultState: AppState = {
