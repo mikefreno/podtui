@@ -173,7 +173,16 @@ if (COMPILE) {
 			);
 		}
 
-		// Keep CFBundleShortVersionString in sync with src/index.tsx VERSION.
+		// Version for the bundle comes from src/index.tsx (single source of
+		// truth — release.yml requires bumping it in the tag commit).
+		const srcIndex = await Bun.file(join("src", "index.tsx")).text();
+		const versionMatch = srcIndex.match(/const VERSION = "([^"]+)"/);
+		const bundleVersion = versionMatch?.[1];
+		if (!bundleVersion) {
+			console.error("Error: could not read VERSION from src/index.tsx");
+			process.exit(1);
+		}
+
 		Bun.write(
 			join(appRoot, "Contents", "Info.plist"),
 			`<?xml version="1.0" encoding="UTF-8"?>
@@ -193,9 +202,9 @@ if (COMPILE) {
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.3.1</string>
+	<string>${bundleVersion}</string>
 	<key>CFBundleVersion</key>
-	<string>0.3.1</string>
+	<string>${bundleVersion}</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 </dict>
