@@ -161,6 +161,52 @@ function registerExitTeardown(): void {
 	}
 }
 
+/** Poll ticks between paused-state checks (~1s at 150ms/tick). While the
+ *  UI believes playback is paused we only need to catch an external
+ *  resume (AirPod play tap, lock-screen/media-center play); checking every
+ *  tick would just hammer mpv IPC for nothing. */
+const PAUSE_WATCH_TICKS = 7;
+
+/** The player process died while we believed playback was live — track
+ *  ended (mpv quits at EOF) or the process crashed. Persist the final
+ *  position and stop polling. */
+function finalizeTrackEnd(): void {
+	setIsPlaying(false);
+	stopPolling();
+	const ep = currentEpisode();
+	if (ep) {
+		const progressStore = useProgressStore();
+		progressStore.update(ep.id, position(), duration(), speed());
+	}
+}
+
+/** mpv paused itself OUTSIDE PodTUI — system sleep/lock, AirPod removal,
+ *  device swap, OS media keys, the Now Playing center. Bring the UI in
+ *  sync; the poll stays armed so an external resume is caught too. */
+function reconcileExternalPause(): void {
+	setIsPlaying(false);
+	const ep = currentEpisode();
+	if (ep) {
+		const progressStore = useProgressStore();
+		progressStore.update(ep.id, position(), duration(), speed());
+		emit("player.pause", { episodeId: ep.id });
+		const media = useMediaRegistry();
+		media.setPlaybackState(false);
+		media.setPosition(position());
+	}
+}
+
+/** Playback was restarted from outside PodTUI (AirPods, lock-screen or
+ *  media-center play, OS media keys). Bring the UI back to "playing". */
+function reconcileExternalResume(): void {
+	setIsPlaying(true);
+	const ep = currentEpisode();
+	if (ep) {
+		emit("player.play", { episodeId: ep.id });
+		useMediaRegistry().setPlaybackState(true);
+	}
+}
+
 function startPolling(): void {
 	stopPolling();
 	pollCount = 0;
@@ -168,36 +214,53 @@ function startPolling(): void {
 	// interval (getPosition opens a fresh mpv IPC connection per call).
 	let pollInFlight = false;
 	pollTimer = setInterval(async () => {
-		if (!backend || !isPlaying() || pollInFlight) return;
+		if (!backend || pollInFlight) return;
 		pollInFlight = true;
 		try {
-			const pos = await backend.getPosition();
-			const dur = await backend.getDuration();
-			setPosition(pos);
-			if (dur > 0) setDuration(dur);
-
-			// Save progress every ~5 seconds (33 ticks * 150ms)
 			pollCount++;
-			if (pollCount % 33 === 0) {
-				const ep = currentEpisode();
-				if (ep) {
-					const progressStore = useProgressStore();
-					progressStore.update(ep.id, pos, dur > 0 ? dur : duration(), speed());
-
-					const media = useMediaRegistry();
-					media.setPosition(pos);
+			if (isPlaying()) {
+				// mpv can pause itself outside PodTUI. Reconcile instead of
+				// staying stuck on "playing" with a frozen waveform
+				// (getPosition would just re-read the same frozen time-pos).
+				const paused = await backend.getPauseState();
+				if (paused === true) {
+					reconcileExternalPause();
+					return;
 				}
-			}
 
-			// Check if backend stopped playing (track ended)
-			if (!backend.isPlaying() && isPlaying()) {
-				setIsPlaying(false);
-				stopPolling();
-				// Save final position on track end
-				const ep = currentEpisode();
-				if (ep) {
-					const progressStore = useProgressStore();
-					progressStore.update(ep.id, pos, dur > 0 ? dur : duration(), speed());
+				const pos = await backend.getPosition();
+				const dur = await backend.getDuration();
+				setPosition(pos);
+				if (dur > 0) setDuration(dur);
+
+				// Save progress every ~5 seconds (33 ticks * 150ms)
+				if (pollCount % 33 === 0) {
+					const ep = currentEpisode();
+					if (ep) {
+						const progressStore = useProgressStore();
+						progressStore.update(ep.id, pos, dur > 0 ? dur : duration(), speed());
+
+						const media = useMediaRegistry();
+						media.setPosition(pos);
+					}
+				}
+
+				// Check if backend stopped playing (track ended)
+				if (!backend.isPlaying()) {
+					finalizeTrackEnd();
+				}
+			} else if (pollCount % PAUSE_WATCH_TICKS === 0) {
+				// Paused — watch for playback restarted from outside (AirPods,
+				// lock-screen/media-center play). Only while the player is
+				// still alive: a dead player while we thought we were paused
+				// means the track ended (mpv quits at EOF) or it crashed.
+				if (!backend.isAlive()) {
+					finalizeTrackEnd();
+					return;
+				}
+				const paused = await backend.getPauseState();
+				if (paused === false) {
+					reconcileExternalResume();
 				}
 			}
 		} catch {
@@ -337,7 +400,9 @@ async function pause(): Promise<void> {
 	try {
 		await backend.pause();
 		setIsPlaying(false);
-		stopPolling();
+		// Polling stays armed (paused-watch mode): playback can be resumed
+		// from OUTSIDE PodTUI — AirPods, lock-screen/media-center play —
+		// and the poll must be live to catch it.
 		const ep = currentEpisode();
 		if (ep) {
 			// Save progress on pause
