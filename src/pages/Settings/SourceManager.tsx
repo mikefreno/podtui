@@ -105,6 +105,7 @@ function AddSourceForm() {
 					width={25}
 					textColor={theme.text}
 					focusedTextColor={theme.accent}
+					cursorColor={theme.accent}
 				/>
 			</box>
 			<box flexDirection="row" gap={1}>
@@ -120,6 +121,7 @@ function AddSourceForm() {
 					width={35}
 					textColor={theme.text}
 					focusedTextColor={theme.accent}
+					cursorColor={theme.accent}
 				/>
 			</box>
 			<box
