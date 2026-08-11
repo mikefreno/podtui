@@ -211,7 +211,7 @@ export function usePreferencesItems(): SettingItem[] {
 			kind: "select",
 			display: () => (prefs().fetchMoreMode === "auto" ? "Auto" : "Manual"),
 			help: () =>
-				`How the Feed list loads older episodes.\nManual: a "[Fetch More]" button at the bottom of the list.\nAuto: fetches automatically when reaching the bottom.\nType: select\nDefault: manual\nCurrent: ${prefs().fetchMoreMode === "auto" ? "Auto" : "Manual"}\nCycle with j/k; Enter to apply.`,
+				`How the Feed and per-show episode lists load older episodes.\nManual: a "[Fetch More]" button at the bottom of the list.\nAuto: fetches automatically when reaching the bottom.\nType: select\nDefault: manual\nCurrent: ${prefs().fetchMoreMode === "auto" ? "Auto" : "Manual"}\nCycle with j/k; Enter to apply.`,
 			cycle: (dir) => {
 				const modes: Array<"manual" | "auto"> = ["manual", "auto"];
 				const idx = modes.indexOf(prefs().fetchMoreMode ?? "manual");

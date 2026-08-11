@@ -86,7 +86,7 @@ export type AppSettings = {
 	visualizer: VisualizerSettings;
 };
 
-/** How the Feed list loads older episodes (default: manual "[Fetch More]"). */
+/** How the Feed and per-show episode lists load older episodes (default: manual "[Fetch More]"). */
 export type FetchMoreMode = "manual" | "auto";
 
 /** Which shows the auto-download setting applies to (default: all). */

@@ -6,12 +6,15 @@
  *   depth 1 (current) — episodes of the drilled show. Parent pane = shows.
  *   preview            — detail of the hovered item in the current column.
  *
+ * Depth 1 ends with a "[Fetch More]" row (same preference-driven behavior
+ * as the Feed tab) that loads the next batch of episodes for that show.
+ *
  * Renders entirely through `<PaneRow>`; no bespoke 3-column flexbox JSX
  * remains. `l`/Enter drills in (show → episodes); `h` pops a depth (noop at
  * 0). j/k move only within the current column.
  */
 
-import { createMemo, For, Show, onMount, onCleanup } from "solid-js";
+import { createMemo, createEffect, For, Show, onMount, onCleanup } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
 import { useAppStore } from "@/stores/app";
@@ -28,6 +31,7 @@ import {
 } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { on, off } from "@/utils/event-bus";
+import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
@@ -40,6 +44,8 @@ import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 export const MyShowsPaneCount = 1;
 
 export function MyShowsPage() {
+	// Static: detection never changes mid-session.
+	const nerd = supportsNerdFonts();
 	const feedStore = useFeedStore();
 	const downloadStore = useDownloadStore();
 	const app = useAppStore();
@@ -71,17 +77,40 @@ export function MyShowsPage() {
 			(a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
 		);
 	});
+	// ── Fetch More ───────────────────────────────────────────────────────────
+	// A "[Fetch More]" row at the bottom of a drilled show's episode list
+	// advances that show's loaded window by 50 episodes — the per-show
+	// counterpart to the Feed page's row (which loads every feed). manual
+	// mode: Enter on the row. auto mode: reaching the bottom row fetches
+	// automatically (see the effect below).
+	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "manual";
+	const showFetchMore = () =>
+		depth() >= 1 &&
+		!!drilledShowId() &&
+		feedStore.hasMoreEpisodes(drilledShowId());
+	// Total navigable rows at depth 1: episodes + the optional Fetch More row.
+	const rowCount = () => episodes().length + (showFetchMore() ? 1 : 0);
+	const focusedRow = () =>
+		rowCount() === 0 ? 0 : Math.min(focus(1), rowCount() - 1);
+	const focusedOnMore = () =>
+		showFetchMore() && focusedRow() === episodes().length;
+	// -1 while the Fetch More row is focused so no episode row renders the
+	// cursor/highlight (the button is the focused row, not the last episode).
 	const focusedEpIdx = () =>
-		episodes().length === 0 ? 0 : Math.min(focus(1), episodes().length - 1);
-	const focusedEpisode = () => episodes()[focusedEpIdx()];
+		focusedOnMore()
+			? -1
+			: Math.min(focusedRow(), Math.max(episodes().length - 1, 0));
+	const focusedEpisode = () =>
+		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
+	const moreRef = useScrollIntoView(() => focusedOnMore());
 
-	const curLen = () => (depth() === 0 ? shows().length : episodes().length);
+	const curLen = () => (depth() === 0 ? shows().length : rowCount());
 
 	const ensureFocus = () => {
 		if (shows().length > 0 && focus(0) >= shows().length)
 			nav.setDepthFocus(shows().length - 1, 0);
-		if (depth() >= 1 && episodes().length > 0 && focus(1) >= episodes().length)
-			nav.setDepthFocus(episodes().length - 1, 1);
+		if (depth() >= 1 && rowCount() > 0 && focus(1) >= rowCount())
+			nav.setDepthFocus(rowCount() - 1, 1);
 	};
 	onMount(ensureFocus);
 
@@ -90,6 +119,17 @@ export function MyShowsPage() {
 			if (depth() === 0) return shows()[i]?.id;
 			return episodes()[i]?.id;
 		});
+	});
+
+	// Auto mode: reaching the bottom of a drilled show's list loads its next
+	// batch. Guarded by isLoadingMore so concurrent loads never stack.
+	createEffect(() => {
+		if (depth() < 1) return;
+		if (fetchMoreMode() !== "auto") return;
+		if (!showFetchMore()) return;
+		if (feedStore.isLoadingMore()) return;
+		if (focusedRow() < rowCount() - 1) return;
+		feedStore.loadMoreEpisodes(drilledShowId()).catch(() => {});
 	});
 
 	// ── helpers ─────────────────────────────────────────────────────────────────
@@ -143,6 +183,10 @@ export function MyShowsPage() {
 			return;
 		}
 		if (depth() >= 1) {
+			if (focusedOnMore()) {
+				feedStore.loadMoreEpisodes(drilledShowId()).catch(() => {});
+				return;
+			}
 			const ep = focusedEpisode();
 			if (ep) playEpisode(ep);
 		}
@@ -405,9 +449,38 @@ export function MyShowsPage() {
 							);
 						}}
 					</For>
-					<Show when={feedStore.isLoadingMore()}>
-						<box paddingLeft={2} paddingTop={1}>
-							<LoadingIndicator label="Loading more…" />
+					<Show when={showFetchMore()}>
+						<box
+							ref={moreRef}
+							flexDirection="row"
+							gap={1}
+							paddingRight={1}
+							backgroundColor={focusBg(
+								episodes().length,
+								focusedRow(),
+								isActive(),
+							)}
+							onMouseDown={() => {
+								nav.setActivePane(DEPTH_CENTER_PANE);
+								nav.setDepthFocus(episodes().length, 1);
+							}}
+						>
+							<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
+								{focusedOnMore() ? marker() : " "}
+							</text>
+							{nerd && (
+								<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
+									{NF_ICONS.more}
+								</text>
+							)}
+							<Show
+								when={!feedStore.isLoadingMore()}
+								fallback={<LoadingIndicator label="Fetching…" />}
+							>
+								<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
+									[Fetch More]
+								</text>
+							</Show>
 						</box>
 					</Show>
 				</Show>
@@ -456,15 +529,33 @@ export function MyShowsPage() {
 				)}
 			</Show>
 		) : (
-			// depth ≥1 preview: hovered episode
-			<Show
-				when={focusedEpisode()}
-				fallback={
-					<box padding={1}>
-						<text fg={muted()}>No episode focused</text>
+			// depth ≥1 preview: hovered episode (or the Fetch More row)
+			<>
+				<Show when={focusedOnMore()}>
+					<box flexDirection="column" gap={1} padding={1}>
+						<text fg={theme.textPrimary ?? theme.text}>
+							<strong>[Fetch More]</strong>
+						</text>
+						<text fg={muted()}>
+							{feedStore.isLoadingMore()
+								? "Loading the next batch of episodes…"
+								: fetchMoreMode() === "auto"
+									? "Auto mode: the next batch loads automatically at the bottom of the list."
+									: "Load the next batch of older episodes for this show (Enter)."}
+						</text>
+						<box height={1} />
+						<text fg={muted()}>enter: load more · h back</text>
 					</box>
-				}
-			>
+				</Show>
+				<Show when={!focusedOnMore()}>
+					<Show
+						when={focusedEpisode()}
+						fallback={
+							<box padding={1}>
+								<text fg={muted()}>No episode focused</text>
+							</box>
+						}
+					>
 				{(ep) => (
 					<box flexDirection="column" gap={1} padding={1}>
 						<text fg={theme.textPrimary ?? theme.text}>
@@ -508,8 +599,10 @@ export function MyShowsPage() {
 						</text>
 					</box>
 				)}
+				</Show>
 			</Show>
-		);
+		</>
+	);
 
 	return (
 		<PaneRow

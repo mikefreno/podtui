@@ -205,7 +205,7 @@ a suggestion in/out), and `w` in My Shows adds/removes the focused show.
 
 Env overrides: `PODTUI_AUDIO_BACKEND`, `XDG_CONFIG_HOME`, `PODTUI_NERD_FONTS`.
 
-**Fonts** — PodTui prepends Nerd Font glyphs to non-episode/show list rows (tabs, Discover categories, Settings sections, the Feed "Fetch More" row). Icons are hidden automatically when your terminal font is not Nerd Font capable (no tofu, no layout gaps); detection is heuristic (terminal type), so force it with `PODTUI_NERD_FONTS=1` or `=0` if it guesses wrong. A Nerd Font-patched font (e.g. JetBrainsMono Nerd Font) is recommended.
+**Fonts** — PodTui prepends Nerd Font glyphs to non-episode/show list rows (tabs, Discover categories, Settings sections, the Feed and per-show "Fetch More" rows). Icons are hidden automatically when your terminal font is not Nerd Font capable (no tofu, no layout gaps); detection is heuristic (terminal type), so force it with `PODTUI_NERD_FONTS=1` or `=0` if it guesses wrong. A Nerd Font-patched font (e.g. JetBrainsMono Nerd Font) is recommended.
 
 ## Troubleshooting
 
