@@ -98,7 +98,9 @@ export enum DownloadStatus {
 export interface DownloadedEpisode {
   /** Episode ID */
   episodeId: string
-  /** Feed ID the episode belongs to */
+  /** Feed ID the episode belongs to. For downloads of shows that aren't
+   *  subscribed (search downloads) this is a deterministic synthetic id
+   *  ("unsub-<slug>") that also names the file subdirectory. */
   feedId: string
   /** Current download status */
   status: DownloadStatus
@@ -114,4 +116,16 @@ export interface DownloadedEpisode {
   fileSize: number
   /** Error message if failed */
   error: string | null
+  /** Episode title, persisted so unsubscribed-show downloads render without
+   *  a loaded feed. */
+  episodeTitle?: string
+  /** Audio URL, persisted so queued downloads survive a restart. */
+  audioUrl?: string
+  /** Publication date (ISO), for display of unsubscribed-show downloads. */
+  pubDate?: string
+  /** Show title, kept for downloads whose show isn't subscribed. */
+  podcastTitle?: string
+  /** The show's RSS feed URL, used to re-classify a download as subscribed
+   *  once the user subscribes to its show. */
+  podcastFeedUrl?: string
 }

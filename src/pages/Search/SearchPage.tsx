@@ -30,6 +30,10 @@ import {
 } from "solid-js";
 import { useSearchStore } from "@/stores/search";
 import { useFeedStore } from "@/stores/feed";
+import { useDownloadStore } from "@/stores/download";
+import { useAudio } from "@/hooks/useAudio";
+import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
+import { DownloadStatus } from "@/types/episode";
 import { useToast } from "@/ui/toast";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
@@ -55,6 +59,9 @@ export const SearchPaneCount = 1;
 function SearchPage() {
 	const searchStore = useSearchStore();
 	const feedStore = useFeedStore();
+	const downloadStore = useDownloadStore();
+	const audio = useAudio();
+	const audioNav = useAudioNavStore();
 	const toast = useToast();
 	const [inputValue, setInputValue] = createSignal("");
 	const { theme } = useTheme();
@@ -134,6 +141,35 @@ function SearchPage() {
 	// ── helpers ─────────────────────────────────────────────────────────────────
 	const formatDate = (d: Date) => format(d, "MMM d, yyyy");
 
+	const downloadLabel = (id: string) => {
+		switch (downloadStore.getDownloadStatus(id)) {
+			case DownloadStatus.QUEUED:
+				return "[Q]";
+			case DownloadStatus.DOWNLOADING:
+				return `[${downloadStore.getDownloadProgress(id)}%]`;
+			case DownloadStatus.COMPLETED:
+				return "[DL]";
+			case DownloadStatus.FAILED:
+				return "[ERR]";
+			default:
+				return "";
+		}
+	};
+	const downloadColor = (id: string) => {
+		switch (downloadStore.getDownloadStatus(id)) {
+			case DownloadStatus.QUEUED:
+				return theme.warning;
+			case DownloadStatus.DOWNLOADING:
+				return theme.primary;
+			case DownloadStatus.COMPLETED:
+				return theme.success;
+			case DownloadStatus.FAILED:
+				return theme.error;
+			default:
+				return muted();
+		}
+	};
+
 	const runSearch = (query: string) => {
 		const q = query.trim();
 		if (!q) return;
@@ -185,6 +221,49 @@ function SearchPage() {
 		if (feed) searchStore.markSubscribed(result.podcast.id);
 	};
 
+	/** The subscribed feed backing a search result, if any (matched by
+	 *  directory id or feed URL). */
+	const feedForResult = (r: SearchResult) =>
+		feedStore.feeds().find(
+			(f) =>
+				f.podcast.id === r.podcast.id ||
+				(!!r.podcast.feedUrl && f.podcast.feedUrl === r.podcast.feedUrl),
+		);
+
+	/** Download the focused episode: under its subscribed feed when the show
+	 *  is subscribed, otherwise as an "unsubscribed show" download (listed
+	 *  under Unsubscribed Show Downloads in My Shows / the download manager). */
+	const downloadFocusedEpisode = () => {
+		if (depth() !== 1) return;
+		const r = focusedResult();
+		if (!r || r.kind !== "episode") return;
+		const feed = feedForResult(r);
+		if (feed) downloadStore.startDownload(r.episode, feed.id);
+		else downloadStore.startUnsubscribedDownload(r.episode, r.podcast);
+	};
+
+	const playFocusedEpisode = () => {
+		if (depth() !== 1) return;
+		const r = focusedResult();
+		if (!r || r.kind !== "episode") return;
+		audio.play(r.episode).catch(() => {});
+		audioNav.setSource(AudioSource.SEARCH, r.podcast.id);
+	};
+
+	const unsubscribeFocused = () => {
+		if (depth() !== 1) return;
+		const r = focusedResult();
+		if (!r || !r.podcast.isSubscribed) return;
+		const feed = feedForResult(r);
+		if (feed) {
+			feedStore.removeFeed(feed.id);
+			downloadStore
+				.removeDownloadsForFeed(feed.id, feed.podcast.feedUrl || undefined)
+				.catch(() => {});
+			searchStore.markUnsubscribed(r.podcast.id, r.podcast.feedUrl);
+		}
+	};
+
 	// ── nav.action handler ──────────────────────────────────────────────────────
 	const PAGE_ACTIONS: Partial<Record<KeybindActionName, () => void>> = {
 		"move-down": () => step(1),
@@ -205,6 +284,17 @@ function SearchPage() {
 					);
 			}
 		},
+		download: () => downloadFocusedEpisode(),
+		"delete-download": () => {
+			if (depth() !== 1) return;
+			const r = focusedResult();
+			if (!r || r.kind !== "episode") return;
+			const id = r.episode.id;
+			if (downloadStore.getDownloadStatus(id) === DownloadStatus.NONE) return;
+			downloadStore.cancelDownload(id);
+			downloadStore.removeDownload(id).catch(() => {});
+		},
+		unsubscribe: () => unsubscribeFocused(),
 		search: () => {
 			// `s` refocuses the query input (typing mode) when on the query depth.
 			if (depth() === 0) nav.setInputFocused(true);
@@ -230,7 +320,13 @@ function SearchPage() {
 		}
 		if (depth() === 1) {
 			const r = focusedResult();
-			if (r) handleSubscribe(r);
+			if (!r) return;
+			if (r.kind === "episode" && r.podcast.isSubscribed) {
+				// Subscribed show's episode → stream it (matches Feed/My Shows).
+				playFocusedEpisode();
+				return;
+			}
+			handleSubscribe(r);
 		}
 	}
 
@@ -474,6 +570,13 @@ function SearchPage() {
 						{(result, index) => {
 							const fi = () => focusedResultIdx();
 							const ref = useScrollIntoView(() => index() === fi());
+							// Episode download status badge ("" when absent).
+							const dlLabel = () =>
+								result.kind === "episode"
+									? downloadLabel(result.episode.id)
+									: "";
+							const dlEpId = () =>
+								result.kind === "episode" ? result.episode.id : "";
 							return (
 								<box
 									ref={ref}
@@ -495,6 +598,11 @@ function SearchPage() {
 												? result.episode.title
 												: result.podcast.title}
 										</text>
+										<Show when={dlLabel()}>
+											<text fg={downloadColor(dlEpId())}>
+												{dlLabel()}
+											</text>
+										</Show>
 										<Show when={result.podcast.isSubscribed}>
 											<text
 												fg={index() === fi() ? theme.surface : theme.success}
@@ -576,9 +684,16 @@ function SearchPage() {
 										{(r.episode.description?.length ?? 0) > 400 ? "…" : ""}
 									</text>
 								</Show>
-								<text fg={muted()}>
-									Published: {formatDate(r.episode.pubDate)}
-								</text>
+								<box flexDirection="row" gap={2}>
+									<text fg={muted()}>
+										Published: {formatDate(r.episode.pubDate)}
+									</text>
+									<Show when={downloadLabel(r.episode.id)}>
+										<text fg={downloadColor(r.episode.id)}>
+											{downloadLabel(r.episode.id)}
+										</text>
+									</Show>
+								</box>
 								<Show when={(r.podcast.categories ?? []).length > 0}>
 									<box flexDirection="row" gap={1}>
 										<For each={(r.podcast.categories ?? []).slice(0, 4)}>
@@ -594,12 +709,28 @@ function SearchPage() {
 									<text fg={theme.primary}>[+] Subscribe (enter)</text>
 								</Show>
 								<Show when={r.podcast.isSubscribed}>
-									<text fg={theme.success}>Already subscribed</text>
+									<text fg={theme.success}>
+										Subscribed · x: unsubscribe
+									</text>
 								</Show>
 								<box height={1} />
-								<text fg={muted()}>
-									enter: subscribe to show · h: back to query
-								</text>
+								<Show
+									when={r.podcast.isSubscribed}
+									fallback={
+										<text fg={muted()}>
+											enter: subscribe · d: download · h: back to query
+										</text>
+									}
+								>
+									<text fg={muted()}>
+										enter: play · d: download · x: unsubscribe
+										{downloadStore.getDownloadStatus(r.episode.id) !==
+										DownloadStatus.NONE
+											? " · D: delete"
+											: ""}{" "}
+										· h: back to query
+									</text>
+								</Show>
 							</box>
 						);
 					}
@@ -640,10 +771,16 @@ function SearchPage() {
 								<text fg={theme.primary}>[+] Subscribe (enter)</text>
 							</Show>
 							<Show when={r.podcast.isSubscribed}>
-								<text fg={theme.success}>Already subscribed</text>
+								<text fg={theme.success}>
+									Subscribed · x: unsubscribe
+								</text>
 							</Show>
 							<box height={1} />
-							<text fg={muted()}>enter: subscribe · h: back to query</text>
+							<text fg={muted()}>
+								enter: subscribe
+								{r.podcast.isSubscribed ? " · x: unsubscribe" : ""}{" "}
+								· h: back to query
+							</text>
 						</box>
 					);
 				}}

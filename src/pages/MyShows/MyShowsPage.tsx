@@ -33,7 +33,7 @@ import { useAudio } from "@/hooks/useAudio";
 import { on, off } from "@/utils/event-bus";
 import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
 import type { KeybindActionName } from "@/context/KeybindContext";
-import type { Episode } from "@/types/episode";
+import type { Episode, DownloadedEpisode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { PaneRow } from "@/components/PaneRow";
@@ -62,9 +62,28 @@ export function MyShowsPage() {
 
 	const shows = () => feedStore.getFilteredFeeds();
 
+	// Downloads of shows that are NOT subscribed (made from episode search) —
+	// listed as their own section under the shows list. Reads feeds() so an
+	// entry drops out the moment the user subscribes to its show.
+	const unsubs = () => downloadStore.getUnsubscribedDownloads();
+
+	// Total depth-0 rows: subscribed shows + unsubscribed-show downloads.
+	const depth0Count = () => shows().length + unsubs().length;
+
 	const focusedShowIdx = () =>
 		shows().length === 0 ? 0 : Math.min(focus(0), shows().length - 1);
-	const selectedShow = (): Feed | undefined => shows()[focusedShowIdx()];
+	/** True when the depth-0 cursor sits on an unsubscribed-show download
+	 *  row (past the shows list). */
+	const focusedOnUnsub = () =>
+		depth() === 0 && focus(0) >= shows().length && unsubs().length > 0;
+	const focusedUnsub = (): DownloadedEpisode | undefined => {
+		if (!focusedOnUnsub()) return undefined;
+		return unsubs()[Math.min(focus(0) - shows().length, unsubs().length - 1)];
+	};
+	const selectedShow = (): Feed | undefined => {
+		if (focusedOnUnsub()) return undefined;
+		return shows()[focusedShowIdx()];
+	};
 
 	// depth-1 frame ctx = the drilled feed id
 	const drilledShowId = (): string => stack()[1]?.ctx ?? "";
@@ -104,11 +123,11 @@ export function MyShowsPage() {
 		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
 	const moreRef = useScrollIntoView(() => focusedOnMore());
 
-	const curLen = () => (depth() === 0 ? shows().length : rowCount());
+	const curLen = () => (depth() === 0 ? depth0Count() : rowCount());
 
 	const ensureFocus = () => {
-		if (shows().length > 0 && focus(0) >= shows().length)
-			nav.setDepthFocus(shows().length - 1, 0);
+		if (depth() === 0 && depth0Count() > 0 && focus(0) >= depth0Count())
+			nav.setDepthFocus(depth0Count() - 1, 0);
 		if (depth() >= 1 && rowCount() > 0 && focus(1) >= rowCount())
 			nav.setDepthFocus(rowCount() - 1, 1);
 	};
@@ -116,7 +135,10 @@ export function MyShowsPage() {
 
 	onMount(() => {
 		nav.registerResolver(`${nav.activeTab()}:${DEPTH_CENTER_PANE}`, (i) => {
-			if (depth() === 0) return shows()[i]?.id;
+			if (depth() === 0) {
+				if (i < shows().length) return shows()[i]?.id;
+				return unsubs()[i - shows().length]?.episodeId;
+			}
 			return episodes()[i]?.id;
 		});
 	});
@@ -172,9 +194,31 @@ export function MyShowsPage() {
 		audioNav.setSource(AudioSource.MY_SHOWS, selectedShow()?.podcast.id);
 	};
 
+	/** Stream an unsubscribed-show download. The record carries only what was
+	 *  persisted at download time, so a minimal Episode is reconstructed. */
+	const playUnsubscribedDownload = (d: DownloadedEpisode) => {
+		audio
+			.play({
+				id: d.episodeId,
+				podcastId: d.feedId,
+				title: d.episodeTitle ?? d.episodeId,
+				description: "",
+				audioUrl: d.audioUrl ?? "",
+				duration: 0,
+				pubDate: d.pubDate ? new Date(d.pubDate) : new Date(),
+			})
+			.catch(() => {});
+		audioNav.setSource(AudioSource.SEARCH, d.feedId);
+	};
+
 	// ── drill / open ───────────────────────────────────────────────────────────
 	function open() {
 		if (depth() === 0) {
+			const d = focusedUnsub();
+			if (d) {
+				playUnsubscribedDownload(d);
+				return;
+			}
 			const show = selectedShow();
 			if (!show) return;
 			nav.pushDepth({ kind: "episodes", ctx: show.id, focus: 0 } as DepthFrame);
@@ -215,6 +259,14 @@ export function MyShowsPage() {
 			if (ep) downloadStore.startDownload(ep, drilledShowId());
 		},
 		"delete-download": () => {
+			if (depth() === 0) {
+				const d = focusedUnsub();
+				if (d) {
+					downloadStore.cancelDownload(d.episodeId);
+					downloadStore.removeDownload(d.episodeId).catch(() => {});
+				}
+				return;
+			}
 			if (depth() < 1) return;
 			const ep = focusedEpisode();
 			if (!ep) return;
@@ -283,7 +335,9 @@ export function MyShowsPage() {
 
 	const currentLabel = () =>
 		depth() === 0
-			? `Shows (${shows().length})`
+			? `Shows (${shows().length})${
+					unsubs().length > 0 ? ` · Unsub DL (${unsubs().length})` : ""
+				}`
 			: `${selectedShow() ? showTitle(selectedShow()!) : "Episodes"} · ${episodes().length}`;
 
 	// ── parent pane: previous-depth list (muted/blank at depth 0) ─────────────
@@ -321,7 +375,7 @@ export function MyShowsPage() {
 			{/* depth 0: shows — stable sibling <Show> so the swap disposes cleanly */}
 			<Show when={depth() === 0}>
 				<Show
-					when={shows().length > 0}
+					when={depth0Count() > 0}
 					fallback={
 						<box padding={1}>
 							<text fg={muted()}>
@@ -377,6 +431,71 @@ export function MyShowsPage() {
 							);
 						}}
 					</For>
+					<Show when={unsubs().length > 0}>
+						<box paddingLeft={1} paddingTop={1}>
+							<text fg={theme.textSecondary}>
+								Unsubscribed Show Downloads
+							</text>
+						</box>
+						<For each={unsubs()}>
+							{(d, index) => {
+								// Rows continue after the shows list.
+								const rowIdx = () => shows().length + index();
+								const lf = () => nav.depthFocus(0);
+								const ref = useScrollIntoView(() => rowIdx() === lf());
+								return (
+									<box
+										ref={ref}
+										flexDirection="column"
+										gap={0}
+										paddingRight={1}
+										backgroundColor={focusBg(rowIdx(), lf(), isActive())}
+										onMouseDown={() => {
+											nav.setActivePane(DEPTH_CENTER_PANE);
+											nav.setDepthFocus(rowIdx(), 0);
+										}}
+									>
+										<box flexDirection="row" gap={1}>
+											<text
+												flexShrink={0}
+												fg={focusFg(rowIdx(), lf(), isActive())}
+											>
+												{rowIdx() === lf() ? marker() : " "}
+											</text>
+											<text
+												wrapMode="none"
+												truncate
+												fg={focusFg(rowIdx(), lf(), isActive())}
+											>
+												{d.episodeTitle ?? d.episodeId}
+											</text>
+											<Show when={downloadLabel(d.episodeId)}>
+												<text
+													flexShrink={0}
+													fg={downloadColor(d.episodeId)}
+												>
+													{downloadLabel(d.episodeId)}
+												</text>
+											</Show>
+										</box>
+										<box paddingLeft={2}>
+											<text
+												wrapMode="none"
+												truncate
+												fg={
+													rowIdx() === lf()
+														? theme.surface
+														: theme.textSecondary
+												}
+											>
+												{d.podcastTitle ?? d.feedId}
+											</text>
+										</box>
+									</box>
+								);
+							}}
+						</For>
+					</Show>
 				</Show>
 			</Show>
 			{/* depth ≥1: episodes */}
@@ -491,39 +610,78 @@ export function MyShowsPage() {
 	// ── preview pane ───────────────────────────────────────────────────────────
 	const previewContent = () =>
 		depth() === 0 ? (
-			// depth 0 preview: hovered show
+			// depth 0 preview: hovered unsubscribed-show download, else the
+			// hovered show.
 			<Show
-				when={selectedShow()}
+				when={focusedUnsub()}
 				fallback={
-					<box padding={1}>
-						<text fg={muted()}>No show focused</text>
-					</box>
+					<Show
+						when={selectedShow()}
+						fallback={
+							<box padding={1}>
+								<text fg={muted()}>No show focused</text>
+							</box>
+						}
+					>
+						{(show) => (
+							<box flexDirection="column" gap={1} padding={1}>
+								<text fg={theme.textPrimary ?? theme.text}>
+									<strong>{showTitle(show())}</strong>
+								</text>
+								<Show when={show().podcast.author}>
+									<text fg={muted()}>by {show().podcast.author}</text>
+								</Show>
+								<text fg={theme.textSecondary}>
+									{show().episodes.length} episodes
+								</text>
+								<text fg={muted()}>
+									{show().podcast.description?.slice(0, 400) ??
+										"No description."}
+								</text>
+								<box height={1} />
+								<text fg={muted()}>
+									enter/l: open · h: back · x: unsubscribe
+									{app.state().preferences.autoDownloadScope ===
+									"whitelist"
+										? (app.state().preferences.autoDownloadWhitelist ??
+											[]
+										  ).includes(show().id)
+											? " · w: un-whitelist"
+											: " · w: whitelist"
+										: ""}
+								</text>
+							</box>
+						)}
+					</Show>
 				}
 			>
-				{(show) => (
+				{(d) => (
 					<box flexDirection="column" gap={1} padding={1}>
 						<text fg={theme.textPrimary ?? theme.text}>
-							<strong>{showTitle(show())}</strong>
+							<strong>{d().episodeTitle ?? d().episodeId}</strong>
 						</text>
-						<Show when={show().podcast.author}>
-							<text fg={muted()}>by {show().podcast.author}</text>
-						</Show>
 						<text fg={theme.textSecondary}>
-							{show().episodes.length} episodes
+							{d().podcastTitle ?? d().feedId}
 						</text>
+						<box flexDirection="row" gap={2}>
+							<Show when={d().pubDate}>
+								<text fg={theme.info}>
+									{formatDate(new Date(d().pubDate!))}
+								</text>
+							</Show>
+							<Show when={downloadLabel(d().episodeId)}>
+								<text fg={downloadColor(d().episodeId)}>
+									{downloadLabel(d().episodeId)}
+								</text>
+							</Show>
+						</box>
 						<text fg={muted()}>
-							{show().podcast.description?.slice(0, 400) ?? "No description."}
+							Downloaded from episode search — the show is not
+							subscribed.
 						</text>
 						<box height={1} />
 						<text fg={muted()}>
-							enter/l: open · h: back · x: unsubscribe
-							{app.state().preferences.autoDownloadScope === "whitelist"
-								? (app.state().preferences.autoDownloadWhitelist ??
-									[]
-								  ).includes(show().id)
-									? " · w: un-whitelist"
-									: " · w: whitelist"
-								: ""}
+							enter: play · D: delete download · h: back
 						</text>
 					</box>
 				)}

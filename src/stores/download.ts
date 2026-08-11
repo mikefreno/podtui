@@ -10,12 +10,31 @@ import { createSignal } from "solid-js";
 import { DownloadStatus } from "../types/episode";
 import type { DownloadedEpisode } from "../types/episode";
 import type { Episode } from "../types/episode";
+import type { Podcast } from "../types/podcast";
 import { downloadEpisode } from "../utils/episode-downloader";
 import { ensureConfigDir, getConfigFilePath } from "../utils/config-dir";
 import { useFeedStore } from "./feed";
 
 const DOWNLOADS_FILE = "downloads.json";
 const MAX_CONCURRENT = 2;
+
+/** Prefix for synthetic feed ids of unsubscribed-show downloads (search
+ *  downloads). The id doubles as the file subdirectory name, so it must be
+ *  filesystem-safe. */
+const UNSUBSCRIBED_FEED_PREFIX = "unsub-";
+
+/** Deterministic synthetic feed id for a show that isn't subscribed: groups
+ *  its search downloads together (and names their file subdirectory) without
+ *  colliding with real feed ids (UUIDs). */
+function unsubscribedFeedId(podcast: Pick<Podcast, "feedUrl" | "title">): string {
+	const base = podcast.feedUrl || podcast.title;
+	const slug = base
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 48);
+	return `${UNSUBSCRIBED_FEED_PREFIX}${slug || "podcast"}`;
+}
 
 /** Serializable download record for persistence */
 interface DownloadRecord {
@@ -28,6 +47,12 @@ interface DownloadRecord {
 	error: string | null;
 	audioUrl: string;
 	episodeTitle: string;
+	/** ISO publication date, for unsubscribed-show downloads. */
+	pubDate?: string;
+	/** Show title, for downloads whose show isn't subscribed. */
+	podcastTitle?: string;
+	/** The show's RSS feed URL (re-classifies the download once subscribed). */
+	podcastFeedUrl?: string;
 }
 
 /** Queue item for pending downloads */
@@ -81,6 +106,11 @@ function createDownloadStore() {
 					speed: 0,
 					fileSize: rec.fileSize,
 					error: rec.error,
+					episodeTitle: rec.episodeTitle || undefined,
+					audioUrl: rec.audioUrl || undefined,
+					pubDate: rec.pubDate || undefined,
+					podcastTitle: rec.podcastTitle || undefined,
+					podcastFeedUrl: rec.podcastFeedUrl || undefined,
 				});
 			}
 			return map;
@@ -106,8 +136,11 @@ function createDownloadStore() {
 					downloadedAt: dl.downloadedAt?.toISOString() ?? null,
 					fileSize: dl.fileSize,
 					error: dl.error,
-					audioUrl: qItem?.audioUrl ?? "",
-					episodeTitle: qItem?.episodeTitle ?? "",
+					audioUrl: dl.audioUrl ?? qItem?.audioUrl ?? "",
+					episodeTitle: dl.episodeTitle ?? qItem?.episodeTitle ?? "",
+					pubDate: dl.pubDate,
+					podcastTitle: dl.podcastTitle,
+					podcastFeedUrl: dl.podcastFeedUrl,
 				});
 			}
 			const filePath = getConfigFilePath(DOWNLOADS_FILE);
@@ -260,8 +293,20 @@ function createDownloadStore() {
 		return null;
 	};
 
+	/** Optional metadata for a download whose show isn't subscribed (search
+	 *  downloads) — without it the record cannot render a title or be
+	 *  re-classified once the show is subscribed. */
+	interface UnsubscribedMeta {
+		podcastTitle: string;
+		podcastFeedUrl?: string;
+	}
+
 	/** Start downloading an episode */
-	const startDownload = (episode: Episode, feedId: string): void => {
+	const startDownload = (
+		episode: Episode,
+		feedId: string,
+		meta?: UnsubscribedMeta,
+	): void => {
 		const existing = downloads().get(episode.id);
 		if (
 			existing?.status === DownloadStatus.DOWNLOADING ||
@@ -280,6 +325,11 @@ function createDownloadStore() {
 			speed: 0,
 			fileSize: episode.fileSize ?? 0,
 			error: null,
+			episodeTitle: episode.title,
+			audioUrl: episode.audioUrl,
+			pubDate: episode.pubDate.toISOString(),
+			podcastTitle: meta?.podcastTitle,
+			podcastFeedUrl: meta?.podcastFeedUrl,
 		};
 
 		setDownloads((prev) => {
@@ -298,6 +348,21 @@ function createDownloadStore() {
 
 		saveDownloads().catch(() => {});
 		processQueue();
+	};
+
+	/** Start downloading an episode of a show that is NOT subscribed. The
+	 *  download gets a deterministic synthetic feed id (also its file
+	 *  subdirectory) plus the show's metadata so it can render under
+	 *  "Unsubscribed Show Downloads" and re-classify if the user later
+	 *  subscribes to the show. */
+	const startUnsubscribedDownload = (
+		episode: Episode,
+		podcast: Podcast,
+	): void => {
+		startDownload(episode, unsubscribedFeedId(podcast), {
+			podcastTitle: podcast.title,
+			podcastFeedUrl: podcast.feedUrl || undefined,
+		});
 	};
 
 	/** Cancel a download */
@@ -348,10 +413,18 @@ function createDownloadStore() {
 	};
 
 	/** Remove every download (active/queued/completed) belonging to a feed —
-	 *  abort in-flight transfers, drop queued items, delete files + metadata. */
-	const removeDownloadsForFeed = async (feedId: string): Promise<void> => {
+	 *  abort in-flight transfers, drop queued items, delete files + metadata.
+	 *  Also removes downloads of the same show made while it was unsubscribed
+	 *  (matched by podcastFeedUrl) so unsubscribing purges search downloads
+	 *  of that show too. */
+	const removeDownloadsForFeed = async (
+		feedId: string,
+		podcastFeedUrl?: string,
+	): Promise<void> => {
 		const eps = Array.from(downloads().values()).filter(
-			(d) => d.feedId === feedId,
+			(d) =>
+				d.feedId === feedId ||
+				(podcastFeedUrl && d.podcastFeedUrl === podcastFeedUrl),
 		);
 		for (const d of eps) {
 			cancelDownload(d.episodeId);
@@ -362,6 +435,24 @@ function createDownloadStore() {
 	/** Get all downloads as an array */
 	const getAllDownloads = (): DownloadedEpisode[] => {
 		return Array.from(downloads().values());
+	};
+
+	/** Downloads whose show is not subscribed — the "Unsubscribed Show
+	 *  Downloads" list shown in My Shows and the settings download manager.
+	 *  Reads feeds() so the list re-classifies (drops out) the moment the
+	 *  user subscribes to the show. Matched by feed id, or by the show's
+	 *  feed URL (covers downloads made before the show was subscribed). */
+	const getUnsubscribedDownloads = (): DownloadedEpisode[] => {
+		const feeds = useFeedStore().feeds();
+		return Array.from(downloads().values()).filter((d) => {
+			if (feeds.some((f) => f.id === d.feedId)) return false;
+			if (d.podcastFeedUrl) {
+				return !feeds.some(
+					(f) => f.podcast.feedUrl === d.podcastFeedUrl,
+				);
+			}
+			return true;
+		});
 	};
 
 	/** Get the current queue */
@@ -381,11 +472,13 @@ function createDownloadStore() {
 		getDownload,
 		getDownloadedFilePath,
 		getAllDownloads,
+		getUnsubscribedDownloads,
 		getQueue,
 		getActiveCount,
 
 		// Actions
 		startDownload,
+		startUnsubscribedDownload,
 		cancelDownload,
 		removeDownload,
 		removeDownloadsForFeed,
