@@ -10,12 +10,12 @@
  * tab root.
  */
 
-import { Show } from "solid-js";
+import { Show, onMount, onCleanup } from "solid-js";
 import { PlaybackControls } from "./PlaybackControls";
 import { ProgressBar } from "./ProgressBar";
 import { RealtimeWaveform } from "./RealtimeWaveform";
 import { useAudio } from "@/hooks/useAudio";
-import { useAppStore } from "@/stores/app";
+import { useVisualizer } from "@/stores/visualizer";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation, DEPTH_CENTER_PANE } from "@/context/NavigationContext";
 import { PaneRow } from "@/components/PaneRow";
@@ -27,7 +27,15 @@ export function PlayerPage() {
 	const audio = useAudio();
 	const { theme } = useTheme();
 	const nav = useNavigation();
+	const viz = useVisualizer();
 	const muted = () => theme.muted || theme.text;
+
+	// The page is mounted exactly while the Player tab is in focus (Shell
+	// renders only the active tab), so mount ⇔ focused. Report it to the
+	// visualizer store: losing focus starts the unload grace timer instead
+	// of killing the pipeline with the page; regaining focus restarts it.
+	onMount(() => viz.setFocused(true));
+	onCleanup(() => viz.setFocused(false));
 
 	const isActive = () => nav.activePane() === DEPTH_CENTER_PANE;
 
@@ -82,18 +90,7 @@ export function PlayerPage() {
 
 						<ProgressBar />
 
-						<RealtimeWaveform
-							visualizerConfig={(() => {
-								const viz = useAppStore().state().settings.visualizer;
-								// bars is width-derived in RealtimeWaveform; pass only the
-								// audio-processing params here.
-								return {
-									noiseReduction: viz.noiseReduction,
-									lowCutOff: viz.lowCutOff,
-									highCutOff: viz.highCutOff,
-								};
-							})()}
-						/>
+						<RealtimeWaveform />
 					</box>
 				)}
 			</Show>

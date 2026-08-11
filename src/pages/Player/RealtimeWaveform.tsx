@@ -1,55 +1,30 @@
 /**
- * RealtimeWaveform — live audio frequency visualization using cavacore.
+ * RealtimeWaveform — renders the shared visualizer pipeline state.
  *
- * Spawns an independent ffmpeg
- * process to decode the audio stream, feeds PCM samples through cavacore
- * for FFT analysis, and renders frequency bars as colored terminal
- * characters at ~30fps.
+ * The pipeline (ffmpeg decode + cavacore FFT) lives in the module-level
+ * visualizer store (`@/stores/visualizer`), not in this component, so it
+ * survives PlayerPage unmounts: leaving the Player tab keeps the waveform
+ * warm for VISUALIZER_UNLOAD_DELAY_MS, then the store tears it down.
+ *
+ * This component only subscribes to store state, reports the width-derived
+ * bar count (terminal resize re-inits the running pipeline), and renders:
+ * a braille spinner while the pipeline is loading its first frames, the
+ * frequency bars once frames arrive, and a dotted placeholder when idle.
  */
 
-import { createSignal, createEffect, onCleanup, on, untrack } from "solid-js";
+import { createEffect, on } from "solid-js";
 import { useTerminalDimensions } from "@opentui/solid";
-import {
-	loadCavaCore,
-	type CavaCore,
-	type CavaCoreConfig,
-} from "@/utils/cavacore";
-import { AudioStreamReader } from "@/utils/audio-stream-reader";
-import { BAR_LEVELS, barChars, createBarScaler } from "@/utils/bar-mapping";
-import { useAudio } from "@/hooks/useAudio";
+import { useVisualizer } from "@/stores/visualizer";
 import { useTheme } from "@/context/ThemeContext";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
+import { BAR_LEVELS, barChars } from "@/utils/bar-mapping";
 import { PANE_RATIO } from "@/utils/navigation";
-
-// ── Types ────────────────────────────────────────────────────────────
-
-export type RealtimeWaveformProps = {
-	visualizerConfig?: Partial<CavaCoreConfig>;
-};
-
-/** Target frame interval in ms (~30 fps) */
-const FRAME_INTERVAL = 33;
-
-/** Number of PCM samples to read per frame (512 is a good FFT window) */
-const SAMPLES_PER_FRAME = 512;
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function RealtimeWaveform(props: RealtimeWaveformProps) {
+export function RealtimeWaveform() {
 	const { theme } = useTheme();
-	const audio = useAudio();
-
-	// Frequency bar values (0.0–1.0 per bar)
-	const [barData, setBarData] = createSignal<number[]>([]);
-
-	// Peak-follower scaler replaces cava's autosens: normalizes each FFT
-	// frame against the running peak so a loud start can't pin every bar
-	// at full height and quiet content still gets normalized up.
-	const scaler = createBarScaler();
-
-	let cava: CavaCore | null = null;
-	let reader: AudioStreamReader | null = null;
-	let frameTimer: ReturnType<typeof setInterval> | null = null;
-	let sampleBuffer: Float64Array | null = null;
+	const viz = useVisualizer();
 
 	// Bar count scales with terminal width so the waveform fills its pane.
 	// The player is a 2-pane row: current column = (current+preview) of
@@ -68,180 +43,24 @@ export function RealtimeWaveform(props: RealtimeWaveformProps) {
 		);
 	};
 
-	// ── Lifecycle: init cavacore once ──────────────────────────────────
-
-	const initCava = () => {
-		if (cava) return true;
-
-		cava = loadCavaCore();
-		if (!cava) {
-			return false;
-		}
-
-		return true;
-	};
-
-	// ── Smooth position clock ──────────────────────────────────────────
-	//
-	// audio.position() updates at the useAudio poll rate (~150ms). Between
-	// polls, interpolate the position from wall time so the FFT window
-	// tracks the audio continuously instead of stepping. The 0.5s cap
-	// prevents extrapolating far beyond reality when the player stalls
-	// (e.g. network re-buffering).
-
-	let lastPolledPosition = 0;
-	let lastPolledAt = 0;
-	const smoothPosition = () => {
-		const pos = audio.position();
-		const now = performance.now();
-		if (pos !== lastPolledPosition) {
-			lastPolledPosition = pos;
-			lastPolledAt = now;
-			return pos;
-		}
-		if (lastPolledAt === 0) return pos;
-		const elapsed = Math.min((now - lastPolledAt) / 1000, 0.5);
-		return lastPolledPosition + elapsed * (audio.speed() ?? 1);
-	};
-
-	// ── Start/stop the visualization pipeline ──────────────────────────
-
-	const startVisualization = (url: string, position: number, speed: number) => {
-		stopVisualization();
-
-		if (!url || !initCava() || !cava) return;
-
-		// Initialize cavacore with current resolution + any overrides.
-		// bars is width-derived (see numBars); visualizerConfig supplies the
-		// audio-processing params (noise reduction, cutoffs, etc.).
-		// autosens is disabled (after the spread so it always wins): cava's
-		// autosens gain-ramps during silence then clips everything to 1.0
-		// when audio arrives — the JS peak scaler handles dynamics instead.
-		const config: CavaCoreConfig = {
-			bars: numBars(),
-			sampleRate: 44100,
-			channels: 1,
-			...props.visualizerConfig,
-			autosens: 0,
-		};
-		cava.init(config);
-
-		// Pre-warm the FFT window: libcavacore's window is malloc'd
-		// uninitialized, so the first real frame would FFT garbage and
-		// render full-scale bars. One zero frame the size of the whole
-		// input buffer clears it (at 44.1kHz mono the window is 8192
-		// samples — FFTbassbufferSize × channels; a 512-sample frame would
-		// leave the tail garbage).
-		cava.execute(new Float64Array(8192));
-
-		// Pre-allocate sample read buffer
-		sampleBuffer = new Float64Array(SAMPLES_PER_FRAME);
-
-		// Start ffmpeg decode stream (reuse reader if same URL, else create new)
-		if (!reader || reader.url !== url) {
-			if (reader) reader.stop();
-			reader = new AudioStreamReader({ url });
-		}
-		reader.start(position, speed);
-
-		frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
-	};
-
-	const stopVisualization = () => {
-		if (frameTimer) {
-			clearInterval(frameTimer);
-			frameTimer = null;
-		}
-		if (reader) {
-			reader.stop();
-			// Don't null reader — we reuse it across start/stop cycles
-		}
-		if (cava?.isReady) {
-			cava.destroy();
-		}
-		sampleBuffer = null;
-	};
-
-	// ── Render loop (called at ~30fps) ─────────────────────────────────
-
-	const renderFrame = () => {
-		if (!cava?.isReady || !reader?.running || !sampleBuffer) return;
-
-		// Sample the FFT window at the player's position, not the decode
-		// head — the reader decodes independently (paced at the player's
-		// clock rate with a LEAD_SECONDS burst head start) and only the
-		// position clock ties the bars to what's actually playing.
-		const target = smoothPosition();
-		const count = reader.read(sampleBuffer, target);
-		// Never feed a partial FFT window to cava.
-		if (count < sampleBuffer.length) return;
-
-		const output = cava.execute(sampleBuffer);
-
-		// Normalize against the running peak and copy to a new array
-		setBarData(scaler(output));
-	};
-
-	createEffect(
-		on(
-			[
-				audio.isPlaying,
-				() => audio.currentEpisode()?.audioUrl ?? "",
-				audio.speed,
-				numBars,
-			],
-			([playing, url, speed]) => {
-				if (playing && url) {
-					const pos = untrack(audio.position);
-					startVisualization(url, pos, speed);
-				} else {
-					stopVisualization();
-				}
-			},
-		),
-	);
-
-	// ── Seek detection: lightweight effect for position jumps ──────────
-	//
-	// Watches position and restarts the reader (not the whole pipeline)
-	// only on significant jumps (>2s), which indicate a user seek.
-	// This is intentionally a separate effect — it should NOT trigger a
-	// full pipeline restart, just restart the ffmpeg stream at the new pos.
-
-	let lastSyncPosition = 0;
-	createEffect(
-		on(audio.position, (pos) => {
-			if (!audio.isPlaying || !reader?.running) {
-				lastSyncPosition = pos;
-				return;
-			}
-
-			const delta = Math.abs(pos - lastSyncPosition);
-			lastSyncPosition = pos;
-
-			if (delta > 2) {
-				reader.restart(pos, audio.speed() ?? 1);
-			}
-		}),
-	);
-
-	onCleanup(() => {
-		stopVisualization();
-		if (reader) {
-			reader.stop();
-			reader = null;
-		}
-		// Don't null cava itself — it can be reused. But do destroy its plan.
-		if (cava?.isReady) {
-			cava.destroy();
-		}
-	});
+	// Keep the store's bar count in sync with the terminal width; the store
+	// re-inits the running pipeline when it changes (terminal resize).
+	createEffect(on(numBars, (n) => viz.setBarCount(n)));
 
 	// ── Rendering ──────────────────────────────────────────────────────
 
 	const renderLine = () => {
-		const bars = barData();
+		const bars = viz.barData();
 		const count = numBars();
+
+		// Loading state: the braille spinner shows while the pipeline warms
+		// up — but only when there are no bars to render yet (first play /
+		// after an unload). On resume/seek the last bars stay on screen
+		// until fresh frames arrive, so the waveform never blanks out for
+		// the (multi-second, network-bound) cold start.
+		if (bars.length === 0 && viz.isLoading()) {
+			return <LoadingIndicator />;
+		}
 
 		if (bars.length === 0) {
 			const placeholder = ".".repeat(count);

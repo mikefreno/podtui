@@ -12,7 +12,7 @@
  * ```
  */
 
-import { createSignal, onCleanup } from "solid-js";
+import { onCleanup } from "solid-js";
 import { unlinkSync } from "fs";
 import { fetchCoverArt, coverTempPath } from "../utils/cover-art";
 import {
@@ -22,6 +22,26 @@ import {
 	type BackendName,
 	type DetectedPlayer,
 } from "../utils/audio-player";
+import {
+	isPlaying,
+	setIsPlaying,
+	position,
+	setPosition,
+	duration,
+	setDuration,
+	volume,
+	setVolume,
+	speed,
+	setSpeed,
+	backendName,
+	setBackendName,
+	error,
+	setError,
+	currentEpisode,
+	setCurrentEpisode,
+	availablePlayers,
+	setAvailablePlayers,
+} from "../utils/audio-signals";
 import { emit, on } from "../utils/event-bus";
 import { useAppStore } from "../stores/app";
 import { useProgressStore } from "../stores/progress";
@@ -71,17 +91,9 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 let refCount = 0;
 let pollCount = 0; // Counts poll ticks for throttling progress saves
 
-const [isPlaying, setIsPlaying] = createSignal(false);
-const [position, setPosition] = createSignal(0);
-const [duration, setDuration] = createSignal(0);
-const [volume, setVolume] = createSignal(1);
-const [speed, setSpeed] = createSignal(1);
-const [backendName, setBackendName] = createSignal<BackendName>("none");
-const [error, setError] = createSignal<string | null>(null);
-const [currentEpisode, setCurrentEpisode] = createSignal<Episode | null>(null);
-const [availablePlayers, setAvailablePlayers] = createSignal<DetectedPlayer[]>(
-	[],
-);
+// Playback signals are declared in utils/audio-signals.ts (imported above)
+// so non-component consumers (the visualizer store) can subscribe without
+// mounting a useAudio() owner.
 
 /** True once the current episode has been handed to the backend (play
  *  started). `false` means the episode is only LOADED in the player (e.g.
