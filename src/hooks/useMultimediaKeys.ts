@@ -57,6 +57,8 @@ export function useMultimediaKeys(options: MultimediaKeysOptions = {}) {
 				break;
 
 			case "s":
+				// Speed is shift+s (S) so plain `s` stays free for search.
+				if (!key.shift) return;
 				emit("media.speedCycle", {});
 				break;
 

@@ -68,7 +68,7 @@ export function PlaybackControls(props: PlaybackControlsProps) {
 				<box flexDirection="row" gap={1} marginLeft={2}>
 					<text fg={theme.textMuted}>Speed</text>
 					<text fg={theme.text}>{props.speed}x</text>
-					<text fg={theme.textMuted}>s</text>
+					<text fg={theme.textMuted}>S</text>
 				</box>
 			</box>
 			{/* audio warnings — wrap to their own (3rd) line when the row is tight */}
