@@ -53,11 +53,17 @@ async function initProgress(): Promise<void> {
 	setProgressMap(parsed);
 }
 
-// Fire-and-forget init
-initProgress();
+// Fire-and-forget init; the promise is exposed via whenReady() so boot-time
+// consumers (e.g. player-session restore) can await the file load.
+const progressInit = initProgress();
 
 function createProgressStore() {
 	return {
+		/**
+		 * Resolves once the persisted progress map has been loaded from disk.
+		 */
+		whenReady: () => progressInit,
+
 		/**
 		 * Get progress for a specific episode.
 		 */

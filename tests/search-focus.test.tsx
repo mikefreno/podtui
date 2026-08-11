@@ -51,6 +51,7 @@ const stubAudio: AudioControls = {
 	currentEpisode: () => null,
 	availablePlayers: () => [],
 	play: async () => {},
+	load: async () => {},
 	pause: async () => {},
 	resume: async () => {},
 	togglePlayback: async () => {},

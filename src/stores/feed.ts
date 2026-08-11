@@ -409,9 +409,15 @@ function createFeedStore() {
 		}
 	};
 
+	// Resolves once the persisted feeds are loaded and visible to feeds() —
+	// before the background refresh so boot-time consumers (player-session
+	// restore) don't wait on the network.
+	const { promise: feedsReady, resolve: resolveFeedsReady } =
+		Promise.withResolvers<void>();
 	(async () => {
 		const loadedFeeds = await loadFeedsFromFile();
 		if (loadedFeeds.length > 0) setFeeds(loadedFeeds);
+		resolveFeedsReady();
 		const loadedSources = await loadSourcesFromFile<PodcastSource>();
 		// The default "rss" placeholder source fabricated fake search results
 		// and was removed from DEFAULT_SOURCES; drop it from persisted configs
@@ -565,6 +571,16 @@ function createFeedStore() {
 		return feeds().find((f) => f.id === feedId);
 	};
 
+	/** Find an episode by ID across all loaded feeds (undefined when the
+	 *  episode isn't in any loaded window, e.g. an unsubscribed show). */
+	const findEpisode = (episodeId: string): Episode | undefined => {
+		for (const feed of feeds()) {
+			const ep = feed.episodes.find((e) => e.id === episodeId);
+			if (ep) return ep;
+		}
+		return undefined;
+	};
+
 	/** Get selected feed */
 	const getSelectedFeed = (): Feed | undefined => {
 		const id = selectedFeedId();
@@ -670,10 +686,15 @@ function createFeedStore() {
 		selectedFeedId,
 		isLoadingMore,
 
+		/** Resolves once persisted feeds are loaded from disk (before the
+		 *  background refresh). */
+		whenReady: () => feedsReady,
+
 		// Computed
 		getFilteredFeeds,
 		getAllEpisodesChronological,
 		getFeed,
+		findEpisode,
 		getSelectedFeed,
 		hasMoreEpisodes,
 		isLoadingFeeds,

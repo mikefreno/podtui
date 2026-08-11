@@ -26,7 +26,12 @@ import { emit, on } from "../utils/event-bus";
 import { useAppStore } from "../stores/app";
 import { useProgressStore } from "../stores/progress";
 import { useMediaRegistry } from "../utils/media-registry";
-import type { Episode } from "../types/episode";
+import {
+	loadLastPlayerFromFile,
+	saveLastPlayerToFile,
+	saveLastPlayerSync,
+} from "../utils/app-persistence";
+import type { Episode, Progress } from "../types/episode";
 import type { Feed } from "../types/feed";
 import { useAudioNavStore, AudioSource } from "../stores/audio-nav";
 import { useFeedStore } from "../stores/feed";
@@ -45,6 +50,8 @@ export interface AudioControls {
 
 	// Actions
 	play: (episode: Episode) => Promise<void>;
+	/** Load an episode into the player WITHOUT starting playback. */
+	load: (episode: Episode) => Promise<void>;
 	pause: () => Promise<void>;
 	resume: () => Promise<void>;
 	togglePlayback: () => Promise<void>;
@@ -76,6 +83,23 @@ const [availablePlayers, setAvailablePlayers] = createSignal<DetectedPlayer[]>(
 	[],
 );
 
+/** True once the current episode has been handed to the backend (play
+ *  started). `false` means the episode is only LOADED in the player (e.g.
+ *  restored at boot) and the first play action must start the backend
+ *  instead of unpausing it. */
+let startedPlayback = false;
+
+/** Completion fraction at/above which an episode is NOT restored at boot. */
+const RESTORE_COMPLETION_THRESHOLD = 0.98;
+
+/** True when saved progress is below the restore cutoff. Episodes with no
+ *  progress (never reached the persist threshold) or unknown duration count
+ *  as eligible — they restore from the start. */
+function isRestoreEligible(progress: Progress | undefined): boolean {
+	if (!progress || progress.duration <= 0) return true;
+	return progress.position / progress.duration < RESTORE_COMPLETION_THRESHOLD;
+}
+
 function ensureBackend(): AudioBackend {
 	if (!backend) {
 		const detected = detectPlayers();
@@ -101,6 +125,17 @@ function registerExitTeardown(): void {
 	exitTeardownRegistered = true;
 	const teardown = (): void => {
 		stopPolling();
+		// Persist "what's loaded in the player right now" synchronously —
+		// process.exit(0) runs this handler synchronously and an async write
+		// would never land. The next launch restores this episode paused.
+		try {
+			const ep = currentEpisode();
+			if (ep) {
+				saveLastPlayerSync({ episodeId: ep.id, timestamp: new Date() });
+			}
+		} catch {
+			/* best-effort at exit */
+		}
 		try {
 			backend?.dispose();
 		} catch {
@@ -228,6 +263,11 @@ async function play(episode: Episode): Promise<void> {
 		setPosition(startPos);
 		setSpeed(spd);
 		if (episode.duration) setDuration(episode.duration);
+		startedPlayback = true;
+
+		// Remember this episode as "loaded in the player" so the next launch
+		// can restore it paused (cleared by stop()).
+		saveLastPlayerToFile({ episodeId: episode.id, timestamp: new Date() });
 
 		// Register with platform media controls
 		const media = useMediaRegistry();
@@ -248,6 +288,48 @@ async function play(episode: Episode): Promise<void> {
 		setError(err instanceof Error ? err.message : "Playback failed");
 		setIsPlaying(false);
 	}
+}
+
+/**
+ * Load an episode into the player WITHOUT starting playback. The player tab
+ * renders it paused at its saved position; the first play action starts the
+ * backend from there (see togglePlayback). Used to restore the last player
+ * session at boot.
+ */
+async function load(episode: Episode): Promise<void> {
+	ensureBackend();
+	setError(null);
+
+	setCurrentEpisode(episode);
+	setIsPlaying(false);
+	startedPlayback = false;
+
+	// Show the saved position so the player tab reflects where playback
+	// will resume; episodes at/above the completion threshold start from 0.
+	const progressStore = useProgressStore();
+	const saved = progressStore.get(episode.id);
+	const pos = saved && isRestoreEligible(saved) ? saved.position : 0;
+	setPosition(pos);
+	if (episode.duration) setDuration(episode.duration);
+
+	const appStore = useAppStore();
+	const storeSpeed = appStore.state().settings.playbackSpeed;
+	setSpeed(storeSpeed || speed());
+
+	// Surface the loaded-but-paused track to the OS media controls.
+	const feedStore = useFeedStore();
+	const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
+	const podcastTitle = feed?.customName || feed?.podcast.title || "";
+	const media = useMediaRegistry();
+	media.setNowPlaying({
+		title: episode.title,
+		artist: podcastTitle || episode.podcastId,
+		duration: episode.duration,
+	});
+	media.setPlaybackState(false);
+	if (pos > 0) media.setPosition(pos);
+
+	saveLastPlayerToFile({ episodeId: episode.id, timestamp: new Date() });
 }
 
 async function pause(): Promise<void> {
@@ -294,7 +376,15 @@ async function togglePlayback(): Promise<void> {
 	if (isPlaying()) {
 		await pause();
 	} else if (currentEpisode()) {
-		await resume();
+		if (startedPlayback) {
+			await resume();
+		} else {
+			// Episode is only LOADED (e.g. restored at boot) — the backend
+			// was never started, so unpausing a dead player would fail
+			// silently. Start playback from the saved position instead.
+			const ep = currentEpisode();
+			if (ep) await play(ep);
+		}
 	}
 }
 
@@ -311,8 +401,12 @@ async function stop(): Promise<void> {
 		setIsPlaying(false);
 		setPosition(0);
 		setCurrentEpisode(null);
+		startedPlayback = false;
 		stopPolling();
 		emit("player.stop", {});
+
+		// Player is empty again — nothing to restore on the next launch.
+		saveLastPlayerToFile({ episodeId: null, timestamp: null });
 
 		const media = useMediaRegistry();
 		media.clearNowPlaying();
@@ -402,12 +496,53 @@ async function switchBackend(name: BackendName): Promise<void> {
 				coverArtPath: coverArtPath ?? undefined,
 			});
 			setIsPlaying(true);
+			startedPlayback = true;
 			startPolling();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Backend switch failed");
 			setIsPlaying(false);
 		}
 	}
+}
+
+/** Serialized restore chain: the boot-triggered restore and any explicit
+ *  call run one after another, so a late-finishing earlier restore can never
+ *  overwrite state changed by a later one (and callers can await the latest
+ *  attempt deterministically). */
+let restoreChain: Promise<void> = Promise.resolve();
+
+/**
+ * Boot-time session restore: reload the episode that was loaded in the
+ * player when the previous run ended (persisted on play/load and at exit),
+ * paused at its saved position — never autostarted. Episodes at/above the
+ * completion threshold are skipped. Silently no-ops when there is nothing
+ * to restore (empty player, unsubscribed show, or completed episode).
+ */
+export async function restoreLastSession(): Promise<void> {
+	const attempt = restoreChain.then(async () => {
+		const marker = await loadLastPlayerFromFile();
+		if (!marker?.episodeId) return;
+
+		// Feeds and progress load asynchronously at boot; wait for both
+		// before looking the episode up.
+		await Promise.all([
+			useProgressStore().whenReady(),
+			useFeedStore().whenReady(),
+		]);
+
+		const episode = useFeedStore().findEpisode(marker.episodeId);
+		if (!episode) return;
+
+		// Only restore episodes below the completion threshold.
+		const saved = useProgressStore().get(episode.id);
+		if (!isRestoreEligible(saved)) return;
+
+		await load(episode);
+	});
+	// Keep the chain alive even when an attempt fails; the caller awaiting
+	// this attempt still observes its own outcome.
+	restoreChain = attempt.catch(() => {});
+	await attempt;
 }
 
 /**
@@ -427,6 +562,9 @@ export function useAudio(): AudioControls {
 		if (storeSpeed && storeSpeed !== speed()) {
 			setSpeed(storeSpeed);
 		}
+
+		// Restore the last player session once at boot (loaded, not playing).
+		restoreLastSession().catch(() => {});
 	}
 
 	refCount++;
@@ -574,6 +712,7 @@ export function useAudio(): AudioControls {
 		availablePlayers,
 
 		play,
+		load,
 		pause,
 		resume,
 		togglePlayback,

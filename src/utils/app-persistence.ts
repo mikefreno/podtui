@@ -219,9 +219,14 @@ export async function loadLastPlayerFromFile(): Promise<LastPlayerState | null> 
 	}
 }
 
-/** Save the last-loaded-player marker (overwrite, fire-and-forget) */
+/** Serialized marker-write chain: concurrent writes land in submission
+ *  order, and callers can await the last one (tests read the file back
+ *  deterministically). Mirrors updateConfig's write serialization. */
+let lastPlayerWriteChain: Promise<void> = Promise.resolve();
+
+/** Save the last-loaded-player marker (fire-and-forget) */
 export function saveLastPlayerToFile(state: LastPlayerState): void {
-	(async () => {
+	lastPlayerWriteChain = lastPlayerWriteChain.then(async () => {
 		try {
 			await ensureConfigDir();
 			await Bun.write(
@@ -231,7 +236,12 @@ export function saveLastPlayerToFile(state: LastPlayerState): void {
 		} catch {
 			// Silently ignore write errors
 		}
-	})();
+	});
+}
+
+/** Resolves once every marker write submitted so far has landed on disk. */
+export function waitForLastPlayerWrite(): Promise<void> {
+	return lastPlayerWriteChain;
 }
 
 /** Synchronous variant for the process-exit teardown. `q` quits through
