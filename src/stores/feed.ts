@@ -11,6 +11,7 @@ import type { Episode } from "../types/episode";
 import type { PodcastSource } from "../types/source";
 import { DEFAULT_SOURCES } from "../types/source";
 import { parseRSSFeed } from "../api/rss-parser";
+import { resolveItunesFeedUrl } from "../utils/itunes-feed-resolver";
 import {
 	loadFeedsFromFile,
 	saveFeedsToFile,
@@ -196,6 +197,17 @@ function createFeedStore() {
 		sourceId: string,
 		visibility: FeedVisibility = FeedVisibility.PUBLIC,
 	): Promise<Feed | null> => {
+		// A directory stub (e.g. a show delisted from Apple Podcasts) has no
+		// feed URL; resolve the real feed from its directory page before
+		// subscribing. Refuse when it can't be resolved rather than adding a
+		// broken feed.
+		if (!podcast.feedUrl) {
+			if (!podcast.directoryUrl) return null;
+			const resolved = await resolveItunesFeedUrl(podcast.directoryUrl);
+			if (!resolved) return null;
+			podcast = { ...podcast, feedUrl: resolved, directoryUrl: undefined };
+		}
+
 		// Guard: don't add a feed we already have (matched by feedUrl)
 		if (hasFeedByUrl(podcast.feedUrl)) {
 			return feeds().find((f) => f.podcast.feedUrl === podcast.feedUrl) ?? null;

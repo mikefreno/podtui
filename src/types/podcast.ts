@@ -12,8 +12,12 @@ export interface Podcast {
   description: string
   /** Cover image URL */
   coverUrl?: string
-  /** RSS feed URL */
+  /** RSS feed URL. Empty when the directory lists the show without a feed
+   *  (e.g. shows delisted from Apple Podcasts); see directoryUrl. */
   feedUrl: string
+  /** Directory listing page (e.g. Apple Podcasts) for shows whose feed URL
+   *  the directory omits — used to resolve the real feed at subscribe time. */
+  directoryUrl?: string
   /** Author/creator name */
   author?: string
   /** Podcast categories */

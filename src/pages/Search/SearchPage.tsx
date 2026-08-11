@@ -26,6 +26,7 @@ import {
 } from "solid-js";
 import { useSearchStore } from "@/stores/search";
 import { useFeedStore } from "@/stores/feed";
+import { useToast } from "@/ui/toast";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import {
@@ -49,6 +50,7 @@ export const SearchPaneCount = 1;
 function SearchPage() {
 	const searchStore = useSearchStore();
 	const feedStore = useFeedStore();
+	const toast = useToast();
 	const [inputValue, setInputValue] = createSignal("");
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
@@ -136,10 +138,23 @@ function SearchPage() {
 		runSearch(query);
 	};
 
-	const handleSubscribe = (result: SearchResult) => {
-		// Actually add the feed to the feed store, then mark the result subscribed
-		feedStore.addFeed(result.podcast, result.sourceId).catch(() => {});
-		searchStore.markSubscribed(result.podcast.id);
+	const handleSubscribe = async (result: SearchResult) => {
+		// Actually add the feed to the feed store, then mark the result
+		// subscribed. addFeed returns null when a feedless directory stub
+		// (delisted show) can't be resolved — tell the user why.
+		const feed = await feedStore
+			.addFeed(result.podcast, result.sourceId)
+			.catch(() => null);
+		if (!feed && !result.podcast.feedUrl) {
+			toast.show({
+				title: "Can't subscribe",
+				message:
+					"No RSS feed is listed for this show and the feed couldn't be resolved. Try adding it by feed URL.",
+				variant: "error",
+			});
+			return;
+		}
+		if (feed) searchStore.markSubscribed(result.podcast.id);
 	};
 
 	// ── nav.action handler ──────────────────────────────────────────────────────
@@ -450,7 +465,11 @@ function SearchPage() {
 								</For>
 							</box>
 						</Show>
-						<text fg={muted()}>Feed: {result().podcast.feedUrl}</text>
+						<text fg={muted()}>
+							Feed:{" "}
+							{result().podcast.feedUrl ||
+								"not listed by source — resolves on subscribe"}
+						</text>
 						<text fg={muted()}>
 							Updated: {formatDate(result().podcast.lastUpdated)}
 						</text>

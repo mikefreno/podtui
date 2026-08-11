@@ -14,11 +14,13 @@ type ItunesResult = {
   collectionId?: number
   collectionName?: string
   artistName?: string
-  feedUrl?: string
+  /** Null for shows delisted from Apple Podcasts (directory stub records). */
+  feedUrl?: string | null
   artworkUrl100?: string
   artworkUrl600?: string
   primaryGenreName?: string
   releaseDate?: string
+  collectionViewUrl?: string
 }
 
 type ItunesResponse = {
@@ -41,8 +43,8 @@ const buildItunesUrl = (query: string, source: PodcastSource) => {
   return url.toString()
 }
 
-const mapItunesResult = (result: ItunesResult, source: PodcastSource): Podcast | null => {
-  if (!result.collectionName || !result.feedUrl) return null
+export const mapItunesResult = (result: ItunesResult, source: PodcastSource): Podcast | null => {
+  if (!result.collectionName) return null
 
   const id = result.collectionId
     ? `itunes-${result.collectionId}`
@@ -52,11 +54,18 @@ const mapItunesResult = (result: ItunesResult, source: PodcastSource): Podcast |
   if (result.artistName) descriptionParts.push(`by ${result.artistName}`)
   if (result.primaryGenreName) descriptionParts.push(result.primaryGenreName)
 
+  // Shows delisted from Apple Podcasts (e.g. The Daily Wire's shows) come back
+  // as metadata-only stub records with feedUrl null. Keep the stub so the show
+  // stays findable; the real feed is resolved from the directory page at
+  // subscribe time (see itunes-feed-resolver).
+  const feedUrl = result.feedUrl ?? ""
+
   return {
     id,
     title: result.collectionName,
     description: descriptionParts.join(" • "),
-    feedUrl: result.feedUrl,
+    feedUrl,
+    directoryUrl: feedUrl ? undefined : result.collectionViewUrl,
     author: result.artistName,
     categories: result.primaryGenreName ? [result.primaryGenreName] : undefined,
     coverUrl: result.artworkUrl600 || result.artworkUrl100,
