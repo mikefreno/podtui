@@ -7,7 +7,8 @@
  * No backups — writes always overwrite.
  */
 
-import { ensureConfigDir, getConfigFilePath } from "./config-dir";
+import { mkdirSync, writeFileSync } from "fs";
+import { ensureConfigDir, getConfigDir, getConfigFilePath } from "./config-dir";
 import { loadConfig, updateConfig } from "./config";
 import type {
 	AppState,
@@ -45,6 +46,7 @@ const defaultPreferences: UserPreferences = {
 	autoDownloadWhitelist: [],
 	autoJumpToPlayer: true,
 	fetchMoreMode: "manual",
+	refreshIntervalMinutes: 15,
 };
 
 const defaultState: AppState = {
@@ -123,6 +125,39 @@ export function saveProgressToFile(data: Record<string, unknown>): void {
 	})();
 }
 
+// ── Search History (separate file — changes on every search) ────────────────
+
+const SEARCH_HISTORY_FILE = "search-history.json";
+
+/** Load search history from JSON file */
+export async function loadSearchHistoryFromFile(): Promise<string[]> {
+	try {
+		const file = Bun.file(getConfigFilePath(SEARCH_HISTORY_FILE));
+		if (!(await file.exists())) return [];
+
+		const raw = await file.json();
+		if (!Array.isArray(raw)) return [];
+		return raw.filter((item): item is string => typeof item === "string");
+	} catch {
+		return [];
+	}
+}
+
+/** Save search history to JSON file (overwrite, no backup) */
+export function saveSearchHistoryToFile(history: string[]): void {
+	(async () => {
+		try {
+			await ensureConfigDir();
+			await Bun.write(
+				getConfigFilePath(SEARCH_HISTORY_FILE),
+				JSON.stringify(history, null, 2),
+			);
+		} catch {
+			// Silently ignore write errors
+		}
+	})();
+}
+
 // ── Audio Nav State (separate file — changes on every track change) ──────────
 
 const AUDIO_NAV_FILE = "audio-nav.json";
@@ -155,4 +190,61 @@ export function saveAudioNavToFile<T>(data: T): void {
 			// Silently ignore write errors
 		}
 	})();
+}
+
+// ── Last Player State (separate file — written on every load/stop) ──────────
+
+const LAST_PLAYER_FILE = "last-player.json";
+
+/** Which episode is currently loaded in the player, persisted so the next
+ *  launch can restore it paused. `episodeId: null` means the player is empty
+ *  (e.g. after Stop). */
+export interface LastPlayerState {
+	episodeId: string | null;
+	timestamp: string | Date | null;
+}
+
+/** Load the last-loaded-player marker (null when absent or unreadable) */
+export async function loadLastPlayerFromFile(): Promise<LastPlayerState | null> {
+	try {
+		const file = Bun.file(getConfigFilePath(LAST_PLAYER_FILE));
+		if (!(await file.exists())) return null;
+
+		const raw = await file.json();
+		if (!raw || typeof raw !== "object") return null;
+
+		return raw as LastPlayerState;
+	} catch {
+		return null;
+	}
+}
+
+/** Save the last-loaded-player marker (overwrite, fire-and-forget) */
+export function saveLastPlayerToFile(state: LastPlayerState): void {
+	(async () => {
+		try {
+			await ensureConfigDir();
+			await Bun.write(
+				getConfigFilePath(LAST_PLAYER_FILE),
+				JSON.stringify(state, null, 2),
+			);
+		} catch {
+			// Silently ignore write errors
+		}
+	})();
+}
+
+/** Synchronous variant for the process-exit teardown. `q` quits through
+ *  `process.exit(0)`, which runs exit listeners synchronously — an async
+ *  write would never land. */
+export function saveLastPlayerSync(state: LastPlayerState): void {
+	try {
+		mkdirSync(getConfigDir(), { recursive: true });
+		writeFileSync(
+			getConfigFilePath(LAST_PLAYER_FILE),
+			JSON.stringify(state, null, 2),
+		);
+	} catch {
+		// Silently ignore write errors
+	}
 }

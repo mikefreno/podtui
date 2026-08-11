@@ -5,12 +5,15 @@
 
 import { createSignal } from "solid-js";
 import { searchPodcasts, searchEpisodes, searchByFeedUrl } from "../utils/search";
+import {
+	loadSearchHistoryFromFile,
+	saveSearchHistoryToFile,
+} from "../utils/app-persistence";
 import { useFeedStore } from "./feed";
 import type { SearchResult, SearchScope } from "../types/source";
 
-const STORAGE_KEY = "podtui_search_history";
 const STORAGE_SCOPE_KEY = "podtui_search_scope";
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 10;
 
 export interface SearchState {
 	query: string;
@@ -21,25 +24,19 @@ export interface SearchState {
 
 const CACHE_TTL = 1000 * 60 * 5;
 
-/** Load search history from localStorage */
-function loadHistory(): string[] {
-	if (typeof localStorage === "undefined") return [];
-	try {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		return stored ? JSON.parse(stored) : [];
-	} catch {
-		return [];
+/** Normalize raw history: drop blanks, dedupe case-insensitively (newest
+ *  wins), cap at MAX_HISTORY. */
+function sanitizeHistory(items: string[]): string[] {
+	const seen = new Set<string>();
+	const cleaned: string[] = [];
+	for (const item of items) {
+		const trimmed = item.trim();
+		const key = trimmed.toLowerCase();
+		if (!key || seen.has(key)) continue;
+		seen.add(key);
+		cleaned.push(trimmed);
 	}
-}
-
-/** Save search history to localStorage */
-function saveHistory(history: string[]): void {
-	if (typeof localStorage === "undefined") return;
-	try {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-	} catch {
-		// Ignore errors
-	}
+	return cleaned.slice(0, MAX_HISTORY);
 }
 
 /** Load persisted search scope ("podcast" | "episode"), defaulting to shows. */
@@ -70,9 +67,18 @@ export function createSearchStore() {
 	const [isSearching, setIsSearching] = createSignal(false);
 	const [results, setResults] = createSignal<SearchResult[]>([]);
 	const [error, setError] = createSignal<string | null>(null);
-	const [history, setHistory] = createSignal<string[]>(loadHistory());
+	const [history, setHistory] = createSignal<string[]>([]);
 	const [selectedSources, setSelectedSources] = createSignal<string[]>([]);
 	const [scope, setScopeState] = createSignal<SearchScope>(loadScope());
+
+	/** Load search history from file (fire-and-forget; recents appear as
+	 *  soon as the file is read). */
+	async function init(): Promise<void> {
+		const loaded = await loadSearchHistoryFromFile();
+		if (loaded.length > 0) setHistory(sanitizeHistory(loaded));
+	}
+
+	init();
 
 	/** Set the search scope (shows vs episodes) and persist it. */
 	const setScope = (next: SearchScope) => {
@@ -164,9 +170,8 @@ export function createSearchStore() {
 	/** Add query to history */
 	const addToHistory = (q: string) => {
 		setHistory((prev) => {
-			const filtered = prev.filter((h) => h.toLowerCase() !== q.toLowerCase());
-			const updated = [q, ...filtered].slice(0, MAX_HISTORY);
-			saveHistory(updated);
+			const updated = sanitizeHistory([q, ...prev]);
+			saveSearchHistoryToFile(updated);
 			return updated;
 		});
 	};
@@ -174,14 +179,14 @@ export function createSearchStore() {
 	/** Clear search history */
 	const clearHistory = () => {
 		setHistory([]);
-		saveHistory([]);
+		saveSearchHistoryToFile([]);
 	};
 
 	/** Remove single history item */
 	const removeFromHistory = (q: string) => {
 		setHistory((prev) => {
 			const updated = prev.filter((h) => h !== q);
-			saveHistory(updated);
+			saveSearchHistoryToFile(updated);
 			return updated;
 		});
 	};
@@ -213,6 +218,27 @@ export function createSearchStore() {
 		);
 	};
 
+	/** Mark a podcast as unsubscribed in results (after an in-place
+	 *  unsubscribe from the results list). */
+	const markUnsubscribed = (podcastId: string, feedUrl?: string) => {
+		setResults((prev) =>
+			prev.map((result) => {
+				const matchesId = result.podcast.id === podcastId;
+				const matchesUrl = feedUrl ? result.podcast.feedUrl === feedUrl : false;
+				if (matchesId || matchesUrl) {
+					return {
+						...result,
+						podcast: {
+							...result.podcast,
+							isSubscribed: false,
+						},
+					};
+				}
+				return result;
+			}),
+		);
+	};
+
 	return {
 		// State
 		query,
@@ -232,6 +258,7 @@ export function createSearchStore() {
 		setSelectedSources,
 		setScope,
 		markSubscribed,
+		markUnsubscribed,
 	};
 }
 
