@@ -43,6 +43,17 @@ function saveSources(sources: PodcastSource[]): void {
 	saveSourcesToFile(sources);
 }
 
+/** True when two episode lists hold the same episodes (id-set equality,
+ *  order-insensitive). Refreshes compare fetched content against this so an
+ *  unchanged feed keeps its `lastUpdated` — and therefore its place in the
+ *  "updated" sort — instead of reordering the list on every background
+ *  refresh. */
+function sameEpisodes(a: Episode[], b: Episode[]): boolean {
+	if (a.length !== b.length) return false;
+	const ids = new Set(a.map((e) => e.id));
+	return b.every((e) => ids.has(e.id));
+}
+
 /** Create feed store */
 function createFeedStore() {
 	const [feeds, setFeeds] = createSignal<Feed[]>([]);
@@ -249,6 +260,26 @@ function createFeedStore() {
 		}
 	};
 
+	/** Apply a freshly fetched episode list to one feed, bumping `lastUpdated`
+	 *  only when the content actually changed (see sameEpisodes). Returns the
+	 *  ORIGINAL array reference when nothing changed so callers skip
+	 *  persistence entirely — a refresh that fetched identical episodes must
+	 *  not re-sort the "updated" view. */
+	const applyRefreshedEpisodes = (
+		prev: Feed[],
+		feedId: string,
+		episodes: Episode[],
+	): Feed[] => {
+		let changed = false;
+		const updated = prev.map((f) => {
+			if (f.id !== feedId) return f;
+			if (sameEpisodes(f.episodes, episodes)) return f;
+			changed = true;
+			return { ...f, episodes, lastUpdated: new Date() };
+		});
+		return changed ? updated : prev;
+	};
+
 	/** Refresh a single feed - re-fetch latest 50 episodes */
 	const refreshFeed = async (feedId: string) => {
 		const feed = getFeed(feedId);
@@ -259,10 +290,8 @@ function createFeedStore() {
 			feedId,
 		);
 		setFeeds((prev) => {
-			const updated = prev.map((f) =>
-				f.id === feedId ? { ...f, episodes, lastUpdated: new Date() } : f,
-			);
-			saveFeeds(updated);
+			const updated = applyRefreshedEpisodes(prev, feedId, episodes);
+			if (updated !== prev) saveFeeds(updated);
 			return updated;
 		});
 
@@ -271,14 +300,35 @@ function createFeedStore() {
 		runAutoDownload();
 	};
 
-	/** Refresh all feeds */
+	/** Refresh all feeds — fetch every feed in parallel, then apply ONE
+	 *  atomic update. Per-feed incremental setFeeds re-sorted the list once
+	 *  per completion (each refresh bumped lastUpdated and the "updated" sort
+	 *  re-ran), which showed up as the list order flapping until the batch
+	 *  finished. */
 	const refreshAllFeeds = async () => {
 		setIsLoadingFeeds(true);
 		try {
 			const currentFeeds = feeds();
-			for (const feed of currentFeeds) {
-				await refreshFeed(feed.id);
-			}
+			const results = await Promise.all(
+				currentFeeds.map(async (feed) => [
+					feed.id,
+					await fetchEpisodes(
+						feed.podcast.feedUrl,
+						MAX_EPISODES_REFRESH,
+						feed.id,
+					),
+				] as const),
+			);
+			setFeeds((prev) => {
+				let updated = prev;
+				for (const [feedId, episodes] of results) {
+					updated = applyRefreshedEpisodes(updated, feedId, episodes);
+				}
+				if (updated !== prev) saveFeeds(updated);
+				return updated;
+			});
+			// Global auto-download: one idempotent pass after the batch.
+			runAutoDownload();
 		} finally {
 			setIsLoadingFeeds(false);
 		}
