@@ -11,16 +11,24 @@
  * right-pane key conflicts).
  */
 
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, onMount } from "solid-js";
+import { Renderable } from "@opentui/core";
 import { useFeedStore } from "@/stores/feed";
 import { useTheme } from "@/context/ThemeContext";
 import { useInputFocusNav } from "@/hooks/useInputFocusNav";
+import { useDialog } from "@/ui/dialog";
+import { useToast } from "@/ui/toast";
+import {
+  resolveSourceCredentials,
+  savePodcastIndexCredentials,
+} from "@/utils/source-credentials";
 import { SourceType } from "@/types/source";
 import type { PodcastSource } from "@/types/source";
 import type { SettingItem } from "./types";
 
 export function useSourceItems(): SettingItem[] {
 	const feedStore = useFeedStore();
+	const dialog = useDialog();
 
 	const typeBadge = (s: PodcastSource) =>
 		s.type === SourceType.API
@@ -48,8 +56,20 @@ export function useSourceItems(): SettingItem[] {
 			kind: "toggle",
 			display: () => `${typeBadge(s)} ${s.enabled ? "on" : "off"}`,
 			help: () =>
-				`Source: ${s.name}\nType: ${s.type}\nEnabled: ${s.enabled}\nURL: ${s.baseUrl ?? "(none)"}\nSpace/Enter to toggle.`,
-			toggle: () => feedStore.toggleSource(s.id),
+				s.id === "podcastindex"
+					? `Source: ${s.name} (open podcast directory)\nEnabled: ${s.enabled}\nSpace to ${s.enabled ? "disable" : "enable"}: enabling asks for API keys.\nKeys are masked in the UI and stored in the macOS keychain\n(encrypted at rest), falling back to config.json when the\nkeychain is unavailable; they are kept when disabled.`
+					: `Source: ${s.name}\nType: ${s.type}\nEnabled: ${s.enabled}\nURL: ${s.baseUrl ?? "(none)"}\nSpace/Enter to toggle.`,
+			toggle: () => {
+				// Enabling Podcast Index requires credentials: ask first
+				// (prefilled with the stored key, masked) instead of flipping
+				// the source into a key-less "on" state. Disabling never
+				// clears the stored credentials.
+				if (s.id === "podcastindex" && !s.enabled) {
+					dialog.push(() => <PodcastIndexCredentialsDialog />);
+					return;
+				}
+				feedStore.toggleSource(s.id);
+			},
 		});
 	}
 
@@ -148,6 +168,155 @@ function AddSourceForm() {
 					</For>
 				</box>
 			</Show>
+		</box>
+	);
+}
+
+/** Mask a stored credential for prefill: first 3 chars then "...". */
+const maskCredential = (value: string): string => `${value.slice(0, 3)}...`;
+
+/** Credentials popup shown when enabling the Podcast Index source. Prefilled
+ *  (masked) with stored credentials so re-enabling just needs Enter; leaving
+ *  a masked field untouched keeps the stored value. Credentials are saved to
+ *  the macOS keychain (encrypted at rest) with a plaintext config.json
+ *  fallback when the keychain is unavailable. */
+function PodcastIndexCredentialsDialog() {
+	const feedStore = useFeedStore();
+	const { theme } = useTheme();
+	const dialog = useDialog();
+	const toast = useToast();
+	const source = feedStore.sources().find((s) => s.id === "podcastindex");
+	const [key, setKey] = createSignal("");
+	const [secret, setSecret] = createSignal("");
+	const [error, setError] = createSignal<string | null>(null);
+	const [saving, setSaving] = createSignal(false);
+	// Yield navigation keybinds to the Shell router while an input is focused.
+	const keyRef = useInputFocusNav();
+	const secretRef = useInputFocusNav();
+	let keyEl: Renderable | null | undefined;
+	let secretEl: Renderable | null | undefined;
+
+	onMount(() => {
+		// Prefill stored credentials (masked) when re-enabling after a
+		// disable — toggling off never clears them. Masked either way, so a
+		// plaintext-stored key never appears in full in the UI.
+		if (source) {
+			resolveSourceCredentials(source)
+				.then((stored) => {
+					if (stored?.apiKey) setKey(maskCredential(stored.apiKey));
+					if (stored?.apiSecret) setSecret(maskCredential(stored.apiSecret));
+				})
+				.catch(() => {});
+		}
+		setTimeout(() => keyEl?.focus(), 1);
+	});
+
+	const save = async () => {
+		if (saving()) return;
+		const stored = source
+			? await resolveSourceCredentials(source).catch(() => null)
+			: null;
+		const keyValue = key().trim();
+		const secretValue = secret().trim();
+		// A field still showing its masked prefill means "keep what's stored".
+		const apiKey =
+			stored?.apiKey && keyValue === maskCredential(stored.apiKey)
+				? stored.apiKey
+				: keyValue;
+		const apiSecret =
+			stored?.apiSecret && secretValue === maskCredential(stored.apiSecret)
+				? stored.apiSecret
+				: secretValue;
+		if (!apiKey || !apiSecret) {
+			setError(
+				"Both API key and secret are required (free at podcastindex.org)",
+			);
+			return;
+		}
+		setSaving(true);
+		const ok = await savePodcastIndexCredentials(apiKey, apiSecret).catch(
+			() => false,
+		);
+		setSaving(false);
+		if (!ok) {
+			// Keychain unavailable (non-macOS, locked, sandboxed): plaintext
+			// fallback on the source so the fallback search still works.
+			feedStore.updateSource("podcastindex", {
+				hasCredentials: true,
+				credentialStorage: "plaintext",
+				apiKey,
+				apiSecret,
+				enabled: true,
+			});
+			toast.show({
+				title: "Credentials stored in config.json",
+				message: "macOS keychain unavailable — API keys saved unencrypted.",
+				variant: "warning",
+			});
+			dialog.pop();
+			return;
+		}
+		feedStore.updateSource("podcastindex", {
+			hasCredentials: true,
+			credentialStorage: "keychain",
+			enabled: true,
+		});
+		dialog.pop();
+	};
+
+	return (
+		<box
+			border
+			title="Podcast Index API Keys"
+			padding={1}
+			flexDirection="column"
+			gap={1}
+		>
+			<text fg={theme.textMuted}>
+				Free key + secret from https://podcastindex.org/. Used as a
+				fallback when other sources return fewer than 3 results.
+			</text>
+			<box flexDirection="row" gap={1}>
+				<text fg={theme.text}>API Key:</text>
+				<input
+					ref={(el: Renderable | null | undefined) => {
+						keyRef(el);
+						keyEl = el;
+					}}
+					value={key()}
+					onInput={setKey}
+					onSubmit={() => secretEl?.focus()}
+					placeholder="e.g. UXKCGDSYGUUEVQJSYDZH"
+					width={30}
+					textColor={theme.text}
+					focusedTextColor={theme.accent}
+					cursorColor={theme.accent}
+				/>
+			</box>
+			<box flexDirection="row" gap={1}>
+				<text fg={theme.text}>API Secret:</text>
+				<input
+					ref={(el: Renderable | null | undefined) => {
+						secretRef(el);
+						secretEl = el;
+					}}
+					value={secret()}
+					onInput={setSecret}
+					onSubmit={() => save()}
+					placeholder="e.g. yzJe2eE7XV-3eY576dyRZ6wXyAbndh6LUrCZ8KN|"
+					width={40}
+					textColor={theme.text}
+					focusedTextColor={theme.accent}
+					cursorColor={theme.accent}
+				/>
+			</box>
+			<Show when={error()}>{(e) => <text fg={theme.error}>{e()}</text>}</Show>
+			<Show when={saving()}>
+				<text fg={theme.textMuted}>Storing credentials...</text>
+			</Show>
+			<text fg={theme.textMuted}>
+				[Enter] save · [Esc] cancel — keys stay stored when disabled.
+			</text>
 		</box>
 	);
 }

@@ -12,6 +12,7 @@ import type { PodcastSource } from "../types/source";
 import { DEFAULT_SOURCES } from "../types/source";
 import { parseRSSFeed } from "../api/rss-parser";
 import { resolveItunesFeedUrl } from "../utils/itunes-feed-resolver";
+import { savePodcastIndexCredentials } from "../utils/source-credentials";
 import {
 	loadFeedsFromFile,
 	saveFeedsToFile,
@@ -42,6 +43,50 @@ function saveFeeds(feeds: Feed[]): void {
 /** Save sources to file (async, fire-and-forget) */
 function saveSources(sources: PodcastSource[]): void {
 	saveSourcesToFile(sources);
+}
+
+/** Move plaintext apiKey/apiSecret (pre-keychain persistence) into the macOS
+ *  keychain, marking the source hasCredentials and stripping the plaintext.
+ *  When the keychain is unavailable the plaintext stays (marked as the
+ *  plaintext storage backend) so the source keeps working.
+ *  Returns the same array when nothing needed migrating. */
+async function migratePlaintextCredentials(
+	sources: PodcastSource[],
+): Promise<PodcastSource[]> {
+	let changed = false;
+	const migrated: PodcastSource[] = [];
+	for (const source of sources) {
+		if (
+			source.id === "podcastindex" &&
+			source.apiKey &&
+			source.apiSecret &&
+			!source.hasCredentials
+		) {
+			const ok = await savePodcastIndexCredentials(
+				source.apiKey,
+				source.apiSecret,
+			);
+			if (ok) {
+				migrated.push({
+					...source,
+					apiKey: undefined,
+					apiSecret: undefined,
+					hasCredentials: true,
+					credentialStorage: "keychain",
+				});
+			} else {
+				migrated.push({
+					...source,
+					hasCredentials: true,
+					credentialStorage: "plaintext",
+				});
+			}
+			changed = true;
+			continue;
+		}
+		migrated.push(source);
+	}
+	return changed ? migrated : sources;
 }
 
 /** True when two episode lists hold the same episodes (id-set equality,
@@ -355,9 +400,24 @@ function createFeedStore() {
 		// too. User-added custom feeds keep their own ids and are untouched.
 		const migratedSources =
 			loadedSources?.filter((source) => source.id !== "rss") ?? [];
-		if (migratedSources.length > 0) {
-			setSources(migratedSources);
-			saveSources(migratedSources);
+		// Default sources fill gaps in persisted configs (so new defaults like
+		// the Podcast Index fallback reach existing installs), while a
+		// persisted source with the same id always wins over its default —
+		// user edits (keys, enabled, country) are never clobbered.
+		const mergedSources = [
+			...migratedSources,
+			...DEFAULT_SOURCES.filter(
+				(defaultSource) =>
+					!migratedSources.some((s) => s.id === defaultSource.id),
+			),
+		];
+		if (mergedSources.length > 0) {
+			// One-time credential migration: sources persisted with plaintext
+			// apiKey/apiSecret (pre-keychain builds) move into the macOS
+			// keychain and are stripped from config.json.
+			const secured = await migratePlaintextCredentials(mergedSources);
+			setSources(secured);
+			if (secured !== mergedSources) saveSources(secured);
 		}
 		await refreshAllFeeds();
 	})();
@@ -437,7 +497,7 @@ function createFeedStore() {
 	/** Remove a source */
 	const removeSource = (sourceId: string) => {
 		// Don't remove default sources
-		if (sourceId === "itunes") return false;
+		if (DEFAULT_SOURCES.some((s) => s.id === sourceId)) return false;
 
 		setSources((prev) => {
 			const updated = prev.filter((s) => s.id !== sourceId);
