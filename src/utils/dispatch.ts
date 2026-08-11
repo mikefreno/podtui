@@ -71,6 +71,7 @@ export const PAGE_ACTIONS: ReadonlySet<KeybindActionName> =
 		"open",
 		"open-interactive",
 		"search",
+		"search-scope-toggle",
 		"filter",
 		"sort",
 		"toggle-hidden",

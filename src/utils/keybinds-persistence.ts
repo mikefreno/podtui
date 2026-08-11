@@ -60,6 +60,7 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
 	help: ["~", "f1"],
 	// list ops
 	search: ["s"],
+	"search-scope-toggle": ["tab"],
 	filter: ["f"],
 	sort: [","],
 	"toggle-hidden": ["."],

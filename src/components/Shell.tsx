@@ -447,6 +447,7 @@ function helpSections(k: ReturnType<typeof useKeybinds>) {
 				["enter", "open"],
 				["r", "refresh"],
 				["s", "search"],
+				[p("search-scope-toggle"), "shows/episodes"],
 				["f", "filter"],
 				[",", "sort"],
 				[".", "hidden"],

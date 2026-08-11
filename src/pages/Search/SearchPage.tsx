@@ -8,6 +8,10 @@
  *                       query (muted, read-only); preview shows the detail of
  *                       the focused result.
  *
+ * Search scope: `tab` (search-scope-toggle) flips between shows and episodes
+ * (clickable pills on the query depth too); toggling while viewing results
+ * re-runs the current query in the new scope.
+ *
  * Typed input owns its keys while `nav.inputFocused()` is true (the Shell
  * router yields). Escape defocuses the input (handled in Shell) so j/k/h
  * navigation resumes; `s` (the `search` action) refocuses it. Enter on the
@@ -38,12 +42,13 @@ import {
 } from "@/context/NavigationContext";
 import { on, off } from "@/utils/event-bus";
 import type { KeybindActionName } from "@/context/KeybindContext";
-import type { SearchResult } from "@/types/source";
+import type { SearchResult, SearchScope } from "@/types/source";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { useSelectionMarker } from "@/hooks/useSelectionMarker";
+import { useInputFocusNav } from "@/hooks/useInputFocusNav";
 
 export const SearchPaneCount = 1;
 
@@ -69,22 +74,29 @@ function SearchPage() {
 	// router yields keys to the <input> while this is true; Escape (in Shell)
 	// sets it false so navigation resumes; `s` (search action) sets it true.
 	//
-	// Typing is the default only on the query depth (0); the results depth
-	// (1) is always list-navigation. Drive `inputFocused` straight off
-	// `depth()` rather than seeding it `true` on mount and patching on change:
-	// the depth stack persists across tab switches, so re-mounting this page
-	// at depth 1 (e.g. after searching, leaving, and returning to the tab)
-	// must NOT leave `inputFocused` stuck on — otherwise the Shell swallows
-	// j/k (yielding to a non-existent input) and only the scrollbox's native
-	// scroll responds.
+	// The input's REAL focus is the source of truth for the flag:
+	// useInputFocusNav (the same hook the Settings forms use) flips
+	// `inputFocused` from the input's FOCUSED/BLURRED events, keeping the flag
+	// and the renderable in lockstep. That matters when the user clicks OFF the
+	// input: opentui's mouse dispatch auto-focuses the clicked target's nearest
+	// focusable ancestor (a pane scrollbox), blurring the input. The BLURRED
+	// event drops the flag, so the Shell router immediately resumes j/k/h
+	// instead of swallowing keys with no input to receive them — no more
+	// stuck "typing" state where Esc/j/k/s all do nothing.
 	//
-	// The depth STACK signal is also written by focus moves (setDepthFocus),
-	// so gate the sync on the depth VALUE via a memo: the effect must re-run
-	// only on an actual depth transition. Without the memo every j/k at the
-	// query depth re-focuses the input (undoing Escape), which keeps the
-	// recents list unreachable by keyboard.
+	// The depth stack still SEEDS the flag on transitions, since the query
+	// depth defaults to typing: re-entering depth 0 (h back from results, or a
+	// fresh mount) focuses the input; mounting at depth 1 (returning to the
+	// tab after a search) stays list-navigation — a stuck-on flag there would
+	// have the Shell yield j/k to a non-existent input. The depth STACK signal
+	// is also written by focus moves (setDepthFocus), so gate the seed on the
+	// depth VALUE via a memo: the effect must re-run only on an actual depth
+	// transition. Without the memo every j/k at the query depth re-focuses the
+	// input (undoing Escape), which keeps the recents list unreachable by
+	// keyboard.
 	onMount(() => nav.setInputFocused(depth() === 0));
 	onCleanup(() => nav.setInputFocused(false));
+	const focusNavRef = useInputFocusNav();
 	const isQueryDepth = createMemo(() => depth() === 0);
 	createEffect(() => {
 		nav.setInputFocused(isQueryDepth());
@@ -113,7 +125,10 @@ function SearchPage() {
 	// Register a visual-mode resolver for the results list (depth 1).
 	onMount(() => {
 		const key = `${nav.activeTab()}:${DEPTH_CENTER_PANE}`;
-		nav.registerResolver(key, (i) => results()[i]?.podcast.id);
+		nav.registerResolver(key, (i) => {
+			const r = results()[i];
+			return r?.kind === "episode" ? r.episode.id : r?.podcast.id;
+		});
 	});
 
 	// ── helpers ─────────────────────────────────────────────────────────────────
@@ -137,6 +152,19 @@ function SearchPage() {
 		setInputValue(query);
 		runSearch(query);
 	};
+
+	/** Set show/episode scope; when viewing results, re-run the current query
+	 *  so the list switches immediately (the toggle is otherwise invisible on
+	 *  a list of results). */
+	const applyScope = (next: SearchScope) => {
+		searchStore.setScope(next);
+		if (depth() >= 1) {
+			const q = submittedQuery() || inputValue().trim();
+			if (q) searchStore.search(q).catch(() => {});
+		}
+	};
+	const toggleScope = () =>
+		applyScope(searchStore.scope() === "podcast" ? "episode" : "podcast");
 
 	const handleSubscribe = async (result: SearchResult) => {
 		// Actually add the feed to the feed store, then mark the result
@@ -171,13 +199,17 @@ function SearchPage() {
 		"toggle-select": () => {
 			if (depth() === 1) {
 				const r = focusedResult();
-				if (r) nav.toggleSelected(r.podcast.id);
+				if (r)
+					nav.toggleSelected(
+						r.kind === "episode" ? r.episode.id : r.podcast.id,
+					);
 			}
 		},
 		search: () => {
 			// `s` refocuses the query input (typing mode) when on the query depth.
 			if (depth() === 0) nav.setInputFocused(true);
 		},
+		"search-scope-toggle": () => toggleScope(),
 		refresh: () => {
 			const q = submittedQuery() || inputValue().trim();
 			if (q) searchStore.search(q).catch(() => {});
@@ -249,6 +281,9 @@ function SearchPage() {
 					<text fg={theme.textSecondary}>Query</text>
 					<text fg={muted()}>{submittedQuery() || "(empty)"}</text>
 					<box height={1} />
+					<text fg={theme.textSecondary}>
+						Scope · {searchStore.scope() === "episode" ? "episodes" : "shows"}
+					</text>
 					<text fg={muted()}>h: back to query</text>
 				</box>
 			</Show>
@@ -264,16 +299,77 @@ function SearchPage() {
 					<box flexDirection="row" gap={1} alignItems="center">
 						<text fg={muted()}>Query:</text>
 						<input
+							ref={focusNavRef}
 							value={inputValue()}
 							onInput={setInputValue}
 							onSubmit={() => handleSubmit()}
-							placeholder="Enter podcast name..."
+							onMouseDown={(evt) => {
+								// Clicking the input must focus it (typing mode).
+								// preventDefault stops opentui's click auto-focus from
+								// grabbing the pane scrollbox instead; setting the flag
+								// drives the `focused` prop → renderable focus → the
+								// useInputFocusNav FOCUSED handler.
+								evt.preventDefault();
+								nav.setInputFocused(true);
+							}}
+							onKeyDown={(evt) => {
+								// While the input owns keys the Shell router never sees
+								// Tab, so the scope toggle must be handled here (the
+								// pills and the tab keybind cover the defocused cases).
+								if (evt.name === "tab") {
+									evt.preventDefault();
+									toggleScope();
+								}
+							}}
+							placeholder={
+								searchStore.scope() === "episode"
+									? "Enter episode, guest, topic..."
+									: "Enter podcast name..."
+							}
 							focused={inputActive()}
 							width={28}
 							textColor={theme.text}
 							focusedTextColor={theme.accent}
 							cursorColor={theme.accent}
 						/>
+					</box>
+					<box flexDirection="row" gap={1} alignItems="center">
+						<text fg={theme.textSecondary}>Scope:</text>
+						<box
+							backgroundColor={
+								searchStore.scope() === "podcast" ? theme.primary : undefined
+							}
+							onMouseDown={() => applyScope("podcast")}
+						>
+							<text
+								fg={
+									searchStore.scope() === "podcast"
+										? theme.surface
+										: muted()
+								}
+							>
+								{" "}
+								Shows{" "}
+							</text>
+						</box>
+						<box
+							backgroundColor={
+								searchStore.scope() === "episode" ? theme.primary : undefined
+							}
+							onMouseDown={() => applyScope("episode")}
+						>
+							<text
+								fg={
+									searchStore.scope() === "episode"
+										? theme.surface
+										: muted()
+								}
+							>
+								{" "}
+								Episodes{" "}
+							</text>
+						</box>
+						<text fg={muted()}>tab to toggle</text>
 					</box>
 					<Show when={searchStore.isSearching()}>
 						<LoadingIndicator label="Searching…" />
@@ -347,7 +443,7 @@ function SearchPage() {
 					<text fg={muted()}>
 						{inputActive()
 							? "Enter to search · Esc to defocus"
-							: "j/k recents · s to type · h back"}
+							: "j/k recents · s to type · tab scope · h back"}
 					</text>
 				</box>
 			</Show>
@@ -363,7 +459,9 @@ function SearchPage() {
 									<text fg={muted()}>
 										{searchStore.query()
 											? "No results found"
-											: "Enter a search term to find podcasts"}
+											: searchStore.scope() === "episode"
+												? "Enter a search term to find episodes"
+												: "Enter a search term to find podcasts"}
 									</text>
 								}
 							>
@@ -393,7 +491,9 @@ function SearchPage() {
 											{index() === fi() ? marker() : " "}
 										</text>
 										<text fg={focusFg(index(), fi(), isActive())}>
-											{result.podcast.title}
+											{result.kind === "episode"
+												? result.episode.title
+												: result.podcast.title}
 										</text>
 										<Show when={result.podcast.isSubscribed}>
 											<text
@@ -403,14 +503,24 @@ function SearchPage() {
 											</text>
 										</Show>
 									</box>
-									<Show when={result.podcast.author}>
+									{result.kind === "episode" ? (
 										<text
 											fg={index() === fi() ? theme.surface : muted()}
 											paddingLeft={2}
 										>
-											by {result.podcast.author}
+											{result.podcast.title} ·{" "}
+											{formatDate(result.episode.pubDate)}
 										</text>
-									</Show>
+									) : (
+										<Show when={result.podcast.author}>
+											<text
+												fg={index() === fi() ? theme.surface : muted()}
+												paddingLeft={2}
+											>
+												by {result.podcast.author}
+											</text>
+										</Show>
+									)}
 								</box>
 							);
 						}}
@@ -428,6 +538,10 @@ function SearchPage() {
 					<strong>Search</strong>
 				</text>
 				<text fg={muted()}>Type a query, press Enter to search.</text>
+				<text fg={muted()}>
+					Tab toggles Shows ↔ Episodes (episode search finds guests
+					and topics).
+				</text>
 				<text fg={muted()}>Esc defocuses the input; h goes back.</text>
 				<box height={1} />
 				<text fg={theme.textSecondary}>Recent · {recents().length}</text>
@@ -444,56 +558,102 @@ function SearchPage() {
 					</box>
 				}
 			>
-				{(result) => (
-					<box flexDirection="column" gap={1} padding={1}>
-						<text fg={theme.text}>
-							<strong>{result().podcast.title}</strong>
-						</text>
-						<Show when={result().podcast.author}>
-							<text fg={muted()}>by {result().podcast.author}</text>
-						</Show>
-						<Show when={result().podcast.description}>
-							<text fg={theme.textSecondary}>
-								{result().podcast.description!.slice(0, 400)}
-								{(result().podcast.description?.length ?? 0) > 400 ? "…" : ""}
-							</text>
-						</Show>
-						<Show when={(result().podcast.categories ?? []).length > 0}>
-							<box flexDirection="row" gap={1}>
-								<For each={(result().podcast.categories ?? []).slice(0, 4)}>
-									{(cat) => <text fg={theme.warning}>[{cat}]</text>}
-								</For>
+				{(result) => {
+					const r = result();
+					if (r.kind === "episode") {
+						return (
+							<box flexDirection="column" gap={1} padding={1}>
+								<text fg={theme.text}>
+									<strong>{r.episode.title}</strong>
+								</text>
+								<text fg={theme.textSecondary}>{r.podcast.title}</text>
+								<Show when={r.podcast.author}>
+									<text fg={muted()}>by {r.podcast.author}</text>
+								</Show>
+								<Show when={r.episode.description}>
+									<text fg={theme.textSecondary}>
+										{r.episode.description!.slice(0, 400)}
+										{(r.episode.description?.length ?? 0) > 400 ? "…" : ""}
+									</text>
+								</Show>
+								<text fg={muted()}>
+									Published: {formatDate(r.episode.pubDate)}
+								</text>
+								<Show when={(r.podcast.categories ?? []).length > 0}>
+									<box flexDirection="row" gap={1}>
+										<For each={(r.podcast.categories ?? []).slice(0, 4)}>
+											{(cat) => <text fg={theme.warning}>[{cat}]</text>}
+										</For>
+									</box>
+								</Show>
+								<Show when={r.sourceName}>
+									<text fg={muted()}>Source: {r.sourceName}</text>
+								</Show>
+								<box height={1} />
+								<Show when={!r.podcast.isSubscribed}>
+									<text fg={theme.primary}>[+] Subscribe (enter)</text>
+								</Show>
+								<Show when={r.podcast.isSubscribed}>
+									<text fg={theme.success}>Already subscribed</text>
+								</Show>
+								<box height={1} />
+								<text fg={muted()}>
+									enter: subscribe to show · h: back to query
+								</text>
 							</box>
-						</Show>
-						<text fg={muted()}>
-							Feed:{" "}
-							{result().podcast.feedUrl ||
-								"not listed by source — resolves on subscribe"}
-						</text>
-						<text fg={muted()}>
-							Updated: {formatDate(result().podcast.lastUpdated)}
-						</text>
-						<Show when={result().sourceName}>
-							<text fg={muted()}>Source: {result().sourceName}</text>
-						</Show>
-						<box height={1} />
-						<Show when={!result().podcast.isSubscribed}>
-							<text fg={theme.primary}>[+] Subscribe (enter)</text>
-						</Show>
-						<Show when={result().podcast.isSubscribed}>
-							<text fg={theme.success}>Already subscribed</text>
-						</Show>
-						<box height={1} />
-						<text fg={muted()}>enter: subscribe · h: back to query</text>
-					</box>
-				)}
+						);
+					}
+					return (
+						<box flexDirection="column" gap={1} padding={1}>
+							<text fg={theme.text}>
+								<strong>{r.podcast.title}</strong>
+							</text>
+							<Show when={r.podcast.author}>
+								<text fg={muted()}>by {r.podcast.author}</text>
+							</Show>
+							<Show when={r.podcast.description}>
+								<text fg={theme.textSecondary}>
+									{r.podcast.description!.slice(0, 400)}
+									{(r.podcast.description?.length ?? 0) > 400 ? "…" : ""}
+								</text>
+							</Show>
+							<Show when={(r.podcast.categories ?? []).length > 0}>
+								<box flexDirection="row" gap={1}>
+									<For each={(r.podcast.categories ?? []).slice(0, 4)}>
+										{(cat) => <text fg={theme.warning}>[{cat}]</text>}
+									</For>
+								</box>
+							</Show>
+							<text fg={muted()}>
+								Feed:{" "}
+								{r.podcast.feedUrl ||
+									"not listed by source — resolves on subscribe"}
+							</text>
+							<text fg={muted()}>
+								Updated: {formatDate(r.podcast.lastUpdated)}
+							</text>
+							<Show when={r.sourceName}>
+								<text fg={muted()}>Source: {r.sourceName}</text>
+							</Show>
+							<box height={1} />
+							<Show when={!r.podcast.isSubscribed}>
+								<text fg={theme.primary}>[+] Subscribe (enter)</text>
+							</Show>
+							<Show when={r.podcast.isSubscribed}>
+								<text fg={theme.success}>Already subscribed</text>
+							</Show>
+							<box height={1} />
+							<text fg={muted()}>enter: subscribe · h: back to query</text>
+						</box>
+					);
+				}}
 			</Show>
 		);
 
 	const currentLabel = () =>
 		depth() === 0
 			? `Search · ${recents().length} recent`
-			: `Results · ${results().length}`;
+			: `Results (${searchStore.scope() === "episode" ? "episodes" : "shows"}) · ${results().length}`;
 
 	return (
 		<PaneRow

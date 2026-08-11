@@ -59,8 +59,11 @@
   "help":           ["~", "f1"],
 
   // ── List operations (yazi: s search, f filter, , sort, . hidden, r refresh)
-  "search":         ["s"],
-  "filter":         ["f"],
+  "search":             ["s"],
+  // tab toggles the Search page between show and episode scope (re-runs the
+  // current query when viewing results)
+  "search-scope-toggle": ["tab"],
+  "filter":             ["f"],
   "sort":           [","],
   "toggle-hidden":  ["."],
   "refresh":        ["r"],

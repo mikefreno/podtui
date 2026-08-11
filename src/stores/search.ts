@@ -4,11 +4,12 @@
  */
 
 import { createSignal } from "solid-js";
-import { searchPodcasts, searchByFeedUrl } from "../utils/search";
+import { searchPodcasts, searchEpisodes, searchByFeedUrl } from "../utils/search";
 import { useFeedStore } from "./feed";
-import type { SearchResult } from "../types/source";
+import type { SearchResult, SearchScope } from "../types/source";
 
 const STORAGE_KEY = "podtui_search_history";
+const STORAGE_SCOPE_KEY = "podtui_search_scope";
 const MAX_HISTORY = 20;
 
 export interface SearchState {
@@ -41,6 +42,27 @@ function saveHistory(history: string[]): void {
 	}
 }
 
+/** Load persisted search scope ("podcast" | "episode"), defaulting to shows. */
+function loadScope(): SearchScope {
+	if (typeof localStorage === "undefined") return "podcast";
+	try {
+		const stored = localStorage.getItem(STORAGE_SCOPE_KEY);
+		return stored === "episode" ? "episode" : "podcast";
+	} catch {
+		return "podcast";
+	}
+}
+
+/** Save search scope to localStorage */
+function saveScope(scope: SearchScope): void {
+	if (typeof localStorage === "undefined") return;
+	try {
+		localStorage.setItem(STORAGE_SCOPE_KEY, scope);
+	} catch {
+		// Ignore errors
+	}
+}
+
 /** Create search store */
 export function createSearchStore() {
 	const feedStore = useFeedStore();
@@ -50,6 +72,13 @@ export function createSearchStore() {
 	const [error, setError] = createSignal<string | null>(null);
 	const [history, setHistory] = createSignal<string[]>(loadHistory());
 	const [selectedSources, setSelectedSources] = createSignal<string[]>([]);
+	const [scope, setScopeState] = createSignal<SearchScope>(loadScope());
+
+	/** Set the search scope (shows vs episodes) and persist it. */
+	const setScope = (next: SearchScope) => {
+		setScopeState(next);
+		saveScope(next);
+	};
 
 	const applySubscribedStatus = (items: SearchResult[]): SearchResult[] => {
 		const feeds = feedStore.feeds();
@@ -110,9 +139,14 @@ export function createSearchStore() {
 				return;
 			}
 
-			const searchResults = await searchPodcasts(q, sourceIds, sources, {
-				cacheTtl: CACHE_TTL,
-			});
+			const searchResults =
+				scope() === "episode"
+					? await searchEpisodes(q, sourceIds, sources, {
+							cacheTtl: CACHE_TTL,
+						})
+					: await searchPodcasts(q, sourceIds, sources, {
+							cacheTtl: CACHE_TTL,
+						});
 
 			setResults(applySubscribedStatus(searchResults));
 		} catch (e) {
@@ -187,6 +221,7 @@ export function createSearchStore() {
 		error,
 		history,
 		selectedSources,
+		scope,
 
 		// Actions
 		search,
@@ -195,6 +230,7 @@ export function createSearchStore() {
 		clearHistory,
 		removeFromHistory,
 		setSelectedSources,
+		setScope,
 		markSubscribed,
 	};
 }

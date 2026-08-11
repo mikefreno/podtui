@@ -63,6 +63,7 @@ export type KeybindActionName =
 	| "quit"
 	| "help"
 	| "search"
+	| "search-scope-toggle"
 	| "filter"
 	| "sort"
 	| "toggle-hidden"
