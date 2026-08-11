@@ -67,6 +67,7 @@
   "sort":           [","],
   "toggle-hidden":  ["."],
   "refresh":        ["r"],
+  "subscribe":      ["a"],   // subscribe focused show/episode result in place (Search)
   "unsubscribe":    ["x"],   // unsubscribe focused show in My Shows
 
   // ── Downloads & auto-download whitelist ───────────────────────────────────

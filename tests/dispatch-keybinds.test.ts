@@ -171,6 +171,20 @@ test("dispatch('move-up') emits nav.action on the current pane only (j/k never c
 	});
 });
 
+test("dispatch('subscribe') on a depth-tab current pane emits nav.action (page-local, like unsubscribe)", () => {
+	withHarness(({ nav, dispatch }) => {
+		nav.setActiveTab(TABS.SEARCH);
+		nav.enterTabContent();
+		expect(nav.activePane()).toBe(DEPTH_CENTER_PANE);
+
+		const events = captureNavActions(() => dispatch("subscribe"));
+		expect(events).toHaveLength(1);
+		expect(events[0].action).toBe("subscribe");
+		expect(events[0].tab).toBe(TABS.SEARCH);
+		expect(events[0].pane).toBe(DEPTH_CENTER_PANE);
+	});
+});
+
 // ── Integration: l drills (open emit), h pops, h@0 → tab root ────────────────
 test("dispatch('swipe-next') on a depth-tab at depth 0 emits 'open' (drill)", () => {
 	withHarness(({ nav, dispatch }) => {

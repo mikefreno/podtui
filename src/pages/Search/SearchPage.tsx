@@ -264,6 +264,16 @@ function SearchPage() {
 		}
 	};
 
+	/** Subscribe the focused result's show in place (episode or podcast
+	 *  result). `enter` plays episodes regardless of subscription, so an
+	 *  unsubscribed show's episode needs this explicit path. */
+	const subscribeFocused = () => {
+		if (depth() !== 1) return;
+		const r = focusedResult();
+		if (!r || r.podcast.isSubscribed) return;
+		handleSubscribe(r);
+	};
+
 	// ── nav.action handler ──────────────────────────────────────────────────────
 	const PAGE_ACTIONS: Partial<Record<KeybindActionName, () => void>> = {
 		"move-down": () => step(1),
@@ -295,6 +305,7 @@ function SearchPage() {
 			downloadStore.removeDownload(id).catch(() => {});
 		},
 		unsubscribe: () => unsubscribeFocused(),
+		subscribe: () => subscribeFocused(),
 		search: () => {
 			// `s` refocuses the query input (typing mode) when on the query depth.
 			if (depth() === 0) nav.setInputFocused(true);
@@ -321,8 +332,10 @@ function SearchPage() {
 		if (depth() === 1) {
 			const r = focusedResult();
 			if (!r) return;
-			if (r.kind === "episode" && r.podcast.isSubscribed) {
-				// Subscribed show's episode → stream it (matches Feed/My Shows).
+			if (r.kind === "episode") {
+				// Any episode result streams directly — subscribed or not
+				// (matches Feed/My Shows). `a` subscribes an unsubscribed
+				// show's episode in place.
 				playFocusedEpisode();
 				return;
 			}
@@ -706,7 +719,7 @@ function SearchPage() {
 								</Show>
 								<box height={1} />
 								<Show when={!r.podcast.isSubscribed}>
-									<text fg={theme.primary}>[+] Subscribe (enter)</text>
+									<text fg={theme.primary}>[+] Subscribe (a)</text>
 								</Show>
 								<Show when={r.podcast.isSubscribed}>
 									<text fg={theme.success}>
@@ -718,7 +731,7 @@ function SearchPage() {
 									when={r.podcast.isSubscribed}
 									fallback={
 										<text fg={muted()}>
-											enter: subscribe · d: download · h: back to query
+											enter: play · a: subscribe · d: download · h: back to query
 										</text>
 									}
 								>

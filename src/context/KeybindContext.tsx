@@ -68,6 +68,7 @@ export type KeybindActionName =
 	| "sort"
 	| "toggle-hidden"
 	| "refresh"
+	| "subscribe"
 	| "unsubscribe"
 	| "download"
 	| "delete-download"

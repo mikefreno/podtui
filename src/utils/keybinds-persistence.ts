@@ -65,6 +65,8 @@ const DEFAULT_KEYBINDS: KeybindsResolved = {
 	sort: [","],
 	"toggle-hidden": ["."],
 	refresh: ["r"],
+	// a subscribes the focused show/episode result in place (x unsubscribes)
+	subscribe: ["a"],
 	unsubscribe: ["x"],
 	// downloads
 	download: ["d"],
