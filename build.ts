@@ -155,9 +155,13 @@ if (COMPILE) {
 		if (mpvPath) {
 			copyFileSync(mpvPath, join(macosDir, "mpv"));
 		} else {
-			console.warn(
-				"Warning: mpv not found in PATH — skipping bundle mpv (Now Playing attribution won't work)",
+			// A darwin release tarball without a bundled mpv silently ships
+			// without Now Playing attribution (blank icon). Fail loudly so CI
+			// can't produce it — the runner must have mpv installed.
+			console.error(
+				"Error: mpv not found in PATH — PodTui.app requires a bundled mpv for macOS Now Playing attribution (brew install mpv on the build machine)",
 			);
+			process.exit(1);
 		}
 
 		const icnsSrc = join("assets", "App Icon", "AppIcon.icns");

@@ -40,6 +40,15 @@ export interface AudioBackend {
 	getPosition(): Promise<number>;
 	getDuration(): Promise<number>;
 	isPlaying(): boolean;
+	/** Live pause state: `true` paused, `false` playing, `undefined` when
+	 *  the read failed (callers keep the last known state). Unlike
+	 *  `isPlaying()` — which reflects only commands PodTUI sent — this
+	 *  reflects the player's real state, including pauses initiated
+	 *  OUTSIDE PodTUI (system sleep/lock, AirPod removal, device swap,
+	 *  OS media keys, the Now Playing center). */
+	getPauseState(): Promise<boolean | undefined>;
+	/** True while the player process is running (regardless of pause). */
+	isAlive(): boolean;
 	dispose(): void;
 }
 
@@ -80,16 +89,39 @@ function mpvSocketPath(): string {
  * (macOS PodTui.app/Contents/MacOS/mpv): running mpv from inside the bundle
  * makes macOS attribute its Now Playing session to PodTui — source-app icon
  * and name in Control Center — instead of a blank placeholder for an
- * unbundled binary. Falls back to PATH so dev runs and Linux keep working.
+ * unbundled binary.
+ *
+ * The bundled copy is verified to actually launch: it links against brew's
+ * dylibs by absolute path, and a Homebrew ffmpeg major upgrade can break it
+ * (dylib gone → immediate non-zero exit). If the bundled binary can't run,
+ * fall back to PATH mpv so audio keeps working — the icon degrades to blank
+ * rather than playback dying. Probed once per process.
  */
+let resolvedMpv: string | null | undefined; // undefined = not yet probed
+
+function mpvLaunches(binary: string): boolean {
+	try {
+		const proc = Bun.spawnSync([binary, "--version"], { timeout: 3000 });
+		return proc.exitCode === 0;
+	} catch {
+		return false;
+	}
+}
+
 function resolveMpvBinary(): string | null {
+	if (resolvedMpv !== undefined) return resolvedMpv;
+	let resolved: string | null = null;
 	try {
 		const bundled = join(dirname(process.execPath), "mpv");
-		if (existsSync(bundled)) return bundled;
+		if (existsSync(bundled) && mpvLaunches(bundled)) {
+			resolved = bundled;
+		}
 	} catch {
 		/* process.execPath unusable — fall through to PATH */
 	}
-	return which("mpv");
+	if (!resolved) resolved = which("mpv");
+	resolvedMpv = resolved;
+	return resolved;
 }
 
 // ── mpv Backend ──────────────────────────────────────────────────────
@@ -104,6 +136,7 @@ export class MpvBackend implements AudioBackend {
 	private _duration = 0;
 	private _volume = 100;
 	private _speed = 1;
+	private _exited = false;
 
 	async play(url: string, opts?: PlayOptions): Promise<void> {
 		await this.stop();
@@ -151,6 +184,7 @@ export class MpvBackend implements AudioBackend {
 		});
 
 		this._playing = true;
+		this._exited = false;
 		this._position = opts?.startPosition ?? 0;
 		this._volume = Math.round((opts?.volume ?? 1) * 100);
 		this._speed = opts?.speed ?? 1;
@@ -165,6 +199,7 @@ export class MpvBackend implements AudioBackend {
 		this.proc.exited
 			.then(() => {
 				this._playing = false;
+				this._exited = true;
 			})
 			.catch(() => {});
 	}
@@ -355,6 +390,17 @@ export class MpvBackend implements AudioBackend {
 		return this._playing;
 	}
 
+	async getPauseState(): Promise<boolean | undefined> {
+		if (!this.isAlive()) return undefined;
+		const p = await this.getProperty("pause");
+		if (p === undefined) return undefined;
+		return p === 1;
+	}
+
+	isAlive(): boolean {
+		return this.proc !== null && !this._exited;
+	}
+
 	dispose(): void {
 		this.stop();
 	}
@@ -378,6 +424,13 @@ class NoopBackend implements AudioBackend {
 		return 0;
 	}
 	isPlaying(): boolean {
+		return false;
+	}
+	async getPauseState(): Promise<boolean | undefined> {
+		// Nothing plays on the no-op backend — never externally paused.
+		return false;
+	}
+	isAlive(): boolean {
 		return false;
 	}
 	dispose(): void {}
