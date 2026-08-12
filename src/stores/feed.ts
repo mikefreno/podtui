@@ -10,7 +10,7 @@ import type { Podcast } from "../types/podcast";
 import type { Episode } from "../types/episode";
 import type { PodcastSource } from "../types/source";
 import { DEFAULT_SOURCES } from "../types/source";
-import { getRSSItems, parseRSSItem } from "../api/rss-parser";
+import { getRSSItems, parseRSSItem, parseChannelCoverUrl } from "../api/rss-parser";
 import { resolveItunesFeedUrl } from "../utils/itunes-feed-resolver";
 import { savePodcastIndexCredentials } from "../utils/source-credentials";
 import { mergeEpisodes } from "../utils/episode-merge";
@@ -324,14 +324,16 @@ function createFeedStore() {
 
 	/** Fetch latest episodes from an RSS feed URL, caching all parsed episodes.
 	 *  Returns NULL when the feed could not be fetched (network error, non-OK
-	 *  response, timeout) — callers must treat null as "unchanged" and keep
-	 *  the previously loaded episodes. A failed refresh must never look like
-	 *  an empty feed, or the store would wipe a subscribed show's episodes. */
+	/** Fetch latest episodes from an RSS feed URL, caching all parsed episodes.
+	 *  Also returns the channel-level artwork so callers can backfill a feed's
+	 *  coverUrl (subscribe + refresh). Null episodes on any failure — a
+	 *  failed fetch must not look like an empty feed, or the store would wipe
+	 *  a subscribed show's episodes. */
 	const fetchEpisodes = async (
 		feedUrl: string,
 		limit: number,
 		feedId?: string,
-	): Promise<Episode[] | null> => {
+	): Promise<{ episodes: Episode[] | null; coverUrl: string | undefined }> => {
 		try {
 			const response = await fetch(feedUrl, {
 				headers: {
@@ -342,8 +344,9 @@ function createFeedStore() {
 				// refresh loop) indefinitely.
 				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
 			});
-			if (!response.ok) return null;
+			if (!response.ok) return { episodes: null, coverUrl: undefined };
 			const xml = await response.text();
+			const channel = xml.match(/<channel[\s\S]*?<\/channel>/i)?.[0] ?? xml;
 			const allEpisodes = sortEpisodesReverseChronological(
 				await parseEpisodesIncremental(xml, feedUrl),
 			);
@@ -354,9 +357,12 @@ function createFeedStore() {
 				episodeLoadCount.set(feedId, Math.min(limit, allEpisodes.length));
 			}
 
-			return allEpisodes.slice(0, limit);
+			return {
+				episodes: allEpisodes.slice(0, limit),
+				coverUrl: parseChannelCoverUrl(channel),
+			};
 		} catch {
-			return null;
+			return { episodes: null, coverUrl: undefined };
 		}
 	};
 
@@ -393,11 +399,14 @@ function createFeedStore() {
 			}
 
 			const feedId = crypto.randomUUID();
-			const episodes = await fetchEpisodes(
+			const { episodes, coverUrl } = await fetchEpisodes(
 				podcast.feedUrl,
 				MAX_EPISODES_SUBSCRIBE,
 				feedId,
 			);
+			if (!podcast.coverUrl && coverUrl) {
+				podcast = { ...podcast, coverUrl };
+			}
 			const newFeed: Feed = {
 				id: feedId,
 				podcast,
@@ -482,7 +491,7 @@ function createFeedStore() {
 		return activity.track((async () => {
 			const feed = getFeed(feedId);
 			if (!feed) return;
-			const episodes = await fetchEpisodes(
+			const { episodes, coverUrl } = await fetchEpisodes(
 				feed.podcast.feedUrl,
 				MAX_EPISODES_REFRESH,
 				feedId,
@@ -490,7 +499,14 @@ function createFeedStore() {
 			// Fetch failed (null): keep the currently loaded episodes untouched.
 			if (!episodes) return;
 			setFeeds((prev) => {
-				const updated = applyRefreshedEpisodes(prev, feedId, episodes);
+				let updated = applyRefreshedEpisodes(prev, feedId, episodes);
+				if (coverUrl) {
+					updated = updated.map((f) =>
+						f.id === feedId && !f.podcast.coverUrl && coverUrl
+							? { ...f, podcast: { ...f.podcast, coverUrl } }
+							: f,
+					);
+				}
 				if (updated !== prev) scheduleSaveFeeds();
 				return updated;
 			});
@@ -515,7 +531,7 @@ function createFeedStore() {
 				feeds(),
 				FETCH_CONCURRENCY,
 				async (feed) => {
-					const episodes = await fetchEpisodes(
+					const { episodes, coverUrl } = await fetchEpisodes(
 						feed.podcast.feedUrl,
 						MAX_EPISODES_REFRESH,
 						feed.id,
@@ -523,7 +539,14 @@ function createFeedStore() {
 					// A failed fetch (null) leaves that feed untouched.
 					if (!episodes) return;
 					setFeeds((prev) => {
-						const updated = applyRefreshedEpisodes(prev, feed.id, episodes);
+						let updated = applyRefreshedEpisodes(prev, feed.id, episodes);
+						if (coverUrl) {
+							updated = updated.map((f) =>
+								f.id === feed.id && !f.podcast.coverUrl && coverUrl
+									? { ...f, podcast: { ...f.podcast, coverUrl } }
+									: f,
+							);
+						}
 						if (updated !== prev) scheduleSaveFeeds();
 						return updated;
 					});

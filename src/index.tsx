@@ -186,9 +186,13 @@ async function handlePlay(feeds: Feed[], arg: string): Promise<void> {
 		const backend = createAudioBackend()
 		if (episodeResult.audioUrl) {
 			// Stage the podcast cover so the system Now Playing shows
-			// artwork (mpv --cover-art-files), like the UI path does.
-			const coverArtPath = feedResult.podcast.coverUrl
-				? await fetchCoverArt(feedResult.podcast.coverUrl)
+			// artwork (mpv --cover-art-files), like the UI path does. Falls
+			// back to the episode's own image when the feed has no channel
+			// cover (URL-added feeds).
+			const coverUrl =
+				feedResult.podcast.coverUrl ?? episodeResult.imageUrl;
+			const coverArtPath = coverUrl
+				? await fetchCoverArt(coverUrl)
 				: null
 			await backend.play(episodeResult.audioUrl, {
 				mediaTitle: `${feedResult.podcast.title} — ${episodeResult.title}`,

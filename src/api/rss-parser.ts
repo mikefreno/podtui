@@ -82,6 +82,16 @@ export const getRSSItems = (xml: string): string[] => {
   return channel.match(/<item[\s\S]*?<\/item>/gi) ?? []
 }
 
+/** Channel-level artwork: `<itunes:image href>` (podcasts) or RSS 2.0
+ *  `<image><url>`. Exported so the feed store can backfill a feed's
+ *  coverUrl on refresh without re-deriving the channel block. */
+export const parseChannelCoverUrl = (channel: string): string | undefined => {
+  const itunesHref = getAttr(channel, "itunes:image", "href")
+  if (itunesHref) return itunesHref
+  const url = getTagValue(channel, "image").match(/<url>([\s\S]*?)<\/url>/i)?.[1]
+  return url?.trim() || undefined
+}
+
 /** Parse a single `<item>` into an Episode. Exported so the feed store can
  *  parse large feeds in bounded chunks (yielding to the event loop between
  *  chunks) instead of one synchronous block. */
@@ -158,6 +168,7 @@ export const parseRSSFeed = (xml: string, feedUrl: string): Podcast & { episodes
     feedUrl,
     lastUpdated,
     isSubscribed: true,
+    coverUrl: parseChannelCoverUrl(channel),
     episodes,
   }
 }

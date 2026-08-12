@@ -56,6 +56,7 @@ import {
 import type { Episode, Progress } from "../types/episode";
 import type { Feed } from "../types/feed";
 import { useAudioNavStore, AudioSource } from "../stores/audio-nav";
+import { useDownloadStore } from "../stores/download";
 import { useFeedStore } from "../stores/feed";
 
 export interface AudioControls {
@@ -315,13 +316,18 @@ async function play(episode: Episode): Promise<void> {
 		const feedStore = useFeedStore();
 		const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
 		const podcastTitle = feed?.customName || feed?.podcast.title || "";
+		// Play the downloaded file when present (offline + no network stalls);
+		// otherwise stream. Cover resolves to the feed art, falling back to the
+		// episode's own image (feeds added by URL may lack a channel cover).
+		const downloadStore = useDownloadStore();
+		const url = downloadStore.getDownloadedFilePath(episode.id) ?? episode.audioUrl;
+		const coverUrl = feed?.podcast.coverUrl ?? episode.imageUrl;
 		// Cover art only applies at file LOAD (the runtime video-add fallback
 		// never becomes an albumart track), so a cold-cache play must wait for
 		// the fetch or play artless. Serve the disk cache synchronously; on a
 		// miss, await the single-flight fetch with a 1.2s cap (covers fetch in
 		// ~300ms typically) — past the cap, play bare and let the fetch warm
 		// the cache for next time.
-		const coverUrl = feed?.podcast.coverUrl;
 		let coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
 		if (coverUrl && !coverArtPath) {
 			const path = await Promise.race([
@@ -338,7 +344,7 @@ async function play(episode: Episode): Promise<void> {
 			startPos = savedProgress.position;
 		}
 
-		await b.play(episode.audioUrl, {
+		await b.play(url, {
 			volume: vol,
 			speed: spd,
 			startPosition: startPos > 0 ? startPos : undefined,
@@ -421,17 +427,20 @@ async function load(episode: Episode): Promise<void> {
 	// fills its demuxer cache while parked, so the user's first Play flips
 	// `pause` off instead of paying the ~2s stream-open cold. Fire-and-forget
 	// — a failed preload just makes the first play take the cold path.
+	const downloadStore = useDownloadStore();
+	const url = downloadStore.getDownloadedFilePath(episode.id) ?? episode.audioUrl;
 	if (episode.audioUrl && backend) {
 		// The preload must carry the cover AT LOAD: cover-art-files only
 		// applies when the file loads, and the runtime video-add fallback
 		// never becomes an albumart track (verified). Restore already waits
 		// on feeds/progress at boot, so the bounded fetch (~300ms typical,
-		// 8s worst case) is free.
-		const coverUrl = feed?.podcast.coverUrl;
+		// 8s worst case) is free. Falls back to the episode's own image when
+		// the feed has no channel cover.
+		const coverUrl = feed?.podcast.coverUrl ?? episode.imageUrl;
 		const coverArtPath = coverUrl ? await fetchCoverArt(coverUrl) : null;
 		const backendSnap = backend;
 		backendSnap
-			.preload(episode.audioUrl, {
+			.preload(url, {
 				volume: volume(),
 				speed: storeSpeed || speed(),
 				startPosition: pos > 0 ? pos : undefined,
@@ -603,9 +612,11 @@ async function switchBackend(name: BackendName): Promise<void> {
 				.feeds()
 				.find((f) => f.podcast.id === ep.podcastId);
 			const podcastTitle = feed?.customName || feed?.podcast.title || "";
-			const coverUrl = feed?.podcast.coverUrl;
+			const url =
+				useDownloadStore().getDownloadedFilePath(ep.id) ?? ep.audioUrl;
+			const coverUrl = feed?.podcast.coverUrl ?? ep.imageUrl;
 			const coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
-			await backend.play(ep.audioUrl, {
+			await backend.play(url, {
 				startPosition: pos,
 				volume: vol,
 				speed: spd,
