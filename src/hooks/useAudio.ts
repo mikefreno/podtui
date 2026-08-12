@@ -318,8 +318,9 @@ async function play(episode: Episode): Promise<void> {
 		const podcastTitle = feed?.customName || feed?.podcast.title || "";
 		// Cover art must NEVER gate playback (it was a curl subprocess blocking
 		// play() by up to 8s). Serve the disk-cached file synchronously when it
-		// exists; on a miss, start playback bare and fetch in the background —
-		// the backend applies late art at runtime (mpv video-add).
+		// exists; on a miss, play bare and warm the cache for the next play —
+		// runtime video-add can't become an albumart track, so late art only
+		// works via the load-time cover-art-files property.
 		const coverUrl = feed?.podcast.coverUrl;
 		const coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
 
@@ -339,13 +340,7 @@ async function play(episode: Episode): Promise<void> {
 		});
 
 		if (coverUrl && !coverArtPath) {
-			fetchCoverArt(coverUrl)
-				.then((path) => {
-					if (path && currentEpisode()?.id === episode.id) {
-						b.addCoverArt(path).catch(() => {});
-					}
-				})
-				.catch(() => {});
+			prefetchCoverArt(coverUrl);
 		}
 
 		setCurrentEpisode(episode);
@@ -424,8 +419,13 @@ async function load(episode: Episode): Promise<void> {
 	// `pause` off instead of paying the ~2s stream-open cold. Fire-and-forget
 	// — a failed preload just makes the first play take the cold path.
 	if (episode.audioUrl && backend) {
+		// The preload must carry the cover AT LOAD: cover-art-files only
+		// applies when the file loads, and the runtime video-add fallback
+		// never becomes an albumart track (verified). Restore already waits
+		// on feeds/progress at boot, so the bounded fetch (~300ms typical,
+		// 8s worst case) is free.
 		const coverUrl = feed?.podcast.coverUrl;
-		if (coverUrl) prefetchCoverArt(coverUrl);
+		const coverArtPath = coverUrl ? await fetchCoverArt(coverUrl) : null;
 		const backendSnap = backend;
 		backendSnap
 			.preload(episode.audioUrl, {
@@ -435,9 +435,7 @@ async function load(episode: Episode): Promise<void> {
 				mediaTitle: podcastTitle
 					? `${podcastTitle} — ${episode.title}`
 					: episode.title,
-				coverArtPath: coverUrl
-					? (cachedCoverPath(coverUrl) ?? undefined)
-					: undefined,
+				coverArtPath: coverArtPath ?? undefined,
 			})
 			.catch(() => {});
 	}

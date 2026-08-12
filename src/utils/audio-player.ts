@@ -60,7 +60,6 @@ export interface AudioBackend {
 	 * (mpv `video-add`). Lets play() start without waiting on art; the
 	 * Now Playing artwork pops in when the download lands.
 	 */
-	addCoverArt(path: string): Promise<void>;
 	pause(): Promise<void>;
 	resume(): Promise<void>;
 	stop(): Promise<void>;
@@ -561,12 +560,6 @@ export class MpvBackend implements AudioBackend {
 					Math.round((opts?.volume ?? 1) * 100),
 				]);
 				await this.send(["set_property", "speed", opts?.speed ?? 1]);
-				if (opts?.coverArtPath) {
-					// File is already loaded: cover-art-files only applies at
-					// load, so add the art as a runtime albumart track instead.
-					await this.send(["set_property", "cover-art-files", opts.coverArtPath]);
-					await this.send(["video-add", opts.coverArtPath]);
-				}
 				if (opts?.mediaTitle) {
 					await this.send(["set_property", "force-media-title", opts.mediaTitle]);
 				}
@@ -589,14 +582,6 @@ export class MpvBackend implements AudioBackend {
 			await this.loadFileLocked(url, opts, true);
 			this._intentPlaying = false;
 		});
-	}
-
-	async addCoverArt(path: string): Promise<void> {
-		if (!this._loadedUrl) return;
-		// Keep the property pointing at the latest art too, so a subsequent
-		// loadfile of the same episode carries it.
-		await this.send(["set_property", "cover-art-files", path]);
-		await this.send(["video-add", path]);
 	}
 
 	async pause(): Promise<void> {
@@ -716,7 +701,6 @@ class NoopBackend implements AudioBackend {
 	readonly name: BackendName = "none";
 	async play(): Promise<void> {}
 	async preload(): Promise<void> {}
-	async addCoverArt(): Promise<void> {}
 	async pause(): Promise<void> {}
 	async resume(): Promise<void> {}
 	async stop(): Promise<void> {}

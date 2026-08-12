@@ -20,6 +20,7 @@ import { createMemo, createEffect, For, Show, onMount, onCleanup } from "solid-j
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
 import { useAppStore } from "@/stores/app";
+import { prefetchCoverArt } from "@/utils/cover-art";
 import { DownloadStatus } from "@/types/episode";
 import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
@@ -62,6 +63,22 @@ function FeedPage() {
 	const episodes = createMemo<EpItem[]>(
 		() => feedStore.getAllEpisodesChronological() as EpItem[],
 	);
+
+	// ── Cover warm-up ────────────────────────────────────────────────────────
+	// Prefetch covers for episodes around the focus (plus the top of the
+	// list) so plays land on a warm cache: cover-art-files only applies at
+	// file load, and there is no working runtime fallback. Single-flight +
+	// cache short-circuit keep repeat runs cheap (hits resolve immediately).
+	createEffect(() => {
+		const list = episodes();
+		const focusIdx = focusedEpIdx();
+		const start = Math.max(0, focusIdx - 10);
+		const end = Math.min(list.length, focusIdx + 11);
+		for (let i = start; i < end; i++) {
+			const item = list[i];
+			if (item?.feed.podcast.coverUrl) prefetchCoverArt(item.feed.podcast.coverUrl);
+		}
+	});
 
 	// ── Fetch More ───────────────────────────────────────────────────────────
 	// A "[Fetch More]" row at the bottom of the list advances every feed's
