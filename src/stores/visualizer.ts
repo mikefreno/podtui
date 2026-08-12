@@ -55,6 +55,9 @@ const FRAME_INTERVAL = 33;
 /** Number of PCM samples to read per frame (512 is a good FFT window) */
 const SAMPLES_PER_FRAME = 512;
 
+/** Timer handle as returned by setTimeout/setInterval in this runtime. */
+type TimerHandle = ReturnType<typeof setTimeout>;
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 export interface VisualizerStore {
@@ -96,9 +99,9 @@ function createVisualizerStore(): VisualizerStore {
 	// pause/resume (segments survive; only the ffmpeg pass is killed) and
 	// dropped only on episode change, stop, disable, or unload.
 	let pcm: EpisodePcmCache | null = null;
-	let frameTimer: ReturnType<typeof setInterval> | null = null;
+	let frameTimer: TimerHandle | null = null;
 	let sampleBuffer: Float64Array | null = null;
-	let unloadTimer: ReturnType<typeof setTimeout> | null = null;
+	let unloadTimer: TimerHandle | null = null;
 
 	// What the running pipeline was started with — lets the playback effect
 	// tell "nothing changed, stay warm" from "must restart".
@@ -209,6 +212,8 @@ function createVisualizerStore(): VisualizerStore {
 			clearInterval(frameTimer);
 			frameTimer = null;
 		}
+		clearTimeout(seekDecodeTimer);
+		seekDecodeTimer = undefined;
 		if (pcm) {
 			pcm.stop();
 			// Keep the (now cache-less, url-tagged) object: a re-start of the
@@ -233,6 +238,10 @@ function createVisualizerStore(): VisualizerStore {
 			clearInterval(frameTimer);
 			frameTimer = null;
 		}
+		// Cancel any debounced seek-decode: it would restart ffmpeg while
+		// paused, defeating the "no background CPU while paused" contract.
+		clearTimeout(seekDecodeTimer);
+		seekDecodeTimer = undefined;
 		if (pcm) pcm.pauseDecode();
 		// Cava plan + sampleBuffer stay alive — cheap to reuse on resume.
 		// Clear the loading spinner: if the pipeline never produced bars
@@ -375,6 +384,7 @@ function createVisualizerStore(): VisualizerStore {
 	// while the last frame holds.
 
 	let lastSyncPosition = 0;
+	let seekDecodeTimer: TimerHandle | undefined;
 	createEffect(
 		on(audioPlaybackSignals.position, (pos) => {
 			if (!audioPlaybackSignals.isPlaying() || !pcm) {
@@ -386,7 +396,16 @@ function createVisualizerStore(): VisualizerStore {
 			lastSyncPosition = pos;
 
 			if (delta > 2) {
-				pcm.ensureDecodeAround(pos);
+				// Debounce: holding the seek key fires a jump per poll tick —
+				// without debounce each one restarts ffmpeg, spamming network
+				// reconnects against the stream's server. Wait for the user to
+				// settle, then decode at the final position.
+				clearTimeout(seekDecodeTimer);
+				const target = pcm; // capture for the timer
+				seekDecodeTimer = setTimeout(() => {
+					seekDecodeTimer = undefined;
+					target.ensureDecodeAround(untrack(audioPlaybackSignals.position));
+				}, 400);
 			}
 		}),
 	);

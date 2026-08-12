@@ -97,6 +97,55 @@ function tmpWav(): string {
 }
 
 const hasFfmpeg = !!Bun.which("ffmpeg");
+
+test.skipIf(!hasFfmpeg)(
+	"far-forward seek into undecoded territory restarts decode AT the target (bars recover in seconds, not minutes)",
+	async () => {
+		const wav = tmpWav();
+		writeSineWav(wav, 60);
+		const cache = new EpisodePcmCache({ url: wav });
+		try {
+			cache.startDecode(0);
+			await waitForCoverage(cache, 1);
+
+			// Skipping 45s ahead while the pass still crawls at 4x must restart
+			// the segment at the target — waiting for the frontier to chew
+			// through the skipped region is minutes of frozen bars.
+			cache.ensureDecodeAround(45);
+			expect(cache.decoding).toBe(true);
+			expect(cache.activeDecodeBaseSec).toBe(45);
+			await waitForCoverage(cache, 45.1);
+		} finally {
+			cache.stop();
+			await Bun.$`rm -f ${wav}`.quiet();
+		}
+	},
+	{ timeout: 20000 },
+);
+
+test.skipIf(!hasFfmpeg)(
+	"small forward gap closes in place — no needless reconnect",
+	async () => {
+		const wav = tmpWav();
+		writeSineWav(wav, 60);
+		const cache = new EpisodePcmCache({ url: wav });
+		try {
+			cache.startDecode(0);
+			await waitForCoverage(cache, 2);
+
+			// ~5s past the running frontier: at 4x pacing this closes in ~1.5s,
+			// cheaper than a reconnect — the pass must NOT restart.
+			const target = cache.coverageEndSec + 5;
+			cache.ensureDecodeAround(target);
+			expect(cache.activeDecodeBaseSec).toBe(0);
+			await waitForCoverage(cache, target);
+		} finally {
+			cache.stop();
+			await Bun.$`rm -f ${wav}`.quiet();
+		}
+	},
+	{ timeout: 20000 },
+);
 const FIVE_SEC_BASE = 5 * SAMPLE_RATE; // decode offset for position-mapping tests
 
 test.skipIf(!hasFfmpeg)(

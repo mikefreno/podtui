@@ -13,6 +13,7 @@
  * always overwrite — no backup files are created.
  */
 
+import { mkdir } from "fs/promises";
 import { ensureConfigDir, getConfigDir, getConfigFilePath } from "./config-dir";
 import type {
 	AppSettings,
@@ -58,15 +59,34 @@ let writeChain: Promise<void> = Promise.resolve();
 
 /** Update sections of config.json (read-modify-write, serialized, overwrite). */
 export function updateConfig(patch: Partial<PodTuiConfig>): void {
+	// Capture the target path AND the patch data eagerly, at call time:
+	// the write chain defers execution, and both the config dir (tests
+	// re-point XDG_CONFIG_HOME between ops) and the state object (stores
+	// mutate in place) move under a pending write. Without the capture, a
+	// queued save writes the LATEST state into whatever directory is
+	// current when the chain drains — a cross-directory misdelivery that
+	// was the source of a flaky "enabled:false survives reload" test.
+	const configPath = getConfigFilePath(CONFIG_FILE);
+	const configDir = getConfigDir();
+	const snapshot = JSON.parse(JSON.stringify(patch)) as Partial<PodTuiConfig>;
 	writeChain = writeChain.then(async () => {
 		try {
-			await ensureConfigDir();
-			const current = await loadConfig();
-			const next = { ...current, ...patch };
-			await Bun.write(
-				getConfigFilePath(CONFIG_FILE),
-				JSON.stringify(next, null, 2),
-			);
+			await migrateOnce();
+			await mkdir(configDir, { recursive: true });
+			let current: PodTuiConfig = {};
+			try {
+				const file = Bun.file(configPath);
+				if (await file.exists()) {
+					const raw = await file.json();
+					if (raw && typeof raw === "object") {
+						current = raw as PodTuiConfig;
+					}
+				}
+			} catch {
+				/* unreadable existing config — treat as empty */
+			}
+			const next = { ...current, ...snapshot };
+			await Bun.write(configPath, JSON.stringify(next, null, 2));
 		} catch {
 			// Fire-and-forget persistence — silently ignore write errors.
 		}

@@ -42,6 +42,14 @@ const BYTES_PER_SAMPLE = 2; // s16le
 const INITIAL_CAPACITY_SAMPLES = 4 * 1024 * 1024;
 
 /**
+ * Gap (seconds) a running decode pass may close on its own before a restart
+ * at the seek target is cheaper than waiting: at 4x pacing, 15s of undecoded
+ * audio closes in ~4s — about the cost of a network reconnect + range
+ * request for a fresh ffmpeg pass. Beyond the gap, restart at the target.
+ */
+const CLOSE_IN_PLACE_GAP_SEC = 15;
+
+/**
  * Monotonically increasing generation counter.
  * Each startDecode() increments this; the read loop checks it to know
  * if it's been superseded and should bail out.
@@ -72,8 +80,8 @@ export class EpisodePcmCache {
 	private segments: Segment[] = [];
 	private generation = 0;
 	private _decoding = false;
-	/** Base offset (playback seconds) of the running decode pass; null when idle. */
-	private activeBaseSec: number | null = null;
+	/** The running pass's segment (base + frontier); null when idle. */
+	private activeSegment: Segment | null = null;
 	readonly url: string;
 	readonly sampleRate: number;
 
@@ -85,6 +93,13 @@ export class EpisodePcmCache {
 	/** Whether an ffmpeg decode pass is currently running. */
 	get decoding(): boolean {
 		return this._decoding;
+	}
+
+	/** Base (playback seconds) of the running decode pass; null when idle. */
+	get activeDecodeBaseSec(): number | null {
+		return this._decoding && this.activeSegment
+			? this.activeSegment.baseSec
+			: null;
 	}
 
 	/** End (playback seconds) of the furthest-decoded segment. */
@@ -184,14 +199,14 @@ export class EpisodePcmCache {
 			stdin: "ignore",
 		});
 		this._decoding = true;
-		this.activeBaseSec = segment.baseSec;
+		this.activeSegment = segment;
 		this.readLoop(myGeneration, segment);
 
 		this.proc.exited
 			.then((code) => {
 				if (this.generation === myGeneration) {
 					this._decoding = false;
-					this.activeBaseSec = null;
+					this.activeSegment = null;
 					// Exit 0 == decoded to stream EOF.
 					if (code === 0) segment.finished = true;
 				}
@@ -199,7 +214,7 @@ export class EpisodePcmCache {
 			.catch(() => {
 				if (this.generation === myGeneration) {
 					this._decoding = false;
-					this.activeBaseSec = null;
+					this.activeSegment = null;
 				}
 			});
 	}
@@ -223,23 +238,30 @@ export class EpisodePcmCache {
 	 * new segment at `sec` (seek into a hole / resume past cached audio).
 	 */
 	ensureDecodeAround(sec: number): void {
-		if (this._decoding) {
-			// A decode pass fills monotonically FORWARD from its base. Only a
-			// target at/after the active base is eventually covered by it —
-			// a target BEHIND the base (seek into an undecoded hole ahead of
-			// the active pass) never is: kill the pass and restart at sec.
-			if (this.activeBaseSec !== null && sec >= this.activeBaseSec) return;
-			this.startDecode(Math.max(0, sec));
-			return;
-		}
+		// Data already on hand: nothing needed here; only keep the tail
+		// filling if the decode is idle and the episode is unfinished.
 		if (this.covers(sec)) {
-			// Covered here: continue the tail so the cache keeps filling
-			// past the position (unless the whole episode is decoded).
-			if (this.decodeFinished) return;
+			if (this._decoding || this.decodeFinished) return;
 			this.startDecode(this.coverageEndSec > sec ? this.coverageEndSec : sec);
 			return;
 		}
-		// Seek into an undecoded region: start a fresh segment there.
+
+		if (this._decoding && this.activeSegment !== null) {
+			// A decode pass fills monotonically FORWARD from its base. Targets
+			// behind the base are unreachable — restart at the target.
+			if (sec < this.activeSegment.baseSec) {
+				this.startDecode(Math.max(0, sec));
+				return;
+			}
+			// Target past the pass's frontier: a SMALL gap closes on its own
+			// (4x pacing covers 15s in ~4s — about what a cold restart costs
+			// to reconnect + range-request a network stream), but a FAR-FORWARD
+			// seek would otherwise mean minutes of frozen bars while the pass
+			// chews through the skipped region. Restart at the target.
+			const frontier =
+				this.activeSegment.baseSec + this.activeSegment.written / this.sampleRate;
+			if (sec - frontier <= CLOSE_IN_PLACE_GAP_SEC) return;
+		}
 		this.startDecode(Math.max(0, sec));
 	}
 
@@ -275,7 +297,7 @@ export class EpisodePcmCache {
 	pauseDecode(): void {
 		this.generation = ++globalGeneration;
 		this._decoding = false;
-		this.activeBaseSec = null;
+		this.activeSegment = null;
 		this.killProcess();
 	}
 
