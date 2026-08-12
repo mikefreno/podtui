@@ -50,10 +50,7 @@ jobs:
       - name: Install fftw (cavacore build dependency)
         run: |
           if uname -s | grep -qi darwin; then
-            # mpv is required for the release bundle: build.ts copies it into
-            # PodTui.app (signed with the podtui bundle identifier) so macOS
-            # Now Playing shows the PodTui icon instead of a blank placeholder.
-            brew install fftw mpv
+            brew install fftw
           else
             sudo apt-get update
             sudo apt-get install -y libfftw3-dev
@@ -79,16 +76,6 @@ jobs:
           printf 'preload = ["./definitely-missing.ts"]\n' > "$SMOKE_DIR/bunfig.toml"
           cd "$SMOKE_DIR"
           ./podtui-*/podtui --version
-          # macOS tarballs must ship PodTui.app with a working bundled mpv
-          # carrying the podtui bundle identifier — otherwise Now Playing
-          # attribution silently regresses to a blank icon.
-          if [ "${{ matrix.plat }}" = "darwin" ]; then
-            MPV=./podtui-*/PodTui.app/Contents/MacOS/mpv
-            test -x $MPV || { echo "PodTui.app missing bundled mpv"; exit 1; }
-            $MPV --version >/dev/null || { echo "bundled mpv does not launch"; exit 1; }
-            codesign -dvv $MPV 2>&1 | grep -q "Identifier=com.mikefreno.podtui" \
-              || { echo "bundled mpv lacks podtui signing identifier"; exit 1; }
-          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6

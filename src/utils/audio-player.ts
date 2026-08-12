@@ -29,7 +29,7 @@
 import { platform } from "os";
 import { existsSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
-import { dirname, join } from "path";
+import { join } from "path";
 import type { Socket, Subprocess } from "bun";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -115,51 +115,11 @@ function mpvSocketPath(): string {
 	// Per-instance, not just per-pid: tests (and backend switching) create
 	// several MpvBackend objects in ONE bun process — a pid-only path makes
 	// every daemon bind the same socket, so later daemons unlink the path
-	// out from under earlier ones and IPC cross-talks between backends.
+	// out from under each other.
 	return join(
 		tmpdir(),
 		`podtui-mpv-${process.pid}-${mpvInstance++}.sock`,
 	);
-}
-
-/**
- * mpv executable to use. Prefers a sibling `mpv` inside the app bundle
- * (macOS PodTui.app/Contents/MacOS/mpv): running mpv from inside the bundle
- * makes macOS attribute its Now Playing session to PodTui — source-app icon
- * and name in Control Center — instead of a blank placeholder for an
- * unbundled binary.
- *
- * The bundled copy is verified to actually launch: it links against brew's
- * dylibs by absolute path, and a Homebrew ffmpeg major upgrade can break it
- * (dylib gone → immediate non-zero exit). If the bundled binary can't run,
- * fall back to PATH mpv so audio keeps working — the icon degrades to blank
- * rather than playback dying. Probed once per process.
- */
-let resolvedMpv: string | null | undefined; // undefined = not yet probed
-
-function mpvLaunches(binary: string): boolean {
-	try {
-		const proc = Bun.spawnSync([binary, "--version"], { timeout: 3000 });
-		return proc.exitCode === 0;
-	} catch {
-		return false;
-	}
-}
-
-function resolveMpvBinary(): string | null {
-	if (resolvedMpv !== undefined) return resolvedMpv;
-	let resolved: string | null = null;
-	try {
-		const bundled = join(dirname(process.execPath), "mpv");
-		if (existsSync(bundled) && mpvLaunches(bundled)) {
-			resolved = bundled;
-		}
-	} catch {
-		/* process.execPath unusable — fall through to PATH */
-	}
-	if (!resolved) resolved = which("mpv");
-	resolvedMpv = resolved;
-	return resolved;
 }
 
 // ── mpv JSON IPC connection ─────────────────────────────────────────
@@ -377,7 +337,7 @@ export class MpvBackend implements AudioBackend {
 
 		this.proc = Bun.spawn(
 			[
-				resolveMpvBinary() ?? "mpv",
+				"mpv",
 				"--no-video",
 				"--no-terminal",
 				"--really-quiet",
@@ -799,7 +759,7 @@ export interface DetectedPlayer {
 export function detectPlayers(): DetectedPlayer[] {
 	const players: DetectedPlayer[] = [];
 
-	const mpvPath = resolveMpvBinary();
+	const mpvPath = which("mpv");
 	if (mpvPath) {
 		players.push({
 			name: "mpv",
@@ -833,13 +793,13 @@ export function createAudioBackend(preferred?: BackendName): AudioBackend {
 		if (backend) return backend;
 	}
 
-	return resolveMpvBinary() ? new MpvBackend() : new NoopBackend();
+	return which("mpv") ? new MpvBackend() : new NoopBackend();
 }
 
 function createBackendByName(name: BackendName): AudioBackend | null {
 	switch (name) {
 		case "mpv":
-			return resolveMpvBinary() ? new MpvBackend() : null;
+			return which("mpv") ? new MpvBackend() : null;
 		case "none":
 			return new NoopBackend();
 	}
