@@ -25,28 +25,10 @@ export function GlobalActivityIndicator() {
     downloadStore.getActiveCount() + downloadStore.getQueue().length > 0 ||
     activity.isActive();
 
-  /** Label priority: downloads in flight > latest tracked activity >
-   *  generic loading (only reachable when an isLoading/isSearching flag is
-   *  on but nothing else is). */
-  const label = () => {
-    const activeCount = downloadStore.getActiveCount();
-    const queueLength = downloadStore.getQueue().length;
-    if (activeCount + queueLength > 0) {
-      return `Downloading ${activeCount}${
-        queueLength > 0 ? ` +${queueLength} queued` : ""
-      }`;
-    }
-    if (activity.isActive()) {
-      const latest = activity.labels().at(-1);
-      return `${latest ?? "Loading"}…`;
-    }
-    return "Loading…";
-  };
-
   return (
     <Show when={isActive()}>
       <box position="absolute" top={0} right={0} paddingRight={1}>
-        <LoadingIndicator label={label()} />
+        <LoadingIndicator />
       </box>
     </Show>
   );

@@ -781,6 +781,13 @@ function createFeedStore() {
 		episodeLoadCount.set(feedId, newCount);
 		const episodes = cached.slice(0, newCount);
 
+		// Yield a real macrotask turn before the sync state update so the
+		// renderer paints the spinner and processes keyboard input before the
+		// (potentially large, per-feed in loadMoreAllFeeds) setFeeds + sort
+		// runs. Without this, the whole body executes in one microtask batch
+		// and the UI freezes through every feed in the batch.
+		await yieldToUI();
+
 		setFeeds((prev) => {
 			const updated = prev.map((f) =>
 				f.id === feedId ? { ...f, episodes } : f,

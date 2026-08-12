@@ -141,17 +141,15 @@ test("track re-throws rejection and returns isActive() to its prior value", asyn
 	expect(activity.labels()).toEqual([]);
 });
 
-test("idle: renders nothing, no spinner, no label", async () => {
+test("idle: renders nothing, no spinner", async () => {
 	const setup = await renderIndicator();
 	const text = frameText(setup);
 	expect(text).not.toMatch(SPINNER_RE);
-	expect(text).not.toContain("…");
-	expect(text).not.toContain("Downloading");
 	expect(text.trim()).toBe("");
 	setup.renderer.destroy();
 });
 
-test("tracked activity: spinner + label appear while active, vanish on end", async () => {
+test("tracked activity: spinner appears while active, vanishes on end", async () => {
 	const activity = useActivityStore();
 	const setup = await renderIndicator();
 	expect(frameText(setup)).not.toMatch(SPINNER_RE);
@@ -160,18 +158,16 @@ test("tracked activity: spinner + label appear while active, vanish on end", asy
 	await setup.renderOnce();
 	const active = frameText(setup);
 	expect(active).toMatch(SPINNER_RE);
-	expect(active).toContain("Refreshing…");
 
 	end();
 	await setup.renderOnce();
 	const done = frameText(setup);
 	expect(done).not.toMatch(SPINNER_RE);
-	expect(done).not.toContain("Refreshing…");
 	expect(done.trim()).toBe("");
 	setup.renderer.destroy();
 });
 
-test("active download: 'Downloading' label appears and disappears", async () => {
+test("active download: spinner appears and disappears", async () => {
 	const dl = useDownloadStore();
 	const setup = await renderIndicator();
 
@@ -184,7 +180,7 @@ test("active download: 'Downloading' label appears and disappears", async () => 
 
 	await setup.renderOnce();
 	const during = frameText(setup);
-	expect(during).toContain("Downloading 1");
+	expect(during).toMatch(SPINNER_RE);
 
 	// Cancel: the abort settles the fetch and activeCount returns to 0.
 	dl.cancelDownload(episode.id);
@@ -197,7 +193,6 @@ test("active download: 'Downloading' label appears and disappears", async () => 
 	const after = frameText(setup);
 	expect(dl.getActiveCount() + dl.getQueue().length).toBe(0);
 	expect(after).not.toMatch(SPINNER_RE);
-	expect(after).not.toContain("Downloading");
 
 	audioDelayMs = 0;
 	setup.renderer.destroy();
