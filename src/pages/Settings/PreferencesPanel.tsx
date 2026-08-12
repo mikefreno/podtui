@@ -4,13 +4,15 @@
  * driven by the Shell router via nav.action.
  *
  * Auto-download (global setting, see stores/feed.ts runAutoDownload):
- *   • Auto Download        — master toggle (default: off)
- *   • Auto Download Count  — X most recent episodes per show (default: 2,
- *                            any positive integer — type it in the editor)
- *   • Auto Download Scope  — which shows: all / none / whitelist (default: all)
  *   • Auto Download Whitelist — shown only when scope is "whitelist": search
  *                            field over subscribed shows; suggestions toggle
  *                            in/out with Space (j/k to move, Esc to browse).
+ *   • Episode Cache Mode   — date or count bound for the episode list
+ *                            (default: date)
+ *   • Episode Cache Count  — N most recent episodes when mode is count
+ *                            (default: 25)
+ *   • Episode Cache Days   — rolling N-day window when mode is date
+ *                            (default: 60)
  */
 
 import { createSignal, Show, For, onMount, onCleanup } from "solid-js";
@@ -30,7 +32,7 @@ import {
 import { on } from "@/utils/event-bus";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import { TABS } from "@/utils/navigation";
-import type { AutoDownloadScope, ThemeName } from "@/types/settings";
+import type { AutoDownloadScope, EpisodeCacheMode, ThemeName } from "@/types/settings";
 import type { Feed } from "@/types/feed";
 import type { SettingItem } from "./types";
 
@@ -48,6 +50,14 @@ const SCOPE_LABELS: Array<{ value: AutoDownloadScope; label: string }> = [
 	{ value: "none", label: "None" },
 	{ value: "whitelist", label: "Whitelist" },
 ];
+const CACHE_MODE_LABELS: Array<{ value: EpisodeCacheMode; label: string }> = [
+	{ value: "date", label: "Date" },
+	{ value: "count", label: "Count" },
+];
+
+function cacheModeLabel(mode: EpisodeCacheMode): string {
+	return CACHE_MODE_LABELS.find((s) => s.value === mode)?.label ?? mode;
+}
 
 function scopeLabel(scope: AutoDownloadScope): string {
 	return SCOPE_LABELS.find((s) => s.value === scope)?.label ?? scope;
@@ -204,6 +214,79 @@ export function usePreferencesItems(): SettingItem[] {
 				app.updatePreferences({
 					autoJumpToPlayer: !prefs().autoJumpToPlayer,
 				}),
+		},
+		{
+			id: "episodeCacheMode",
+			label: "Episode Cache Mode",
+			kind: "select",
+			display: () => cacheModeLabel(prefs().episodeCacheMode),
+			help: () =>
+				`How the Feed and My Shows episode lists are bounded.\nDate: keep episodes from the last N days (see Cache Days below).\nCount: keep the N most recent episodes (see Cache Count below).\nFetch More always pages beyond this bound — these episodes are volatile and don't persist.\nType: select\nDefault: date\nCurrent: ${cacheModeLabel(prefs().episodeCacheMode)}\nCycle with j/k; Enter to apply.`,
+			cycle: (dir) => {
+				const idx = CACHE_MODE_LABELS.findIndex(
+					(s) => s.value === prefs().episodeCacheMode,
+				);
+				const next =
+					CACHE_MODE_LABELS[
+						(idx + dir + CACHE_MODE_LABELS.length) % CACHE_MODE_LABELS.length
+					].value;
+				app.updatePreferences({ episodeCacheMode: next });
+			},
+		},
+		{
+			id: "episodeCacheCount",
+			label: "Episode Cache Count",
+			kind: "number",
+			display: () =>
+				prefs().episodeCacheMode === "count"
+					? `${prefs().episodeCacheCount} eps`
+					: "(date mode)",
+			help: () =>
+				`Number of most-recent episodes to keep in the Feed/My Shows lists when mode is Count.\nType: number (any positive integer)\nDefault: 25\nCurrent: ${prefs().episodeCacheCount}\nj/k to −/+1 · Enter to type a value.`,
+			cycle: (dir) => {
+				const next = Math.max(1, prefs().episodeCacheCount + dir);
+				app.updatePreferences({ episodeCacheCount: next });
+			},
+			renderEditor: () => (
+				<NumberInputEditor
+					label="Episode Cache Count"
+					value={() => prefs().episodeCacheCount}
+					commit={(n) => {
+						app.updatePreferences({
+							episodeCacheCount: Math.max(1, n),
+						});
+					}}
+				/>
+			),
+		},
+		{
+			id: "episodeCacheDays",
+			label: "Episode Cache Days",
+			kind: "number",
+			display: () =>
+				prefs().episodeCacheMode === "date"
+					? `${prefs().episodeCacheDays} days`
+					: "(count mode)",
+			help: () =>
+				`Rolling window in days for the Feed/My Shows episode lists when mode is Date.\nType: number (1–365)\nDefault: 60\nCurrent: ${prefs().episodeCacheDays} days\nj/k to −/+5 · Enter to type a value.`,
+			cycle: (dir) => {
+				const next = Math.min(
+					365,
+					Math.max(1, prefs().episodeCacheDays + dir * 5),
+				);
+				app.updatePreferences({ episodeCacheDays: next });
+			},
+			renderEditor: () => (
+				<NumberInputEditor
+					label="Episode Cache Days"
+					value={() => prefs().episodeCacheDays}
+					commit={(n) => {
+						app.updatePreferences({
+							episodeCacheDays: Math.min(365, Math.max(1, n)),
+						});
+					}}
+				/>
+			),
 		},
 		{
 			id: "fetchMore",

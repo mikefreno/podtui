@@ -96,6 +96,11 @@ export type FetchMoreMode = "manual" | "auto";
 /** Which shows the auto-download setting applies to (default: all). */
 export type AutoDownloadScope = "all" | "none" | "whitelist";
 
+/** How the episode cache (the Feed / My Shows list + the pagination cache)
+ *  is bounded: by a rolling date window or by a count of most-recent
+ *  episodes (default: date). */
+export type EpisodeCacheMode = "date" | "count";
+
 export type UserPreferences = {
 	showExplicit: boolean;
 	autoDownload: boolean;
@@ -111,6 +116,12 @@ export type UserPreferences = {
 	fetchMoreMode: FetchMoreMode;
 	/** Minutes between automatic background feed refreshes (default: 30). */
 	refreshIntervalMinutes: number;
+	/** How the episode list cache is bounded — by date or by count (default: date). */
+	episodeCacheMode: EpisodeCacheMode;
+	/** Number of most-recent episodes to keep when mode is "count" (default: 25). */
+	episodeCacheCount: number;
+	/** Rolling window in days for the episode list when mode is "date" (default: 60). */
+	episodeCacheDays: number;
 };
 
 export type AppState = {

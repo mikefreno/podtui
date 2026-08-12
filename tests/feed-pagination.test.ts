@@ -3,11 +3,12 @@
  * row in a drilled show's episode list (My Shows depth 1) and the Feed
  * page's row.
  *
- * addFeed caches the FULL parsed feed while exposing only the first
- * MAX_EPISODES_SUBSCRIBE (20) episodes. `hasMoreEpisodes` reports when the
- * cache holds more than the loaded window; `loadMoreEpisodes` advances that
- * window in MAX_EPISODES_REFRESH (50) chunks until it is exhausted. This
- * pins:
+ * addFeed caches every episode inside the lifecycle window (the last
+ * EPISODE_WINDOW_DAYS days — the date bound, not a count) while exposing
+ * only the first MAX_EPISODES_SUBSCRIBE (20) episodes. `hasMoreEpisodes`
+ * reports when the cache holds more than the loaded window;
+ * `loadMoreEpisodes` advances that window in MAX_EPISODES_REFRESH (50)
+ * chunks until it is exhausted. This pins:
  *   1. A freshly subscribed feed with a longer cache reports hasMoreEpisodes.
  *   2. loadMoreEpisodes grows that feed's episodes from the cache (no refetch
  *      needed) and hasMoreEpisodes flips false once the window reaches the end.
@@ -26,6 +27,8 @@ process.env.XDG_CONFIG_HOME = configHome;
 
 import { useFeedStore } from "../src/stores/feed";
 import type { Podcast } from "../src/types/podcast";
+
+const HOUR = 3600 * 1000;
 
 interface ServedEpisode {
 	title: string;
@@ -94,10 +97,12 @@ afterAll(() => {
 
 test("loadMoreEpisodes advances one feed's window from the cache, then no-ops", async () => {
 	const store = useFeedStore();
-	// 60 episodes: 20 shown at subscribe, 40 held back in the cache.
+	// 60 episodes: 20 shown at subscribe, 40 held back in the cache. All
+	// inside the lifecycle window (11h apart ≈ 27.5 days) so every one is
+	// cacheable — the cache bound is the date window, not a count.
 	servedEpisodes = Array.from({ length: 60 }, (_, i) => ({
 		title: `Ep ${60 - i}`,
-		date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+		date: new Date(Date.now() - (60 - i) * 11 * HOUR).toISOString(),
 	}));
 	const feedUrl = `http://127.0.0.1:${server!.port}/paged.xml`;
 	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
@@ -123,9 +128,10 @@ test("loadMoreEpisodes advances one feed's window from the cache, then no-ops", 
 test("hasMoreEpisodes stays true across chunked loads until the end", async () => {
 	const store = useFeedStore();
 	// 120 episodes: 20 shown, 100 cached — two 50-episode chunks remaining.
+	// All inside the lifecycle window (5h apart = 25 days).
 	servedEpisodes = Array.from({ length: 120 }, (_, i) => ({
 		title: `Ep ${120 - i}`,
-		date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+		date: new Date(Date.now() - (120 - i) * 5 * HOUR).toISOString(),
 	}));
 	const feedUrl = `http://127.0.0.1:${server!.port}/paged-chunked.xml`;
 	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");

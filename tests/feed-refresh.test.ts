@@ -29,6 +29,8 @@ process.env.XDG_CONFIG_HOME = configHome;
 import { useFeedStore } from "../src/stores/feed";
 import type { Podcast } from "../src/types/podcast";
 
+const HOUR = 3600 * 1000;
+
 interface ServedEpisode {
 	title: string;
 	date: string;
@@ -193,10 +195,12 @@ test("refreshAllFeeds keeps unchanged feeds' order and timestamps", async () => 
 test("refresh parses in bounded chunks, yielding to the event loop between them", async () => {
 	const store = useFeedStore();
 	// 60 episodes: a chunked parse (25/chunk) must yield between chunks; a
-	// monolithic parse would complete without yielding at all.
+	// monolithic parse would complete without yielding at all. All dated
+	// inside the lifecycle window (11h apart ≈ 27.5 days) so every one is
+	// cacheable and the window assertions below hold.
 	servedEpisodes = Array.from({ length: 60 }, (_, i) => ({
 		title: `Ep ${60 - i}`,
-		date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+		date: new Date(Date.now() - (60 - i) * 11 * HOUR).toISOString(),
 	}));
 	const feedUrl = `http://127.0.0.1:${server!.port}/chunky.xml`;
 	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");

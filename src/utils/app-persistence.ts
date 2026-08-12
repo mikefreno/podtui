@@ -49,6 +49,9 @@ const defaultPreferences: UserPreferences = {
 	autoJumpToPlayer: true,
 	fetchMoreMode: "auto",
 	refreshIntervalMinutes: 30,
+	episodeCacheMode: "date",
+	episodeCacheCount: 25,
+	episodeCacheDays: 60,
 };
 
 const defaultState: AppState = {

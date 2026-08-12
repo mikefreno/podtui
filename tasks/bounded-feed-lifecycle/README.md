@@ -21,7 +21,7 @@ Dependencies
 Exit criteria
 
 - After any refresh + save, `config.json` `feeds[*].episodes` contains only episodes with `pubDate` within the last 30 days or episodes marked `completed` in `downloads.json`; loading a legacy config prunes stale episodes on first launch.
-- In-memory retention is capped per feed; episodes aged out of the persisted window remain browsable within the session and are re-fetchable via fetch-more after a restart.
+- The volatile episode list and pagination cache are bounded by the same 30-day window as persistence: only in-window episodes are cached/loadable, and everything in-window is (no episode-count ceiling).
 - A refresh batch never exceeds a fixed fetch concurrency, applies each feed's result as it lands (no `Promise.all` barrier), and persistence writes are debounced; keyboard input stays responsive throughout.
 - The top-right indicator is visible iff at least one feed refresh, fetch-more, subscribe fetch, search, or episode download is in flight, hidden otherwise.
 - `bun test` and `bun run lint` pass.

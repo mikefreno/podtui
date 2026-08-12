@@ -22,11 +22,9 @@ background (read this before touching code):
 deliverables:
 
 - `src/utils/feeds-persistence.ts`:
-  - New exported constant `PERSISTED_WINDOW_DAYS = 30`.
-  - New exported pure function `episodeIsPersistable(ep: Episode, downloadedIds: Set<string>, now: Date): boolean` — returns `true` when:
-    - `ep.pubDate` is missing/not a valid `Date` (fail-safe: never drop an undatable episode), OR
-    - `ep.pubDate.getTime() >= now.getTime() - PERSISTED_WINDOW_DAYS * 24 * 3600 * 1000`, OR
-    - `downloadedIds.has(ep.id)`.
+  - New exported constant `EPISODE_WINDOW_DAYS = 30` — the lifecycle window: bounds BOTH persistence (here) and the volatile episode list/cache (task 02).
+  - New exported pure function `episodeInWindow(ep: Episode, now: Date): boolean` — returns `true` when `ep.pubDate` is missing/not a valid `Date` (fail-safe: never drop an undatable episode) OR `ep.pubDate.getTime() >= now.getTime() - EPISODE_WINDOW_DAYS * 24 * 3600 * 1000`.
+  - New exported pure function `episodeIsPersistable(ep: Episode, downloadedIds: Set<string>, now: Date): boolean` — returns `true` when `downloadedIds.has(ep.id)` OR `episodeInWindow(ep, now)`.
   - New (module-private) async helper `readDownloadedEpisodeIds(): Promise<Set<string>>` — reads `getConfigFilePath("downloads.json")` with `Bun.file`, returns the `episodeId`s of records whose `status` equals `DownloadStatus.COMPLETED`; returns an empty set on any error or missing file. Note: an episode whose download is merely in-flight is NOT exempted; it will be re-included by the next save after completion, since the in-memory `feed.episodes` still holds it — document this in the function comment.
   - `saveFeedsToFile(feeds: Feed[])` — before calling `updateConfig`, map each feed to `{ ...feed, episodes: feed.episodes.filter(ep => episodeIsPersistable(ep, downloadedIds, new Date())) }`. The downloaded-ids lookup is async, so wrap the whole body in a fire-and-forget async IIFE (`.catch(() => {})`) that preserves the existing sync/fire-and-forget signature; on any lookup failure, save the feeds unpruned (never lose data on an error path).
   - `loadFeedsFromFile()` — after `reviveDates`, apply the same prune to the loaded feeds; if the prune removed at least one episode, call `saveFeedsToFile(pruned)` to rewrite `config.json` (this is the startup cleanup for legacy configs). `await` the prune path deterministically (the function is already async).

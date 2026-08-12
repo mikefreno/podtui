@@ -10,22 +10,35 @@ import type { Episode } from "../types/episode";
 import type { Feed } from "../types/feed";
 import type { PodcastSource } from "../types/source";
 
-/** Retention window for persisted episodes: older episodes are dropped when
- *  feeds are written to config.json unless they are completed downloads. */
-export const PERSISTED_WINDOW_DAYS = 30;
+/** Default episode lifecycle window in days — used when no preference is
+ *  configured (legacy configs, first launch). The actual bound is the user's
+ *  episodeCacheDays preference; this is just the fail-safe default. */
+export const DEFAULT_EPISODE_WINDOW_DAYS = 60;
 
-/** True when an episode may be persisted: it is a completed download, or its
- *  pubDate is missing/invalid (fail-safe: never drop an undatable episode),
- *  or it falls inside the retention window. */
+/** True when an episode falls inside a rolling date window of `days` days.
+ *  A missing/invalid pubDate is ALWAYS kept (fail-safe: never drop an
+ *  undatable episode) — the volatile cache must agree with
+ *  episodeIsPersistable so an episode the persistence layer retains can
+ *  never be silently pruned from the list. */
+export function episodeInWindow(
+	ep: Episode,
+	now: Date,
+	days: number = DEFAULT_EPISODE_WINDOW_DAYS,
+): boolean {
+	const t = ep.pubDate?.getTime();
+	if (!t || Number.isNaN(t)) return true;
+	return t >= now.getTime() - days * 24 * 3600 * 1000;
+}
+
+/** True when an episode may be persisted: a completed download, or it falls
+ *  inside the lifecycle window (undatable episodes always kept). */
 export function episodeIsPersistable(
 	ep: Episode,
 	downloadedIds: Set<string>,
 	now: Date,
+	days: number = DEFAULT_EPISODE_WINDOW_DAYS,
 ): boolean {
-	if (downloadedIds.has(ep.id)) return true;
-	const t = ep.pubDate?.getTime();
-	if (!t || Number.isNaN(t)) return true;
-	return t >= now.getTime() - PERSISTED_WINDOW_DAYS * 24 * 3600 * 1000;
+	return downloadedIds.has(ep.id) || episodeInWindow(ep, now, days);
 }
 
 /** Episode ids of completed downloads, read from downloads.json. In-flight
@@ -70,12 +83,13 @@ function reviveDates(feed: Feed): Feed {
 		})),
 	};
 }
-
 /** Load feeds from config.json, pruning episodes outside the retention
  *  window (completed downloads always kept). When anything was pruned, the
  *  pruned list is rewritten to config.json (startup cleanup for legacy
  *  configs). The read path is awaited so the returned value is deterministic. */
-export async function loadFeedsFromFile(): Promise<Feed[]> {
+export async function loadFeedsFromFile(
+	windowDays?: number,
+): Promise<Feed[]> {
 	try {
 		const cfg = await loadConfig();
 		if (!Array.isArray(cfg.feeds)) return [];
@@ -85,14 +99,14 @@ export async function loadFeedsFromFile(): Promise<Feed[]> {
 		let prunedAny = false;
 		const pruned = feeds.map((f) => {
 			const kept = f.episodes.filter((ep) =>
-				episodeIsPersistable(ep, downloadedIds, now),
+				episodeIsPersistable(ep, downloadedIds, now, windowDays),
 			);
 			if (kept.length !== f.episodes.length) prunedAny = true;
 			return { ...f, episodes: kept };
 		});
 		if (prunedAny) {
 			// Fire-and-forget cleanup rewrite of the legacy config.
-			saveFeedsToFile(pruned);
+			saveFeedsToFile(pruned, windowDays);
 		}
 		return pruned;
 	} catch {
@@ -104,14 +118,14 @@ export async function loadFeedsFromFile(): Promise<Feed[]> {
  *  (completed downloads always kept). Fire-and-forget: the prune reads
  *  downloads.json asynchronously, then enqueues the write. On any error the
  *  UNPRUNED feeds are saved instead, so data is never lost. */
-export function saveFeedsToFile(feeds: Feed[]): void {
+export function saveFeedsToFile(feeds: Feed[], windowDays?: number): void {
 	(async () => {
 		try {
 			const downloadedIds = await readDownloadedEpisodeIds();
 			const pruned = feeds.map((f) => ({
 				...f,
 				episodes: f.episodes.filter((ep) =>
-					episodeIsPersistable(ep, downloadedIds, new Date()),
+					episodeIsPersistable(ep, downloadedIds, new Date(), windowDays),
 				),
 			}));
 			updateConfig({ feeds: pruned });
@@ -120,7 +134,6 @@ export function saveFeedsToFile(feeds: Feed[]): void {
 		}
 	})().catch(() => {});
 }
-
 /** Load sources from config.json */
 export async function loadSourcesFromFile<T>(): Promise<T[] | null> {
 	try {
@@ -131,7 +144,6 @@ export async function loadSourcesFromFile<T>(): Promise<T[] | null> {
 		return null;
 	}
 }
-
 /** Save sources to config.json */
 export function saveSourcesToFile<T>(sources: T[]): void {
 	updateConfig({ sources: sources as unknown as PodcastSource[] });

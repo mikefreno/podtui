@@ -41,11 +41,12 @@ let delayMs = 0;
 let feedUrl = "";
 let feedId = "";
 
-/** 3 episodes × 3 rows = 9 list rows: the spinner sits right below them. */
+/** 3 episodes × 3 rows = 9 list rows: the spinner sits right below them.
+ *  Dated inside the lifecycle window (1–3 days ago) so all three render. */
 function feedXml(origin: string): string {
 	const items = Array.from({ length: 3 }, (_, i) => `<item>
 	<title>Spin Ep ${3 - i}</title>
-	<pubDate>${new Date(Date.UTC(2026, 0, 1 + i)).toISOString()}</pubDate>
+	<pubDate>${new Date(Date.now() - (3 - i) * 24 * 3600 * 1000).toISOString()}</pubDate>
 	<enclosure url="${origin}/audio-${i}.mp3" length="12345" type="audio/mpeg"/>
 </item>`).join("\n");
 	return `<?xml version="1.0" encoding="UTF-8"?>

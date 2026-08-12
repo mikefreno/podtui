@@ -2,7 +2,7 @@
  * Bounded-feed-lifecycle persistence tests — task 01 (retention window).
  *
  * Pins the persistence contract:
- *   1. saveFeedsToFile never writes an episode older than PERSISTED_WINDOW_DAYS
+ *   1. saveFeedsToFile never writes an episode older than DEFAULT_EPISODE_WINDOW_DAYS
  *      unless its id is a completed download in downloads.json.
  *   2. loadFeedsFromFile prunes over-window episodes from legacy configs and
  *      rewrites config.json when it pruned anything.
@@ -27,7 +27,7 @@ const configHome = mkdtempSync(join(tmpdir(), "podtui-retention-"));
 process.env.XDG_CONFIG_HOME = configHome;
 
 import {
-	PERSISTED_WINDOW_DAYS,
+	DEFAULT_EPISODE_WINDOW_DAYS,
 	episodeIsPersistable,
 	loadFeedsFromFile,
 	saveFeedsToFile,
@@ -134,18 +134,18 @@ afterAll(() => {
 
 // ── Unit: episodeIsPersistable ──────────────────────────────────────────────
 
-test("episodeIsPersistable drops a 40-day-old episode that is not downloaded", () => {
+test("episodeIsPersistable drops a 70-day-old episode that is not downloaded", () => {
 	const ep = makeEpisode({
 		id: "old-plain-id",
-		pubDate: new Date(Date.now() - 40 * DAY),
+		pubDate: new Date(Date.now() - 70 * DAY),
 	});
 	expect(episodeIsPersistable(ep, new Set(), new Date())).toBe(false);
 });
 
-test("episodeIsPersistable keeps a 40-day-old episode whose id is a completed download", () => {
+test("episodeIsPersistable keeps a 70-day-old episode whose id is a completed download", () => {
 	const ep = makeEpisode({
 		id: "old-downloaded-id",
-		pubDate: new Date(Date.now() - 40 * DAY),
+		pubDate: new Date(Date.now() - 70 * DAY),
 	});
 	expect(
 		episodeIsPersistable(ep, new Set(["old-downloaded-id"]), new Date()),
@@ -165,8 +165,8 @@ test("episodeIsPersistable keeps an episode with an invalid pubDate", () => {
 	expect(episodeIsPersistable(ep, new Set(), new Date())).toBe(true);
 });
 
-test("PERSISTED_WINDOW_DAYS is 30", () => {
-	expect(PERSISTED_WINDOW_DAYS).toBe(30);
+test("DEFAULT_EPISODE_WINDOW_DAYS is 60", () => {
+	expect(DEFAULT_EPISODE_WINDOW_DAYS).toBe(60);
 });
 
 // ── Save path: retention window applied with completed-download exemption ──
@@ -199,11 +199,11 @@ test("saveFeedsToFile prunes over-window episodes but keeps completed downloads"
 		}),
 		makeEpisode({
 			id: "old-plain-id",
-			pubDate: new Date(Date.now() - 40 * DAY),
+			pubDate: new Date(Date.now() - 70 * DAY),
 		}),
 		makeEpisode({
 			id: "old-downloaded-id",
-			pubDate: new Date(Date.now() - 40 * DAY),
+			pubDate: new Date(Date.now() - 70 * DAY),
 		}),
 	]);
 	saveFeedsToFile([feed]);
@@ -249,7 +249,7 @@ test("loadFeedsFromFile prunes over-window episodes and rewrites config.json", a
 								description: "",
 								audioUrl: "https://example.com/audio/old-a.mp3",
 								duration: 60,
-								pubDate: new Date(Date.now() - 40 * DAY).toISOString(),
+								pubDate: new Date(Date.now() - 70 * DAY).toISOString(),
 							},
 							{
 								id: "old-b",
@@ -258,7 +258,7 @@ test("loadFeedsFromFile prunes over-window episodes and rewrites config.json", a
 								description: "",
 								audioUrl: "https://example.com/audio/old-b.mp3",
 								duration: 60,
-								pubDate: new Date(Date.now() - 40 * DAY).toISOString(),
+								pubDate: new Date(Date.now() - 70 * DAY).toISOString(),
 							},
 						],
 						visibility: "public",

@@ -13,8 +13,9 @@ import { DEFAULT_SOURCES } from "../types/source";
 import { getRSSItems, parseRSSItem, parseChannelCoverUrl } from "../api/rss-parser";
 import { resolveItunesFeedUrl } from "../utils/itunes-feed-resolver";
 import { savePodcastIndexCredentials } from "../utils/source-credentials";
-import { mergeEpisodes } from "../utils/episode-merge";
+import { mergeEpisodesBounded } from "../utils/episode-merge";
 import {
+	episodeInWindow,
 	loadFeedsFromFile,
 	saveFeedsToFile,
 	loadSourcesFromFile,
@@ -30,11 +31,6 @@ const MAX_EPISODES_REFRESH = 50;
 
 /** Max episodes to fetch on initial subscribe */
 const MAX_EPISODES_SUBSCRIBE = 20;
-
-/** Per-feed bound on both the cached parse results and the merged in-memory
- *  window; 500 covers years of a weekly show's history while capping a
- *  20-subscription install at 10k episodes. */
-export const MAX_EPISODES_IN_MEMORY = 500;
 
 /** Per-feed fetch timeout — a hung feed must not stall a refresh batch or
  *  the background refresh loop. */
@@ -93,15 +89,42 @@ const parseEpisodesIncremental = async (
 	return episodes;
 };
 
-/** Cache of all parsed episodes per feed (feedId -> Episode[]) */
+/** Cache of ALL parsed episodes per feed (feedId -> Episode[]). Holds the
+ *  full parse — the bound (count or date) is applied when reading, not when
+ *  writing, so changing the preference takes effect without a refetch.
+ *  Fetch-more reads beyond the bound from this cache (volatile only — the
+ *  cache itself is never extended by fetch-more). */
 const fullEpisodeCache = new Map<string, Episode[]>();
 
-/** Track how many episodes are currently loaded per feed */
+/** Track how many episodes are currently loaded (visible) per feed. The
+ *  loaded window grows via fetch-more but never exceeds what the cache
+ *  holds — when it reaches the cache length, hasMoreEpisodes flips false. */
 const episodeLoadCount = new Map<string, number>();
 
-/** Save feeds to file (async, fire-and-forget) */
+/** Read the episode cache bound from preferences: a closure that decides
+ *  whether the episode at `index` (0 = newest, after sort) is kept. */
+function episodeKeepFn(prefs: {
+	episodeCacheMode: "date" | "count";
+	episodeCacheCount: number;
+	episodeCacheDays: number;
+}): (ep: Episode, index: number) => boolean {
+	const now = new Date();
+	if (prefs.episodeCacheMode === "count") {
+		const count = Math.max(1, prefs.episodeCacheCount);
+		return (_ep: Episode, index: number) => index < count;
+	}
+	const days = Math.max(1, prefs.episodeCacheDays);
+	return (ep: Episode) => episodeInWindow(ep, now, days);
+}
+
+/** Save feeds to file (async, fire-and-forget). */
 function saveFeeds(feeds: Feed[]): void {
-	saveFeedsToFile(feeds);
+	const prefs = useAppStore().state().preferences;
+	const days =
+		prefs.episodeCacheMode === "date"
+			? Math.max(1, prefs.episodeCacheDays)
+			: undefined;
+	saveFeedsToFile(feeds, days);
 }
 
 /** Save sources to file (async, fire-and-forget) */
@@ -325,13 +348,15 @@ function createFeedStore() {
 		);
 	};
 
-	/** Fetch latest episodes from an RSS feed URL, caching all parsed episodes.
-	 *  Returns NULL when the feed could not be fetched (network error, non-OK
-	/** Fetch latest episodes from an RSS feed URL, caching all parsed episodes.
-	 *  Also returns the channel-level artwork so callers can backfill a feed's
-	 *  coverUrl (subscribe + refresh). Null episodes on any failure — a
-	 *  failed fetch must not look like an empty feed, or the store would wipe
-	 *  a subscribed show's episodes. */
+	/** Fetch latest episodes from an RSS feed URL, caching ALL parsed
+	 *  episodes in fullEpisodeCache. The visible episodes returned are
+	 *  bounded by the user's cache preference (count or date); the full
+	 *  cache survives so fetch-more can page beyond the bound without a
+	 *  refetch (volatile only — the cache is never extended by fetch-more).
+	 *  Returns NULL episodes on any failure — a failed fetch must not look
+	 *  like an empty feed, or the store would wipe a subscribed show's
+	 *  episodes. Also returns the channel-level artwork so callers can
+	 *  backfill a feed's coverUrl (subscribe + refresh). */
 	const fetchEpisodes = async (
 		feedUrl: string,
 		limit: number,
@@ -356,14 +381,28 @@ function createFeedStore() {
 				await parseEpisodesIncremental(xml, feedUrl),
 			);
 
-			// Cache all parsed episodes for pagination
 			if (feedId) {
-				fullEpisodeCache.set(feedId, allEpisodes.slice(0, MAX_EPISODES_IN_MEMORY));
-				episodeLoadCount.set(feedId, Math.min(limit, allEpisodes.length));
+				// Cache the FULL parse — the bound is applied when reading,
+				// not when writing, so a preference change takes effect
+				// without a refetch.
+				fullEpisodeCache.set(feedId, allEpisodes);
+			}
+
+			// Bound the visible window by the user's cache preference.
+			const prefs = useAppStore().state().preferences;
+			const keep = episodeKeepFn(prefs);
+			const bounded = allEpisodes.filter((ep, i) => keep(ep, i));
+			const visible = bounded.slice(0, limit);
+
+			if (feedId) {
+				// Track how many episodes are visible — the bounded window,
+				// not the full parse. hasMoreEpisodes compares this to the
+				// full cache length to decide if fetch-more can page deeper.
+				episodeLoadCount.set(feedId, visible.length);
 			}
 
 			return {
-				episodes: allEpisodes.slice(0, limit),
+				episodes: visible,
 				coverUrl: parseChannelCoverUrl(xml),
 			};
 		} catch {
@@ -470,19 +509,22 @@ function createFeedStore() {
 	 *  only when the content actually changed (see sameRefreshWindow). The
 	 *  fetched window is MERGED into the existing episodes (fetched copy wins
 	 *  on id collision) so a refresh never shrinks the in-memory list; the
-	 *  union is capped at MAX_EPISODES_IN_MEMORY. Returns the ORIGINAL array
-	 *  reference when nothing changed so callers skip persistence entirely —
-	 *  a refresh that fetched identical episodes must not re-sort the
-	 *  "updated" view. */
+	 *  union is pruned by the user's cache bound (count or date) so episodes
+	 *  outside the bound fall out of the visible list on the next refresh.
+	 *  Returns the ORIGINAL array reference when nothing changed so callers
+	 *  skip persistence entirely — a refresh that fetched identical episodes
+	 *  must not re-sort the "updated" view. */
 	const applyRefreshedEpisodes = (
 		prev: Feed[],
 		feedId: string,
 		episodes: Episode[],
 	): Feed[] => {
 		let changed = false;
+		const prefs = useAppStore().state().preferences;
+		const keep = episodeKeepFn(prefs);
 		const updated = prev.map((f) => {
 			if (f.id !== feedId) return f;
-			const merged = mergeEpisodes(f.episodes, episodes, MAX_EPISODES_IN_MEMORY);
+			const merged = mergeEpisodesBounded(f.episodes, episodes, keep);
 			if (sameRefreshWindow(f.episodes, episodes)) return f;
 			changed = true;
 			return { ...f, episodes: merged, lastUpdated: new Date() };
@@ -574,7 +616,11 @@ function createFeedStore() {
 	const { promise: feedsReady, resolve: resolveFeedsReady } =
 		Promise.withResolvers<void>();
 	(async () => {
-		const loadedFeeds = await loadFeedsFromFile();
+		const loadedFeeds = await loadFeedsFromFile(
+			useAppStore().state().preferences.episodeCacheMode === "date"
+				? Math.max(1, useAppStore().state().preferences.episodeCacheDays)
+				: undefined,
+		);
 		if (loadedFeeds.length > 0) setFeeds(loadedFeeds);
 		resolveFeedsReady();
 		const loadedSources = await loadSourcesFromFile<PodcastSource>();
@@ -752,7 +798,12 @@ function createFeedStore() {
 		return id ? getFeed(id) : undefined;
 	};
 
-	/** Check if a feed has more episodes available beyond what's currently loaded */
+	/** Check if a feed has more episodes available beyond what's currently
+	 *  loaded. The full parse cache holds ALL episodes (including beyond the
+	 *  cache bound), so fetch-more can always page deeper — the bound limits
+	 *  what the Feed/My Shows list shows initially, not what fetch-more can
+	 *  reach. When the loaded window reaches the cache length, this flips
+	 *  false. */
 	const hasMoreEpisodes = (feedId: string): boolean => {
 		const cached = fullEpisodeCache.get(feedId);
 		if (!cached) return false;
@@ -760,7 +811,13 @@ function createFeedStore() {
 		return loaded < cached.length;
 	};
 
-	/** Load the next chunk of episodes for one feed from the cache.
+	/** Load the next chunk of episodes for one feed from the full parse
+	 *  cache — VOLATILE only: the episodes surfaced beyond the cache bound
+	 *  are held in the feed's in-memory episode list (so the user can browse
+	 *  them) but are NOT written back to fullEpisodeCache (the cache keeps
+	 *  its original bounded shape; these episodes vanish on the next
+	 *  refresh or restart). The cache is populated by fetchEpisodes/refresh;
+	 *  a cold cache (post-restart) triggers a refetch here.
 	 *  No global guard — callers own the `isLoadingMore` flag so batches
 	 *  (loadMoreAllFeeds) can loop over multiple feeds in one go. */
 	const loadMoreEpisodesForFeed = async (feedId: string) => {
@@ -769,7 +826,8 @@ function createFeedStore() {
 
 		let cached = fullEpisodeCache.get(feedId);
 
-		// If no cache, re-fetch and parse the full feed
+		// If no cache, re-fetch and parse the full feed (cold path after a
+		// restart). The cache holds the FULL parse — no bound applied here.
 		if (!cached) {
 			try {
 				const response = await fetch(feed.podcast.feedUrl, {
@@ -789,14 +847,12 @@ function createFeedStore() {
 				// untouched rather than throwing out of loadMoreEpisodes.
 				return;
 			}
-			// Cold-refetch parse output is unsorted; sort and cap it so the
-			// cache and the pagination window stay newest-first and bounded.
+			// Cold-refetch parse output is unsorted; sort it newest-first.
 			// Yield before the sync sort (the parse already yielded before
 			// this point, but the sort of potentially hundreds of episodes
 			// is its own sync block).
 			await yieldToUI();
 			cached = sortEpisodesReverseChronological(cached);
-			cached = cached.slice(0, MAX_EPISODES_IN_MEMORY);
 			fullEpisodeCache.set(feedId, cached);
 			// Set current load count to match what's already displayed
 			episodeLoadCount.set(feedId, feed.episodes.length);
@@ -810,6 +866,9 @@ function createFeedStore() {
 
 		if (newCount <= currentCount) return; // nothing more to load
 
+		// Advance the loaded window — volatile: the episodes beyond the cache
+		// bound are held in feed.episodes (visible) but the cache itself is
+		// NOT extended. episodeLoadCount tracks the volatile window size.
 		episodeLoadCount.set(feedId, newCount);
 		const episodes = cached.slice(0, newCount);
 

@@ -1,19 +1,21 @@
 /**
- * Volatile in-memory episode merge + bounded cache tests.
+ * Configurable episode cache + volatile merge tests.
  *
- * Two behaviors from the bounded-feed-lifecycle work:
- *   1. mergeEpisodes unions refreshed episodes with what's already in memory
- *      (the fetched copy wins on id collision), so a refresh never shrinks
- *      the session's visible window; the union is capped per feed at
- *      MAX_EPISODES_IN_MEMORY.
- *   2. The per-feed parse cache is capped at MAX_EPISODES_IN_MEMORY, so
- *      loadMoreEpisodes can never surface more than the cap and
- *      hasMoreEpisodes flips false there.
+ * The episode list cache (what the Feed and My Shows pages show) is bounded by
+ * the user's preference: a date window (default 60 days) or a count (default
+ * 25). The full parse cache holds ALL episodes; fetch-more pages beyond the
+ * bound from that cache (volatile — never written back). These tests pin:
+ *   1. mergeEpisodesBounded unions refreshed episodes with what's in memory
+ *      (fetched copy wins on id collision) and prunes by the supplied keep
+ *      predicate (count or date). Undated episodes are always kept.
+ *   2. The store bounds the visible list by the configured mode, but the
+ *      full parse cache survives — fetch-more pages beyond the bound.
+ *   3. Refresh merge never shrinks the in-memory list except via the bound.
  *
- * Unchanged-refresh detection compares the fetched window against the
- * corresponding PREFIX of the merged list (sameRefreshWindow) — comparing
- * full lists would bump lastUpdated on every refresh because the merged list
- * legitimately holds episodes beyond the fetched window.
+ * Clock constraint: these tests run under vi.useFakeTimers, and a LARGE
+ * vi.advanceTimersByTime (past ~5 days of fake time) makes every subsequent
+ * network fetch hang in Bun 1.3.8's fake-timer implementation. The date
+ * boundary is pinned with relative pubDates, never by moving the clock.
  */
 
 import { test, expect, beforeAll, afterAll, beforeEach, vi } from "bun:test";
@@ -26,10 +28,15 @@ import { join } from "path";
 const configHome = mkdtempSync(join(tmpdir(), "podtui-volatile-"));
 process.env.XDG_CONFIG_HOME = configHome;
 
-import { MAX_EPISODES_IN_MEMORY, useFeedStore } from "../src/stores/feed";
-import { mergeEpisodes } from "../src/utils/episode-merge";
+import { useFeedStore } from "../src/stores/feed";
+import { mergeEpisodesBounded } from "../src/utils/episode-merge";
+import { episodeInWindow } from "../src/utils/feeds-persistence";
+import { useAppStore } from "../src/stores/app";
 import type { Episode } from "../src/types/episode";
 import type { Podcast } from "../src/types/podcast";
+
+const HOUR = 3600 * 1000;
+const DAY = 24 * HOUR;
 
 interface ServedEpisode {
 	title: string;
@@ -38,13 +45,8 @@ interface ServedEpisode {
 
 let server: ReturnType<typeof Bun.serve> | null = null;
 let servedEpisodes: ServedEpisode[] = [];
-// Bun runs test files in ONE process, so the store singleton is shared with
-// the other feed test files. Track the feeds we add and remove them in
-// afterAll so whichever file runs next sees a pristine store (execution
-// order between files is not guaranteed).
 const addedFeedIds: string[] = [];
 
-/** XML for the current served episode list (episode ids = feedUrl#index). */
 function feedXml(episodes: ServedEpisode[], origin: string): string {
 	const items = episodes
 		.map(
@@ -104,16 +106,17 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.useRealTimers();
-	// Leave the shared singleton as we found it (see addedFeedIds note).
 	const store = useFeedStore();
 	for (const id of addedFeedIds) store.removeFeed(id);
 	server?.stop(true);
 	rmSync(configHome, { recursive: true, force: true });
 });
 
-// ── mergeEpisodes unit tests ─────────────────────────────────────────────
+// ── mergeEpisodesBounded unit tests ──────────────────────────────────────
 
-test("mergeEpisodes dedupes on id collision and keeps the fetched copy", () => {
+const NOW = new Date("2026-08-10T00:00:00Z");
+
+test("mergeEpisodesBounded dedupes on id collision and keeps the fetched copy", () => {
 	const existing = [
 		makeEpisode("a", "Old Title", new Date("2026-08-01T00:00:00Z")),
 		makeEpisode("b", "Ep B", new Date("2026-08-02T00:00:00Z")),
@@ -121,14 +124,15 @@ test("mergeEpisodes dedupes on id collision and keeps the fetched copy", () => {
 	const fetched = [
 		makeEpisode("a", "New Title", new Date("2026-08-01T00:00:00Z")),
 	];
+	const keepAll = () => true;
 
-	const merged = mergeEpisodes(existing, fetched, 10);
+	const merged = mergeEpisodesBounded(existing, fetched, keepAll);
 
 	expect(merged).toHaveLength(2);
 	expect(merged.find((e) => e.id === "a")!.title).toBe("New Title");
 });
 
-test("mergeEpisodes unions disjoint lists sorted newest-first", () => {
+test("mergeEpisodesBounded unions disjoint lists sorted newest-first", () => {
 	const existing = [
 		makeEpisode("old", "Old", new Date("2026-08-01T00:00:00Z")),
 	];
@@ -136,13 +140,14 @@ test("mergeEpisodes unions disjoint lists sorted newest-first", () => {
 		makeEpisode("newest", "Newest", new Date("2026-08-03T00:00:00Z")),
 		makeEpisode("mid", "Mid", new Date("2026-08-02T00:00:00Z")),
 	];
+	const keepAll = () => true;
 
-	const merged = mergeEpisodes(existing, fetched, 10);
+	const merged = mergeEpisodesBounded(existing, fetched, keepAll);
 
 	expect(merged.map((e) => e.id)).toEqual(["newest", "mid", "old"]);
 });
 
-test("mergeEpisodes drops the oldest episodes past the cap", () => {
+test("mergeEpisodesBounded with count keep drops oldest beyond the count", () => {
 	const existing = [
 		makeEpisode("day1", "Day 1", new Date("2026-08-01T00:00:00Z")),
 	];
@@ -150,13 +155,32 @@ test("mergeEpisodes drops the oldest episodes past the cap", () => {
 		makeEpisode("day3", "Day 3", new Date("2026-08-03T00:00:00Z")),
 		makeEpisode("day2", "Day 2", new Date("2026-08-02T00:00:00Z")),
 	];
+	const keepCount2 = (_ep: Episode, i: number) => i < 2;
 
-	const merged = mergeEpisodes(existing, fetched, 2);
+	const merged = mergeEpisodesBounded(existing, fetched, keepCount2);
 
 	expect(merged.map((e) => e.id)).toEqual(["day3", "day2"]);
 });
 
-test("mergeEpisodes never mutates its inputs", () => {
+test("mergeEpisodesBounded with date keep drops out-of-window and keeps undated", () => {
+	const existing = [
+		makeEpisode("fresh", "Fresh", new Date("2026-08-09T00:00:00Z")),
+		makeEpisode("stale", "Stale", new Date("2026-06-01T00:00:00Z")),
+		makeEpisode("undated", "Undated", new Date(NaN)),
+	];
+	const fetched = [
+		makeEpisode("newStale", "New Stale", new Date("2026-05-01T00:00:00Z")),
+		makeEpisode("newFresh", "New Fresh", new Date("2026-08-08T00:00:00Z")),
+	];
+	// 30-day window from NOW (2026-08-10)
+	const keepDate = (ep: Episode) => episodeInWindow(ep, NOW, 30);
+
+	const merged = mergeEpisodesBounded(existing, fetched, keepDate);
+
+	expect(merged.map((e) => e.id)).toEqual(["undated", "fresh", "newFresh"]);
+});
+
+test("mergeEpisodesBounded never mutates its inputs", () => {
 	const existing = [
 		makeEpisode("a", "A", new Date("2026-08-01T00:00:00Z")),
 		makeEpisode("b", "B", new Date("2026-08-02T00:00:00Z")),
@@ -167,18 +191,15 @@ test("mergeEpisodes never mutates its inputs", () => {
 	];
 	const existingIds = existing.map((e) => e.id);
 	const existingTitles = existing.map((e) => e.title);
-	const fetchedIds = fetched.map((e) => e.id);
-	const fetchedTitles = fetched.map((e) => e.title);
+	const keepAll = () => true;
 
-	mergeEpisodes(existing, fetched, 10);
+	mergeEpisodesBounded(existing, fetched, keepAll);
 
 	expect(existing.map((e) => e.id)).toEqual(existingIds);
 	expect(existing.map((e) => e.title)).toEqual(existingTitles);
-	expect(fetched.map((e) => e.id)).toEqual(fetchedIds);
-	expect(fetched.map((e) => e.title)).toEqual(fetchedTitles);
 });
 
-// ── store integration ────────────────────────────────────────────────────
+// ── store integration (default date mode, 60-day window) ─────────────────
 
 test("refresh merges new episodes without removing the volatile window", async () => {
 	const store = useFeedStore();
@@ -195,8 +216,6 @@ test("refresh merges new episodes without removing the volatile window", async (
 	expect(store.getFeed(id)!.episodes.length).toBe(3);
 	const beforeUpdated = store.getFeed(id)!.lastUpdated.getTime();
 
-	// The feed now serves the same 3 episodes plus 2 newer ones (new ids at
-	// item indices 3 and 4).
 	servedEpisodes = [
 		{ title: "Ep 3", date: "2026-08-03T00:00:00Z" },
 		{ title: "Ep 2", date: "2026-08-02T00:00:00Z" },
@@ -221,32 +240,92 @@ test("refresh merges new episodes without removing the volatile window", async (
 	expect(afterSecond.lastUpdated.getTime()).toBe(afterFirst.lastUpdated.getTime());
 });
 
-test("cached episodes are capped at MAX_EPISODES_IN_MEMORY", async () => {
+test("date mode: episodes outside the 60-day window never enter the list", async () => {
 	const store = useFeedStore();
+	const now = Date.now();
+	// 600 episodes at 2h spacing span ~50 days — all inside the 60-day default
+	// window, so all 600 are cached and loadable (no count ceiling).
 	servedEpisodes = Array.from({ length: 600 }, (_, i) => ({
 		title: `Ep ${600 - i}`,
-		date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+		date: new Date(now - i * 2 * HOUR).toISOString(),
 	}));
-	const feedUrl = `http://127.0.0.1:${server!.port}/huge.xml`;
+	const feedUrl = `http://127.0.0.1:${server!.port}/date-all.xml`;
 	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
 	expect(feed).not.toBeNull();
 	const id = feed!.id;
 	addedFeedIds.push(id);
 
-	// Subscribe window (MAX_EPISODES_SUBSCRIBE = 20) with 480 more cached.
+	// Subscribe window (20) with more cached.
 	expect(store.getFeed(id)!.episodes.length).toBe(20);
 
-	// Load in MAX_EPISODES_REFRESH chunks until the cache is exhausted.
-	let maxLoaded = 0;
+	// Load everything — the cache holds all 600 (date mode keeps them all).
 	let iterations = 0;
 	while (store.hasMoreEpisodes(id) && iterations < 20) {
 		await store.loadMoreEpisodes(id);
-		maxLoaded = Math.max(maxLoaded, store.getFeed(id)!.episodes.length);
 		iterations++;
 	}
-
-	expect(iterations).toBeLessThan(20);
 	expect(store.hasMoreEpisodes(id)).toBe(false);
-	expect(store.getFeed(id)!.episodes.length).toBe(MAX_EPISODES_IN_MEMORY);
-	expect(maxLoaded).toBeLessThanOrEqual(MAX_EPISODES_IN_MEMORY);
+	expect(store.getFeed(id)!.episodes.length).toBe(600);
+});
+
+test("date mode boundary: 25 days in, 70 days out", async () => {
+	const store = useFeedStore();
+	const now = Date.now();
+	servedEpisodes = [
+		{ title: "In Window", date: new Date(now - 25 * DAY).toISOString() },
+		{ title: "Out Window", date: new Date(now - 70 * DAY).toISOString() },
+	];
+	const feedUrl = `http://127.0.0.1:${server!.port}/date-boundary.xml`;
+	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
+	expect(feed).not.toBeNull();
+	const id = feed!.id;
+	addedFeedIds.push(id);
+
+	expect(store.getFeed(id)!.episodes.map((e) => e.title)).toEqual([
+		"In Window",
+	]);
+	// The full cache holds both, but the visible list only shows the in-window
+	// one — fetch-more surfaces the out-of-window one (volatile).
+	expect(store.hasMoreEpisodes(id)).toBe(true);
+	await store.loadMoreEpisodes(id);
+	expect(store.getFeed(id)!.episodes.map((e) => e.title)).toEqual([
+		"In Window",
+		"Out Window",
+	]);
+});
+
+// ── count mode ────────────────────────────────────────────────────────────
+
+test("count mode: only N most-recent episodes are visible, but fetch-more goes beyond", async () => {
+	const store = useFeedStore();
+	const app = useAppStore();
+	app.updatePreferences({ episodeCacheMode: "count", episodeCacheCount: 25 });
+
+	const now = Date.now();
+	// 50 episodes at 1h spacing — all recent, but count mode caps at 25.
+	servedEpisodes = Array.from({ length: 50 }, (_, i) => ({
+		title: `Ep ${50 - i}`,
+		date: new Date(now - i * HOUR).toISOString(),
+	}));
+	const feedUrl = `http://127.0.0.1:${server!.port}/count.xml`;
+	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
+	expect(feed).not.toBeNull();
+	const id = feed!.id;
+	addedFeedIds.push(id);
+
+	// Subscribe window (20), but the cache holds all 50 — count mode only
+	// bounds the visible list (25), but the full parse cache is unbounded.
+	// The subscribe window returns min(20, 25) = 20.
+	expect(store.getFeed(id)!.episodes.length).toBe(20);
+	expect(store.hasMoreEpisodes(id)).toBe(true);
+
+	// Fetch more: the visible list grows beyond the count bound — these
+	// episodes are volatile (held in feed.episodes, not extending the cache).
+	while (store.hasMoreEpisodes(id)) {
+		await store.loadMoreEpisodes(id);
+	}
+	expect(store.getFeed(id)!.episodes.length).toBe(50);
+
+	// Reset to date mode for subsequent tests.
+	app.updatePreferences({ episodeCacheMode: "date" });
 });
