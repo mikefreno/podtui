@@ -137,6 +137,7 @@ test("refresh with a genuinely new episode bumps lastUpdated", async () => {
 
 test("a failed refresh does not wipe the feed's episodes", async () => {
 	const store = useFeedStore();
+	const savedEpisodes = servedEpisodes;
 	servedEpisodes = [{ title: "Ep 1", date: "2026-08-01T00:00:00Z" }];
 	const feedUrl = `http://127.0.0.1:${server!.port}/flaky.xml`;
 	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
@@ -158,6 +159,11 @@ test("a failed refresh does not wipe the feed's episodes", async () => {
 
 	failPath = null;
 	store.removeFeed(feedId);
+	// Restore the shared served content: with union merge semantics (volatile
+	// episodes survive refreshes) this feed keeps its larger in-memory window,
+	// so later tests must serve the same episodes they added — a shrink here
+	// would make the next test's "unchanged" refresh genuinely different.
+	servedEpisodes = savedEpisodes;
 });
 
 test("refreshAllFeeds keeps unchanged feeds' order and timestamps", async () => {
@@ -182,4 +188,45 @@ test("refreshAllFeeds keeps unchanged feeds' order and timestamps", async () => 
 	for (const id of [feedAId, feedBId]) {
 		expect(store.getFeed(id)!.lastUpdated.getTime()).toBe(tsBefore[id]);
 	}
+});
+
+test("refresh parses in bounded chunks, yielding to the event loop between them", async () => {
+	const store = useFeedStore();
+	// 60 episodes: a chunked parse (25/chunk) must yield between chunks; a
+	// monolithic parse would complete without yielding at all.
+	servedEpisodes = Array.from({ length: 60 }, (_, i) => ({
+		title: `Ep ${60 - i}`,
+		date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+	}));
+	const feedUrl = `http://127.0.0.1:${server!.port}/chunky.xml`;
+	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
+	const feedId = feed!.id;
+	expect(store.getFeed(feedId)!.episodes.length).toBe(20); // subscribe window
+
+	// Count event-loop yields during the refresh: each parse-chunk boundary
+	// posts through a MessageChannel (the yield primitive in feed.ts — the
+	// one macrotask turn bun's fake timers do not trap, which also pins that
+	// the yield works under fake timers). This runs under fake timers like
+	// the other tests; a setTimeout-based yield would deadlock here.
+	const OriginalMessageChannel = globalThis.MessageChannel;
+	let posts = 0;
+	globalThis.MessageChannel = class extends OriginalMessageChannel {
+		constructor() {
+			super();
+			posts++;
+		}
+	};
+	try {
+		vi.advanceTimersByTime(60_000);
+		await store.refreshFeed(feedId);
+	} finally {
+		globalThis.MessageChannel = OriginalMessageChannel;
+	}
+
+	expect(posts).toBeGreaterThan(0);
+	expect(store.getFeed(feedId)!.episodes.length).toBe(50); // refresh window
+
+	// Leave the shared singleton as we found it (see the addedFeedIds note
+	// in feed-pagination.test.ts — bun runs test files in one process).
+	store.removeFeed(feedId);
 });

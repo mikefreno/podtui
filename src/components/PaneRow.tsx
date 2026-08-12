@@ -63,6 +63,9 @@ export type PaneRowProps = {
 	/** Number of visible columns. `3` (default) = parent|current|preview;
 	 *  `2` = parent|current (preview omitted, current grows to fill). */
 	panes?: 2 | 3;
+	/** Which sides of the current column's border render. Defaults to
+	 *  `["left", "right"]` (the standard focused-list frame). */
+	currentBorder?: boolean | BorderSides[];
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -181,6 +184,9 @@ export function PaneRow(props: PaneRowProps) {
 			? PANE_RATIO.current + PANE_RATIO.preview
 			: PANE_RATIO.current,
 	);
+	const currentBorder = createMemo<boolean | BorderSides[]>(
+		() => props.currentBorder ?? ["left", "right"],
+	);
 
 	return (
 		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
@@ -197,7 +203,7 @@ export function PaneRow(props: PaneRowProps) {
 				grow={currentGrow()}
 				label={() => ""}
 				content={currentContent}
-				border={["left", "right"]}
+				border={currentBorder()}
 				scrollFocused={() => focused()}
 			/>
 			{/* ── preview (30%) — hovered-item detail; no border, no header ────── */}

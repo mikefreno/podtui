@@ -93,6 +93,13 @@ export function updateConfig(patch: Partial<PodTuiConfig>): void {
 	});
 }
 
+/** Resolve once every queued config write has flushed. Tests await this to
+ *  observe the serialized result of pending saveFeedsToFile/updateConfig
+ *  calls before asserting on config.json. */
+export function whenConfigIdle(): Promise<void> {
+	return writeChain;
+}
+
 /** Guards so migration runs exactly once per process. */
 let migrationDone = false;
 let migrationPromise: Promise<void> | null = null;

@@ -133,6 +133,7 @@ export function PlayerPage() {
 			currentLabel="Player"
 			panes={2}
 			focused={isActive}
+			currentBorder={["left"]}
 		/>
 	);
 }

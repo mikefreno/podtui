@@ -27,6 +27,7 @@ import { TABS } from "@/utils/navigation";
 import { createDispatcher } from "@/utils/dispatch";
 import { TabListPane } from "@/components/TabPanel";
 import { PaneRow } from "@/components/PaneRow";
+import { GlobalActivityIndicator } from "@/components/GlobalActivityIndicator";
 
 export function Shell() {
 	const theme = useTheme();
@@ -396,6 +397,8 @@ export function Shell() {
 					theme={t as any}
 				/>
 			</Show>
+			{/* ── Global activity indicator (top-right overlay) ─────────────────────── */}
+			<GlobalActivityIndicator />
 		</box>
 	);
 }

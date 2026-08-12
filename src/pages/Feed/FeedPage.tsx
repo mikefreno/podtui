@@ -236,7 +236,7 @@ function FeedPage() {
 		<Show
 			when={episodes().length > 0}
 			fallback={
-				<box padding={1}>
+				<box padding={1} alignItems="center">
 					<Show
 						when={feedStore.isLoadingFeeds()}
 						fallback={
@@ -355,7 +355,7 @@ function FeedPage() {
 				</box>
 			</Show>
 			<Show when={feedStore.isLoadingFeeds()}>
-				<box paddingLeft={2} paddingTop={1}>
+				<box alignItems="center" paddingTop={1}>
 					<LoadingIndicator label="Refreshing…" />
 				</box>
 			</Show>

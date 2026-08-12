@@ -10,15 +10,17 @@ import type { Podcast } from "../types/podcast";
 import type { Episode } from "../types/episode";
 import type { PodcastSource } from "../types/source";
 import { DEFAULT_SOURCES } from "../types/source";
-import { parseRSSFeed } from "../api/rss-parser";
+import { getRSSItems, parseRSSItem } from "../api/rss-parser";
 import { resolveItunesFeedUrl } from "../utils/itunes-feed-resolver";
 import { savePodcastIndexCredentials } from "../utils/source-credentials";
+import { mergeEpisodes } from "../utils/episode-merge";
 import {
 	loadFeedsFromFile,
 	saveFeedsToFile,
 	loadSourcesFromFile,
 	saveSourcesToFile,
 } from "../utils/feeds-persistence";
+import { useActivityStore } from "./activity";
 import { useDownloadStore } from "./download";
 import { useAppStore } from "./app";
 import { DownloadStatus } from "../types/episode";
@@ -29,12 +31,64 @@ const MAX_EPISODES_REFRESH = 50;
 /** Max episodes to fetch on initial subscribe */
 const MAX_EPISODES_SUBSCRIBE = 20;
 
+/** Per-feed bound on both the cached parse results and the merged in-memory
+ *  window; 500 covers years of a weekly show's history while capping a
+ *  20-subscription install at 10k episodes. */
+export const MAX_EPISODES_IN_MEMORY = 500;
+
 /** Per-feed fetch timeout — a hung feed must not stall a refresh batch or
  *  the background refresh loop. */
 const FETCH_TIMEOUT_MS = 20_000;
 
+/** Bounds simultaneous RSS requests during a refresh batch — a hung feed
+ *  burns at most one slot for FETCH_TIMEOUT_MS instead of pinning the whole
+ *  batch. */
+const FETCH_CONCURRENCY = 4;
+
 /** Default minutes between automatic background feed refreshes. */
 const DEFAULT_REFRESH_INTERVAL_MINUTES = 30;
+
+/** Max episodes parsed per chunk before yielding to the event loop — bounds
+ *  the synchronous regex work per frame so one huge feed (or a batch of
+ *  feeds) can't stall the renderer. */
+const PARSE_CHUNK_SIZE = 25;
+
+/** Yield to the event loop (task queue) so the renderer can paint between
+ *  parse chunks. MessageChannel instead of setTimeout/setImmediate because
+ *  bun:test fake timers trap those (feed-refresh/pagination tests run under
+ *  vi.useFakeTimers and await refreshes, so a trapped yield would deadlock
+ *  them); MessageChannel posts are real task-queue turns that fire in both
+ *  environments. */
+const yieldToUI = (): Promise<void> =>
+	new Promise((resolve) => {
+		const { port1, port2 } = new MessageChannel();
+		port1.onmessage = () => {
+			port1.close();
+			port2.close();
+			resolve();
+		};
+		port2.postMessage(null);
+	});
+
+/** Parse all episodes from feed XML in bounded chunks, yielding to the event
+ *  loop between chunks. The whole-feed sync `parseRSSFeed` would otherwise
+ *  block the UI thread for the combined parse time of every feed in a
+ *  refresh batch. */
+const parseEpisodesIncremental = async (
+	xml: string,
+	feedUrl: string,
+): Promise<Episode[]> => {
+	const items = getRSSItems(xml);
+	const episodes: Episode[] = new Array(items.length);
+	for (let start = 0; start < items.length; start += PARSE_CHUNK_SIZE) {
+		const end = Math.min(start + PARSE_CHUNK_SIZE, items.length);
+		for (let i = start; i < end; i++) {
+			episodes[i] = parseRSSItem(items[i], feedUrl, i);
+		}
+		if (end < items.length) await yieldToUI();
+	}
+	return episodes;
+};
 
 /** Cache of all parsed episodes per feed (feedId -> Episode[]) */
 const fullEpisodeCache = new Map<string, Episode[]>();
@@ -96,15 +150,42 @@ async function migratePlaintextCredentials(
 	return changed ? migrated : sources;
 }
 
-/** True when two episode lists hold the same episodes (id-set equality,
- *  order-insensitive). Refreshes compare fetched content against this so an
- *  unchanged feed keeps its `lastUpdated` — and therefore its place in the
- *  "updated" sort — instead of reordering the list on every background
- *  refresh. */
-function sameEpisodes(a: Episode[], b: Episode[]): boolean {
-	if (a.length !== b.length) return false;
-	const ids = new Set(a.map((e) => e.id));
-	return b.every((e) => ids.has(e.id));
+/** True when the freshly fetched window matches the corresponding PREFIX of
+ *  the existing episode list (id-set equality, order-insensitive). With
+ *  union semantics the merged list legitimately contains episodes BEYOND the
+ *  fetched window, so unchanged-detection must compare the fetched window
+ *  against the existing list's prefix — comparing full lists would bump
+ *  `lastUpdated` on every refresh. */
+function sameRefreshWindow(existing: Episode[], fetched: Episode[]): boolean {
+	if (fetched.length === 0) return true;
+	const prefix = existing.slice(0, fetched.length);
+	const ids = new Set(prefix.map((e) => e.id));
+	return fetched.every((e) => ids.has(e.id));
+}
+
+/** Run `fn` over every item with at most `limit` executions in flight — a
+ *  classic worker pool. Workers pull indexes from a shared counter, so the
+ *  first `limit` calls start immediately and each completion frees its slot
+ *  for the next item; results are assembled in INPUT order regardless of
+ *  completion order. A hung `fn` holds at most one slot. */
+async function mapWithConcurrency<T, R>(
+	items: T[],
+	limit: number,
+	fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+	const results = new Array<R>(items.length);
+	let nextIndex = 0;
+	const workers = Array.from(
+		{ length: Math.min(limit, items.length) },
+		async () => {
+			let i: number;
+			while ((i = nextIndex++) < items.length) {
+				results[i] = await fn(items[i]);
+			}
+		},
+	);
+	await Promise.all(workers);
+	return results;
 }
 
 /** Create feed store */
@@ -121,6 +202,39 @@ function createFeedStore() {
 	const [selectedFeedId, setSelectedFeedId] = createSignal<string | null>(null);
 	const [isLoadingMore, setIsLoadingMore] = createSignal(false);
 	const [isLoadingFeeds, setIsLoadingFeeds] = createSignal(false);
+
+	// ── Debounced persistence ───────────────────────────────────────────────
+	/** Trailing-edge debounce window for config.json writes. */
+	const SAVE_DEBOUNCE_MS = 250;
+	/** True when a save is scheduled but has not flushed yet. */
+	let savePending = false;
+	let pendingSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/** Schedule a config.json write (trailing edge) — rapid state changes
+	 *  (a refresh batch landing feed-by-feed, pin toggles, load-more pages)
+	 *  collapse into one final write instead of one file rewrite per step. */
+	const scheduleSaveFeeds = (): void => {
+		savePending = true;
+		if (pendingSaveTimer) clearTimeout(pendingSaveTimer);
+		pendingSaveTimer = setTimeout(() => {
+			pendingSaveTimer = null;
+			flushPendingSave();
+		}, SAVE_DEBOUNCE_MS);
+	};
+
+	/** Persist immediately when anything is dirty; exported for tests and
+	 *  quit hooks. Cancels a pending debounced save — the state it would
+	 *  have written is already reflected in feeds(), so writing now is
+	 *  strictly more current. */
+	const flushPendingSave = (): void => {
+		if (pendingSaveTimer) {
+			clearTimeout(pendingSaveTimer);
+			pendingSaveTimer = null;
+		}
+		if (!savePending) return;
+		savePending = false;
+		saveFeeds(feeds());
+	};
 
 	/** Get filtered and sorted feeds */
 	const getFilteredFeeds = (): Feed[] => {
@@ -230,12 +344,13 @@ function createFeedStore() {
 			});
 			if (!response.ok) return null;
 			const xml = await response.text();
-			const parsed = parseRSSFeed(xml, feedUrl);
-			const allEpisodes = sortEpisodesReverseChronological(parsed.episodes);
+			const allEpisodes = sortEpisodesReverseChronological(
+				await parseEpisodesIncremental(xml, feedUrl),
+			);
 
 			// Cache all parsed episodes for pagination
 			if (feedId) {
-				fullEpisodeCache.set(feedId, allEpisodes);
+				fullEpisodeCache.set(feedId, allEpisodes.slice(0, MAX_EPISODES_IN_MEMORY));
 				episodeLoadCount.set(feedId, Math.min(limit, allEpisodes.length));
 			}
 
@@ -256,45 +371,51 @@ function createFeedStore() {
 		sourceId: string,
 		visibility: FeedVisibility = FeedVisibility.PUBLIC,
 	): Promise<Feed | null> => {
-		// A directory stub (e.g. a show delisted from Apple Podcasts) has no
-		// feed URL; resolve the real feed from its directory page before
-		// subscribing. Refuse when it can't be resolved rather than adding a
-		// broken feed.
-		if (!podcast.feedUrl) {
-			if (!podcast.directoryUrl) return null;
-			const resolved = await resolveItunesFeedUrl(podcast.directoryUrl);
-			if (!resolved) return null;
-			podcast = { ...podcast, feedUrl: resolved, directoryUrl: undefined };
-		}
+		const activity = useActivityStore();
+		// The "Subscribing" label covers the directory-resolve + subscribe
+		// fetch stretch — the gaps no existing signal (isLoadingFeeds,
+		// per-pane spinners) covers.
+		return activity.track((async () => {
+			// A directory stub (e.g. a show delisted from Apple Podcasts) has no
+			// feed URL; resolve the real feed from its directory page before
+			// subscribing. Refuse when it can't be resolved rather than adding a
+			// broken feed.
+			if (!podcast.feedUrl) {
+				if (!podcast.directoryUrl) return null;
+				const resolved = await resolveItunesFeedUrl(podcast.directoryUrl);
+				if (!resolved) return null;
+				podcast = { ...podcast, feedUrl: resolved, directoryUrl: undefined };
+			}
 
-		// Guard: don't add a feed we already have (matched by feedUrl)
-		if (hasFeedByUrl(podcast.feedUrl)) {
-			return feeds().find((f) => f.podcast.feedUrl === podcast.feedUrl) ?? null;
-		}
+			// Guard: don't add a feed we already have (matched by feedUrl)
+			if (hasFeedByUrl(podcast.feedUrl)) {
+				return feeds().find((f) => f.podcast.feedUrl === podcast.feedUrl) ?? null;
+			}
 
-		const feedId = crypto.randomUUID();
-		const episodes = await fetchEpisodes(
-			podcast.feedUrl,
-			MAX_EPISODES_SUBSCRIBE,
-			feedId,
-		);
-		const newFeed: Feed = {
-			id: feedId,
-			podcast,
-			episodes: episodes ?? [],
-			visibility,
-			sourceId,
-			lastUpdated: new Date(),
-			isPinned: false,
-		};
-		setFeeds((prev) => {
-			const updated = [...prev, newFeed];
-			saveFeeds(updated);
-			return updated;
-		});
-		// Global auto-download: newly subscribed shows join the next pass.
-		runAutoDownload();
-		return newFeed;
+			const feedId = crypto.randomUUID();
+			const episodes = await fetchEpisodes(
+				podcast.feedUrl,
+				MAX_EPISODES_SUBSCRIBE,
+				feedId,
+			);
+			const newFeed: Feed = {
+				id: feedId,
+				podcast,
+				episodes: episodes ?? [],
+				visibility,
+				sourceId,
+				lastUpdated: new Date(),
+				isPinned: false,
+			};
+			setFeeds((prev) => {
+				const updated = [...prev, newFeed];
+				scheduleSaveFeeds();
+				return updated;
+			});
+			// Global auto-download: newly subscribed shows join the next pass.
+			runAutoDownload();
+			return newFeed;
+		})(), "Subscribing");
 	};
 
 	/** Download the N most recent episodes of every in-scope show, per the
@@ -332,10 +453,13 @@ function createFeedStore() {
 	};
 
 	/** Apply a freshly fetched episode list to one feed, bumping `lastUpdated`
-	 *  only when the content actually changed (see sameEpisodes). Returns the
-	 *  ORIGINAL array reference when nothing changed so callers skip
-	 *  persistence entirely — a refresh that fetched identical episodes must
-	 *  not re-sort the "updated" view. */
+	 *  only when the content actually changed (see sameRefreshWindow). The
+	 *  fetched window is MERGED into the existing episodes (fetched copy wins
+	 *  on id collision) so a refresh never shrinks the in-memory list; the
+	 *  union is capped at MAX_EPISODES_IN_MEMORY. Returns the ORIGINAL array
+	 *  reference when nothing changed so callers skip persistence entirely —
+	 *  a refresh that fetched identical episodes must not re-sort the
+	 *  "updated" view. */
 	const applyRefreshedEpisodes = (
 		prev: Feed[],
 		feedId: string,
@@ -344,66 +468,73 @@ function createFeedStore() {
 		let changed = false;
 		const updated = prev.map((f) => {
 			if (f.id !== feedId) return f;
-			if (sameEpisodes(f.episodes, episodes)) return f;
+			const merged = mergeEpisodes(f.episodes, episodes, MAX_EPISODES_IN_MEMORY);
+			if (sameRefreshWindow(f.episodes, episodes)) return f;
 			changed = true;
-			return { ...f, episodes, lastUpdated: new Date() };
+			return { ...f, episodes: merged, lastUpdated: new Date() };
 		});
 		return changed ? updated : prev;
 	};
 
 	/** Refresh a single feed - re-fetch latest 50 episodes */
 	const refreshFeed = async (feedId: string) => {
-		const feed = getFeed(feedId);
-		if (!feed) return;
-		const episodes = await fetchEpisodes(
-			feed.podcast.feedUrl,
-			MAX_EPISODES_REFRESH,
-			feedId,
-		);
-		// Fetch failed (null): keep the currently loaded episodes untouched.
-		if (!episodes) return;
-		setFeeds((prev) => {
-			const updated = applyRefreshedEpisodes(prev, feedId, episodes);
-			if (updated !== prev) saveFeeds(updated);
-			return updated;
-		});
+		const activity = useActivityStore();
+		return activity.track((async () => {
+			const feed = getFeed(feedId);
+			if (!feed) return;
+			const episodes = await fetchEpisodes(
+				feed.podcast.feedUrl,
+				MAX_EPISODES_REFRESH,
+				feedId,
+			);
+			// Fetch failed (null): keep the currently loaded episodes untouched.
+			if (!episodes) return;
+			setFeeds((prev) => {
+				const updated = applyRefreshedEpisodes(prev, feedId, episodes);
+				if (updated !== prev) scheduleSaveFeeds();
+				return updated;
+			});
 
-		// Global auto-download: ensure the N most recent episodes of in-scope
-		// shows are available offline after every refresh (idempotent).
-		runAutoDownload();
+			// Global auto-download: ensure the N most recent episodes of in-scope
+			// shows are available offline after every refresh (idempotent).
+			runAutoDownload();
+		})(), "Refreshing");
 	};
 
-	/** Refresh all feeds — fetch every feed in parallel, then apply ONE
-	 *  atomic update. Per-feed incremental setFeeds re-sorted the list once
-	 *  per completion (each refresh bumped lastUpdated and the "updated" sort
-	 *  re-ran), which showed up as the list order flapping until the batch
-	 *  finished. */
+	/** Refresh all feeds — bounded concurrency (at most FETCH_CONCURRENCY
+	 *  in-flight requests), and each feed's refreshed episodes are applied
+	 *  AS ITS OWN FETCH LANDS (no Promise.all barrier). Per-feed apply is
+	 *  safe because applyRefreshedEpisodes keeps unchanged feeds' object
+	 *  identity and lastUpdated (union merge), so each feed's refreshed
+	 *  episodes render as its own fetch resolves — the order flapping the
+	 *  old atomic barrier existed to hide can no longer happen. */
 	const refreshAllFeeds = async () => {
 		setIsLoadingFeeds(true);
 		try {
-			const currentFeeds = feeds();
-			const results = await Promise.all(
-				currentFeeds.map(async (feed) => [
-					feed.id,
-					await fetchEpisodes(
+			await mapWithConcurrency(
+				feeds(),
+				FETCH_CONCURRENCY,
+				async (feed) => {
+					const episodes = await fetchEpisodes(
 						feed.podcast.feedUrl,
 						MAX_EPISODES_REFRESH,
 						feed.id,
-					),
-				] as const),
-			);
-			setFeeds((prev) => {
-				let updated = prev;
-				for (const [feedId, episodes] of results) {
+					);
 					// A failed fetch (null) leaves that feed untouched.
-					if (!episodes) continue;
-					updated = applyRefreshedEpisodes(updated, feedId, episodes);
-				}
-				if (updated !== prev) saveFeeds(updated);
-				return updated;
-			});
+					if (!episodes) return;
+					setFeeds((prev) => {
+						const updated = applyRefreshedEpisodes(prev, feed.id, episodes);
+						if (updated !== prev) scheduleSaveFeeds();
+						return updated;
+					});
+				},
+			);
 			// Global auto-download: one idempotent pass after the batch.
 			runAutoDownload();
+			// A refresh batch always ends with a persisted write when
+			// anything changed — never leave the debounce's trailing edge
+			// pending across a process exit.
+			flushPendingSave();
 		} finally {
 			setIsLoadingFeeds(false);
 		}
@@ -476,7 +607,10 @@ function createFeedStore() {
 		episodeLoadCount.delete(feedId);
 		setFeeds((prev) => {
 			const updated = prev.filter((f) => f.id !== feedId);
-			saveFeeds(updated);
+			// Unsubscribe intent must not sit in the debounce window if the
+			// process exits — persist the removal immediately.
+			scheduleSaveFeeds();
+			flushPendingSave();
 			return updated;
 		});
 	};
@@ -489,7 +623,10 @@ function createFeedStore() {
 			episodeLoadCount.delete(feed.id);
 			setFeeds((prev) => {
 				const updated = prev.filter((f) => f.podcast.feedUrl !== feedUrl);
-				saveFeeds(updated);
+				// Unsubscribe intent must not sit in the debounce window if
+				// the process exits — persist the removal immediately.
+				scheduleSaveFeeds();
+				flushPendingSave();
 				return updated;
 			});
 		}
@@ -501,7 +638,7 @@ function createFeedStore() {
 			const updated = prev.map((f) =>
 				f.id === feedId ? { ...f, ...updates, lastUpdated: new Date() } : f,
 			);
-			saveFeeds(updated);
+			scheduleSaveFeeds();
 			return updated;
 		});
 	};
@@ -512,7 +649,7 @@ function createFeedStore() {
 			const updated = prev.map((f) =>
 				f.id === feedId ? { ...f, isPinned: !f.isPinned } : f,
 			);
-			saveFeeds(updated);
+			scheduleSaveFeeds();
 			return updated;
 		});
 	};
@@ -606,16 +743,28 @@ function createFeedStore() {
 
 		// If no cache, re-fetch and parse the full feed
 		if (!cached) {
-			const response = await fetch(feed.podcast.feedUrl, {
-				headers: {
-					"Accept-Encoding": "identity",
-					Accept: "application/rss+xml, application/xml, text/xml, */*",
-				},
-			});
-			if (!response.ok) return;
-			const xml = await response.text();
-			const parsed = parseRSSFeed(xml, feed.podcast.feedUrl);
-			cached = parsed.episodes;
+			try {
+				const response = await fetch(feed.podcast.feedUrl, {
+					headers: {
+						"Accept-Encoding": "identity",
+						Accept: "application/rss+xml, application/xml, text/xml, */*",
+					},
+					// A hung feed must not stall the load-more path forever —
+					// mirror fetchEpisodes' per-feed timeout.
+					signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+				});
+				if (!response.ok) return;
+				const xml = await response.text();
+				cached = await parseEpisodesIncremental(xml, feed.podcast.feedUrl);
+			} catch {
+				// Failed/hung refetch: leave the feed's loaded episodes
+				// untouched rather than throwing out of loadMoreEpisodes.
+				return;
+			}
+			// Cold-refetch parse output is unsorted; sort and cap it so the
+			// cache and the pagination window stay newest-first and bounded.
+			cached = sortEpisodesReverseChronological(cached);
+			cached = cached.slice(0, MAX_EPISODES_IN_MEMORY);
 			fullEpisodeCache.set(feedId, cached);
 			// Set current load count to match what's already displayed
 			episodeLoadCount.set(feedId, feed.episodes.length);
@@ -636,7 +785,7 @@ function createFeedStore() {
 			const updated = prev.map((f) =>
 				f.id === feedId ? { ...f, episodes } : f,
 			);
-			saveFeeds(updated);
+			scheduleSaveFeeds();
 			return updated;
 		});
 	};
@@ -713,6 +862,7 @@ function createFeedStore() {
 		loadMoreEpisodes,
 		loadMoreAllFeeds,
 		hasMoreAcrossAll,
+		flushPendingSave,
 		addSource,
 		removeSource,
 		toggleSource,

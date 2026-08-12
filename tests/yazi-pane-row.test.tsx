@@ -66,6 +66,7 @@ type TestPaneProps = {
 	current?: (() => unknown) | unknown;
 	preview?: unknown;
 	focused?: unknown;
+	currentBorder?: unknown;
 	width?: number;
 	height?: number;
 };
@@ -83,6 +84,7 @@ async function renderPaneRow(props: TestPaneProps): Promise<{
 					preview={props.preview as any}
 					currentLabel="List"
 					focused={props.focused as any}
+					currentBorder={props.currentBorder as any}
 				/>
 			</ThemeProvider>
 		),
@@ -230,6 +232,19 @@ describe("PaneRow current-pane borders", () => {
 		});
 		cleanups.push(destroy);
 		expect(borderColumns(spans)).toEqual([20, 69]);
+		expect(frameText(spans)).not.toMatch(boxGlyphs);
+	});
+
+	test("currentBorder=['left'] removes the right edge (left only)", async () => {
+		const { spans, destroy } = await renderPaneRow({
+			parent: null,
+			current: () => <text>ITEM</text>,
+			preview: null,
+			currentBorder: ["left"],
+		});
+		cleanups.push(destroy);
+		// Only the left border glyph at column 20 — no right edge at 69.
+		expect(borderColumns(spans)).toEqual([20]);
 		expect(frameText(spans)).not.toMatch(boxGlyphs);
 	});
 });
