@@ -237,23 +237,36 @@ function createDownloadStore() {
 			});
 
 			// Write the podcast cover beside the audio so mpv's
-			// --cover-art-auto=exact picks it up for Now Playing art.
-			const coverUrl = useFeedStore()
-				.feeds()
-				.find((f) => f.id === item.feedId)?.podcast.coverUrl;
+			// --cover-art-auto=exact picks it up for Now Playing art when the
+			// local file plays (same basename, .jpg extension — verified
+			// against mpv 0.41). curl, NOT fetch: Bun's fetch hangs in
+			// compiled binaries, so the shipped app never wrote this file.
+			// Falls back to the episode's own image when the feed has no
+			// channel cover (URL-added feeds).
+			const feedStore = useFeedStore();
+			const episode = feedStore.findEpisode(item.episodeId);
+			const coverUrl =
+				feedStore
+					.feeds()
+					.find((f) => f.id === item.feedId)?.podcast.coverUrl ??
+				episode?.imageUrl;
 			if (coverUrl && result.filePath) {
 				const dot = result.filePath.lastIndexOf(".");
 				if (dot > 0) {
 					const coverPath = result.filePath.slice(0, dot) + ".jpg";
-					fetch(coverUrl)
-						.then(async (r) => {
-							if (!r.ok) return;
-							await Bun.write(
-								coverPath,
-								new Uint8Array(await r.arrayBuffer()),
-							);
-						})
-						.catch(() => {});
+					Bun.spawn([
+						"curl",
+						"-sS",
+						"--fail",
+						"-m",
+						"8",
+						"--max-filesize",
+						"2097152",
+						"-o",
+						coverPath,
+						coverUrl,
+					])
+						.exited.catch(() => {});
 				}
 			}
 		} else {
