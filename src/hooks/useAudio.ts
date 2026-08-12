@@ -16,7 +16,6 @@ import { onCleanup } from "solid-js";
 import {
 	cachedCoverPath,
 	fetchCoverArt,
-	prefetchCoverArt,
 } from "../utils/cover-art";
 import {
 	createAudioBackend,
@@ -316,13 +315,21 @@ async function play(episode: Episode): Promise<void> {
 		const feedStore = useFeedStore();
 		const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
 		const podcastTitle = feed?.customName || feed?.podcast.title || "";
-		// Cover art must NEVER gate playback (it was a curl subprocess blocking
-		// play() by up to 8s). Serve the disk-cached file synchronously when it
-		// exists; on a miss, play bare and warm the cache for the next play —
-		// runtime video-add can't become an albumart track, so late art only
-		// works via the load-time cover-art-files property.
+		// Cover art only applies at file LOAD (the runtime video-add fallback
+		// never becomes an albumart track), so a cold-cache play must wait for
+		// the fetch or play artless. Serve the disk cache synchronously; on a
+		// miss, await the single-flight fetch with a 1.2s cap (covers fetch in
+		// ~300ms typically) — past the cap, play bare and let the fetch warm
+		// the cache for next time.
 		const coverUrl = feed?.podcast.coverUrl;
-		const coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
+		let coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
+		if (coverUrl && !coverArtPath) {
+			const path = await Promise.race([
+				fetchCoverArt(coverUrl),
+				new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+			]);
+			if (path) coverArtPath = path;
+		}
 
 		// Resume from saved progress if available and not completed
 		const savedProgress = progressStore.get(episode.id);
@@ -338,10 +345,6 @@ async function play(episode: Episode): Promise<void> {
 			mediaTitle: podcastTitle ? `${podcastTitle} — ${episode.title}` : episode.title,
 			coverArtPath: coverArtPath ?? undefined,
 		});
-
-		if (coverUrl && !coverArtPath) {
-			prefetchCoverArt(coverUrl);
-		}
 
 		setCurrentEpisode(episode);
 		setIsPlaying(true);
