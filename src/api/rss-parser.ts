@@ -74,21 +74,21 @@ const parseEpisodeType = (raw: string): EpisodeType | undefined => {
   return undefined
 }
 
-/** Extract the `<item>` blocks from an RSS document (the sync part of
- *  parsing is bounded to this single regex pass). Exported so the feed store
- *  can parse episodes incrementally without re-deriving item boundaries. */
+/** Extract the `<item>` blocks from an RSS document. Matches items directly
+ *  on the full XML string — scoping to <channel> first is a redundant 5MB
+ *  regex pass that doubles parse cost with no practical benefit (well-formed
+ *  RSS has no items outside <channel>). */
 export const getRSSItems = (xml: string): string[] => {
-  const channel = xml.match(/<channel[\s\S]*?<\/channel>/i)?.[0] ?? xml
-  return channel.match(/<item[\s\S]*?<\/item>/gi) ?? []
+  return xml.match(/<item[\s\S]*?<\/item>/gi) ?? []
 }
 
 /** Channel-level artwork: `<itunes:image href>` (podcasts) or RSS 2.0
- *  `<image><url>`. Exported so the feed store can backfill a feed's
- *  coverUrl on refresh without re-deriving the channel block. */
-export const parseChannelCoverUrl = (channel: string): string | undefined => {
-  const itunesHref = getAttr(channel, "itunes:image", "href")
+ *  `<image><url>`. Works on the full XML — channel-level tags precede
+ *  <item> blocks in RSS, so the first match is the channel image. */
+export const parseChannelCoverUrl = (xml: string): string | undefined => {
+  const itunesHref = getAttr(xml, "itunes:image", "href")
   if (itunesHref) return itunesHref
-  const url = getTagValue(channel, "image").match(/<url>([\s\S]*?)<\/url>/i)?.[1]
+  const url = getTagValue(xml, "image").match(/<url>([\s\S]*?)<\/url>/i)?.[1]
   return url?.trim() || undefined
 }
 

@@ -51,7 +51,7 @@ const DEFAULT_REFRESH_INTERVAL_MINUTES = 30;
 /** Max episodes parsed per chunk before yielding to the event loop — bounds
  *  the synchronous regex work per frame so one huge feed (or a batch of
  *  feeds) can't stall the renderer. */
-const PARSE_CHUNK_SIZE = 25;
+const PARSE_CHUNK_SIZE = 5;
 
 /** Yield to the event loop (task queue) so the renderer can paint between
  *  parse chunks. MessageChannel instead of setTimeout/setImmediate because
@@ -79,6 +79,9 @@ const parseEpisodesIncremental = async (
 	feedUrl: string,
 ): Promise<Episode[]> => {
 	const items = getRSSItems(xml);
+	// Yield after the item-extraction regex (which scans the full XML
+	// synchronously) so the renderer paints before the first parse chunk.
+	await yieldToUI();
 	const episodes: Episode[] = new Array(items.length);
 	for (let start = 0; start < items.length; start += PARSE_CHUNK_SIZE) {
 		const end = Math.min(start + PARSE_CHUNK_SIZE, items.length);
@@ -340,13 +343,15 @@ function createFeedStore() {
 					"Accept-Encoding": "identity",
 					Accept: "application/rss+xml, application/xml, text/xml, */*",
 				},
-				// Hung feeds must not stall a refresh batch (or the background
-				// refresh loop) indefinitely.
+				// Hung feeds must not stall a refresh batch (or the
+				// background refresh loop) indefinitely.
 				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
 			});
 			if (!response.ok) return { episodes: null, coverUrl: undefined };
 			const xml = await response.text();
-			const channel = xml.match(/<channel[\s\S]*?<\/channel>/i)?.[0] ?? xml;
+			// Yield after the network read so the renderer gets a turn
+			// before the sync regex + parse work begins.
+			await yieldToUI();
 			const allEpisodes = sortEpisodesReverseChronological(
 				await parseEpisodesIncremental(xml, feedUrl),
 			);
@@ -359,7 +364,7 @@ function createFeedStore() {
 
 			return {
 				episodes: allEpisodes.slice(0, limit),
-				coverUrl: parseChannelCoverUrl(channel),
+				coverUrl: parseChannelCoverUrl(xml),
 			};
 		} catch {
 			return { episodes: null, coverUrl: undefined };
@@ -786,6 +791,10 @@ function createFeedStore() {
 			}
 			// Cold-refetch parse output is unsorted; sort and cap it so the
 			// cache and the pagination window stay newest-first and bounded.
+			// Yield before the sync sort (the parse already yielded before
+			// this point, but the sort of potentially hundreds of episodes
+			// is its own sync block).
+			await yieldToUI();
 			cached = sortEpisodesReverseChronological(cached);
 			cached = cached.slice(0, MAX_EPISODES_IN_MEMORY);
 			fullEpisodeCache.set(feedId, cached);

@@ -45,6 +45,10 @@ export function ProgressBar() {
 			padding={0}
 			flexDirection="row"
 			gap={0}
+			// The bar's block-char texts are non-selectable below: a drag
+			// over the bar is a seek gesture, not a text selection — otherwise
+			// mouse-up would copy █/░ to the clipboard via the global
+			// selection handler.
 			ref={(el) => {
 				bar = el;
 			}}
@@ -58,9 +62,11 @@ export function ProgressBar() {
 			}}
 		>
 			{playedChars() > 0 && (
-				<text fg={theme.primary}>{"\u2588".repeat(playedChars())}</text>
+				<text fg={theme.primary} selectable={false}>
+					{"\u2588".repeat(playedChars())}
+				</text>
 			)}
-			<text fg={remainingColor}>
+			<text fg={remainingColor} selectable={false}>
 				{"\u2591".repeat(width() - playedChars())}
 			</text>
 		</box>
