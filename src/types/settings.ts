@@ -90,7 +90,7 @@ export type AppSettings = {
 	visualizer: VisualizerSettings;
 };
 
-/** How the Feed and per-show episode lists load older episodes (default: manual "[Fetch More]"). */
+/** How the Feed and per-show episode lists load older episodes (default: auto). */
 export type FetchMoreMode = "manual" | "auto";
 
 /** Which shows the auto-download setting applies to (default: all). */
@@ -107,7 +107,7 @@ export type UserPreferences = {
 	autoDownloadWhitelist: string[];
 	/** Jump to the Player view automatically when playback starts (default: true) */
 	autoJumpToPlayer: boolean;
-	/** Load older episodes from the Feed list: manual button or automatic at the bottom (default: manual). */
+	/** Load older episodes from the Feed list: manual button or automatic at the bottom (default: auto). */
 	fetchMoreMode: FetchMoreMode;
 	/** Minutes between automatic background feed refreshes (default: 30). */
 	refreshIntervalMinutes: number;

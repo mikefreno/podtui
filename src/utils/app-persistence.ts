@@ -47,7 +47,7 @@ const defaultPreferences: UserPreferences = {
 	autoDownloadScope: "all",
 	autoDownloadWhitelist: [],
 	autoJumpToPlayer: true,
-	fetchMoreMode: "manual",
+	fetchMoreMode: "auto",
 	refreshIntervalMinutes: 30,
 };
 

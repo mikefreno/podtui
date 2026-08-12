@@ -68,7 +68,7 @@ function FeedPage() {
 	// loaded window by 50 episodes. manual mode: Enter on the row. auto mode:
 	// reaching the bottom row fetches automatically (see the effect below).
 	const app = useAppStore();
-	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "manual";
+	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "auto";
 	const showFetchMore = () => feedStore.hasMoreAcrossAll();
 	// Total navigable rows: episodes + the optional Fetch More row.
 	const rowCount = () => episodes().length + (showFetchMore() ? 1 : 0);

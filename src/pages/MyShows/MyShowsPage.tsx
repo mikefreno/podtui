@@ -102,7 +102,7 @@ export function MyShowsPage() {
 	// counterpart to the Feed page's row (which loads every feed). manual
 	// mode: Enter on the row. auto mode: reaching the bottom row fetches
 	// automatically (see the effect below).
-	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "manual";
+	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "auto";
 	const showFetchMore = () =>
 		depth() >= 1 &&
 		!!drilledShowId() &&
