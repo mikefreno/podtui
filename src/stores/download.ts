@@ -269,6 +269,39 @@ function createDownloadStore() {
 						.exited.catch(() => {});
 				}
 			}
+
+			// Tag the local file (codec-copy, no re-encode) so mpv's Now
+			// Playing metadata for local playback is title=episode,
+			// artist=podcast — the source streams carry no usable tags and
+			// macOS composes "title - artist" from exactly these fields.
+			// Atomic: ffmpeg writes a temp file, then renames into place.
+			if (result.filePath && episode) {
+				const podcastTitle =
+					feedStore.feeds().find((f) => f.id === item.feedId)?.podcast.title ??
+					downloads().get(item.episodeId)?.podcastTitle;
+				if (podcastTitle) {
+					const tmp = `${result.filePath}.tag`;
+					Bun.spawn([
+						"ffmpeg",
+						"-y",
+						"-i",
+						result.filePath,
+						"-c",
+						"copy",
+						"-metadata",
+						`title=${episode.title}`,
+						"-metadata",
+						`artist=${podcastTitle}`,
+						tmp,
+					])
+						.exited.then(async (code) => {
+							if (code !== 0) return;
+							const { renameSync } = await import("node:fs");
+							renameSync(tmp, result.filePath);
+						})
+						.catch(() => {});
+				}
+			}
 		} else {
 			updateDownload(item.episodeId, {
 				status: DownloadStatus.FAILED,

@@ -348,7 +348,7 @@ async function play(episode: Episode): Promise<void> {
 			volume: vol,
 			speed: spd,
 			startPosition: startPos > 0 ? startPos : undefined,
-			mediaTitle: podcastTitle ? `${podcastTitle} — ${episode.title}` : episode.title,
+			mediaTitle: episode.title,
 			coverArtPath: coverArtPath ?? undefined,
 		});
 
@@ -444,9 +444,7 @@ async function load(episode: Episode): Promise<void> {
 				volume: volume(),
 				speed: storeSpeed || speed(),
 				startPosition: pos > 0 ? pos : undefined,
-				mediaTitle: podcastTitle
-					? `${podcastTitle} — ${episode.title}`
-					: episode.title,
+mediaTitle: episode.title,
 				coverArtPath: coverArtPath ?? undefined,
 			})
 			.catch(() => {});
@@ -620,9 +618,7 @@ async function switchBackend(name: BackendName): Promise<void> {
 				startPosition: pos,
 				volume: vol,
 				speed: spd,
-				mediaTitle: podcastTitle
-					? `${podcastTitle} — ${ep.title}`
-					: ep.title,
+mediaTitle: ep.title,
 				coverArtPath: coverArtPath ?? undefined,
 			});
 			setIsPlaying(true);

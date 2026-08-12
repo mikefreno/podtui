@@ -195,7 +195,7 @@ async function handlePlay(feeds: Feed[], arg: string): Promise<void> {
 				? await fetchCoverArt(coverUrl)
 				: null
 			await backend.play(episodeResult.audioUrl, {
-				mediaTitle: `${feedResult.podcast.title} — ${episodeResult.title}`,
+				mediaTitle: episodeResult.title,
 				coverArtPath: coverArtPath ?? undefined,
 			})
 			console.log("Playback started (use the UI to control)")
