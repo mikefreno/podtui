@@ -280,7 +280,7 @@ function createDownloadStore() {
 					feedStore.feeds().find((f) => f.id === item.feedId)?.podcast.title ??
 					downloads().get(item.episodeId)?.podcastTitle;
 				if (podcastTitle) {
-					const tmp = `${result.filePath}.tag`;
+					const tmp = `${result.filePath}.tag.mp3`;
 					Bun.spawn([
 						"ffmpeg",
 						"-y",
