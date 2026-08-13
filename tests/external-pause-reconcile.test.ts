@@ -16,6 +16,11 @@
  * property the same way the OS does and asserts useAudio reconciles in
  * both directions. Skipped when mpv isn't installed.
  *
+ * Also covers daemon crash recovery: killing mpv out from under the app
+ * must drop the UI out of "playing" (finalizeTrackEnd), and the next Play
+ * press must respawn a fresh daemon and resume audio from the saved
+ * position — the play button may never silently no-op on a dead player.
+ *
  * Real-timer note: the reconcile path runs on useAudio's real 150ms poll
  * interval against a real mpv process, with no injectable clock — the
  * deliberate-exception case from the no-real-timers rule (same as
@@ -190,6 +195,27 @@ async function waitFor(
 	}
 }
 
+/** SIGKILL the backend's mpv daemon — a crash/kill out from under the app.
+ *  The mpv command line carries the IPC socket path, so pgrep finds it by
+ *  that (the socket name is unique to this test process). */
+async function killMpvDaemon(): Promise<void> {
+	const socket = mpvSocket();
+	if (!socket) throw new Error("backend mpv socket not found");
+	const pids = (await Bun.$`pgrep -f ${socket}`.quiet().text())
+		.split("\n")
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0)
+		.map(Number);
+	expect(pids.length).toBeGreaterThan(0);
+	for (const pid of pids) {
+		try {
+			process.kill(pid, "SIGKILL");
+		} catch {
+			/* already gone */
+		}
+	}
+}
+
 const episode = {
 	id: "ep1",
 	podcastId: "pod1",
@@ -228,6 +254,42 @@ test.skipIf(!hasMpv)(
 		expect(audio.isPlaying()).toBe(false);
 		await audio.togglePlayback();
 		expect(audio.isPlaying()).toBe(true);
+
+		await audio.stop();
+		expect(audio.isPlaying()).toBe(false);
+	},
+	{ timeout: 30000 },
+);
+
+test.skipIf(!hasMpv)(
+	"mpv killed mid-play: UI drops out of playing; pressing play recovers a fresh daemon",
+	async () => {
+		const audio = useAudio();
+		await audio.play(episode);
+		// Instant assertion: play() sets isPlaying synchronously when it
+		// succeeded. (In a shared worker that leaked a store mock from
+		// another test file, play() fails and this catches it at 0ms
+		// instead of burning the waitFor timeout below.)
+		expect(audio.isPlaying()).toBe(true);
+		// Let the clock advance past the 5s progress-save floor so recovery
+		// has a saved position to resume from (positions <5s are not stored).
+		await waitFor(() => audio.position() > 6);
+		const crashPos = audio.position();
+
+		// Crash the player out from under the app.
+		await killMpvDaemon();
+		await waitFor(() => !audio.isPlaying());
+		expect(audio.isPlaying()).toBe(false);
+		// The episode stays current — recovery can restart it.
+		expect(audio.currentEpisode()?.id).toBe("ep1");
+
+		// Press play: must respawn mpv and resume from the saved position —
+		// not silently flip the UI to "playing" with no process behind it.
+		await audio.togglePlayback();
+		expect(audio.isPlaying()).toBe(true);
+		expect(audio.position()).toBeGreaterThanOrEqual(crashPos - 0.5);
+		// Audio actually advances again — proof a fresh daemon is playing.
+		await waitFor(() => audio.position() > crashPos + 0.5);
 
 		await audio.stop();
 		expect(audio.isPlaying()).toBe(false);

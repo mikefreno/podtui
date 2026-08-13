@@ -20,6 +20,7 @@ import {
 import {
 	createAudioBackend,
 	detectPlayers,
+	PlayerRestartedError,
 	type AudioBackend,
 	type BackendName,
 	type DetectedPlayer,
@@ -502,8 +503,25 @@ async function pause(): Promise<void> {
 	}
 }
 
+/** mpv was killed/crashed: respawn it and restart playback from the saved
+ *  position via the full play path (fresh loadfile, cover art, media
+ *  registry). A bare unpause would target a dead — or freshly-idle —
+ *  daemon and silently do nothing. */
+async function recoverPlayback(): Promise<void> {
+	const ep = currentEpisode();
+	if (ep && ep.audioUrl) {
+		await play(ep);
+	} else {
+		setError("Player is not running");
+	}
+}
+
 async function resume(): Promise<void> {
 	if (!backend) return;
+	if (!backend.isAlive()) {
+		await recoverPlayback();
+		return;
+	}
 	try {
 		await backend.resume();
 		setIsPlaying(true);
@@ -515,6 +533,13 @@ async function resume(): Promise<void> {
 			media.setPlaybackState(true);
 		}
 	} catch (err) {
+		// Race: the daemon died between the liveness check above and the
+		// unpause — backend.resume() respawned it and threw
+		// PlayerRestartedError (the fresh daemon has no file loaded).
+		if (err instanceof PlayerRestartedError) {
+			await recoverPlayback();
+			return;
+		}
 		setError(err instanceof Error ? err.message : "Resume failed");
 	}
 }

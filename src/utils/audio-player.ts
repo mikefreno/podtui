@@ -24,6 +24,10 @@
  *   fills its demuxer cache ahead of time; the first real play just flips
  *   `pause` to false — the ~2s network open is paid at boot, not on the
  *   user's first Play.
+ * - Crash/kill recovery: a dead daemon (process exit or broken IPC socket)
+ *   is detected on the next command; play() respawns a fresh daemon and
+ *   reloads. resume() cannot unpause a freshly-idle daemon — it throws
+ *   PlayerRestartedError so the caller reloads the episode via play().
  */
 
 import { platform } from "os";
@@ -274,11 +278,27 @@ class MpvConnection {
 		}
 		this.handleTeardown();
 	}
+
+	/** True while the Unix socket is open — a live, reachable daemon. */
+	isConnected(): boolean {
+		return this.sock !== null;
+	}
 }
 
 // ── mpv Backend ──────────────────────────────────────────────────────
 // One resident daemon for the app's lifetime, controlled over a single
 // persistent JSON IPC connection with property observation.
+
+/** Thrown by resume() when the daemon restarted (killed/crashed) and the
+ *  previously-loaded file is gone — the fresh daemon is idle, so the
+ *  caller must reload the episode via the full play path instead of
+ *  unpausing (which would silently do nothing). */
+export class PlayerRestartedError extends Error {
+	constructor() {
+		super("mpv restarted; episode must be reloaded");
+		this.name = "PlayerRestartedError";
+	}
+}
 
 /** Property observation ids (correlate property-change events). */
 const OBS_TIME_POS = 1;
@@ -318,12 +338,33 @@ export class MpvBackend implements AudioBackend {
 	// ── Daemon lifecycle ─────────────────────────────────────────────
 
 	private async ensureDaemon(): Promise<void> {
-		if (this.proc && !this._exited && this.conn) return;
+		// Healthy = process alive AND its IPC socket open. A socket teardown
+		// with a living process (rare) is just as unusable as a dead one —
+		// every command would fail "not-connected" forever.
+		if (this.proc && !this._exited && this.conn?.isConnected()) return;
 		if (this.startPromise) return this.startPromise;
-		this.startPromise = this.spawnDaemon().finally(() => {
+		this.startPromise = this.recoverDaemon().finally(() => {
 			this.startPromise = null;
 		});
 		return this.startPromise;
+	}
+
+	/** Bring up a usable daemon. If the old process still lives with a dead
+	 *  IPC connection, kill it so the fresh spawn owns the socket path and
+	 *  no orphan lingers — and await its exit so its exit handler can't run
+	 *  after spawnDaemon() and clobber the new daemon's `_exited` flag. */
+	private async recoverDaemon(): Promise<void> {
+		const stale = this.proc;
+		if (stale && !this._exited) {
+			try {
+				stale.kill();
+			} catch {
+				/* already gone */
+			}
+		}
+		if (stale) await stale.exited.catch(() => {});
+		this.conn = null;
+		await this.spawnDaemon();
 	}
 
 	private async spawnDaemon(): Promise<void> {
@@ -360,9 +401,15 @@ export class MpvBackend implements AudioBackend {
 		this._exited = false;
 		this.proc.exited
 			.then(() => {
+				// Daemon died (crash or external kill): every per-file state
+				// is gone with it. _loadedUrl null forces the next play()
+				// down the full reload path; _position/_volume/_speed are
+				// kept so a recovery reload can carry them over.
 				this._exited = true;
 				this._intentPlaying = false;
 				this._loadedUrl = null;
+				this._loadedPaused = false;
+				this._ended = false;
 				this._paused = null;
 			})
 			.catch(() => {});
@@ -590,6 +637,13 @@ export class MpvBackend implements AudioBackend {
 	}
 
 	async resume(): Promise<void> {
+		// The daemon may have died while we were paused (crash/kill): bring
+		// a fresh one up. It starts idle — no file to unpause — so throw
+		// PlayerRestartedError and let the caller reload the episode.
+		await this.ensureDaemon();
+		if (!this._loadedUrl) {
+			throw new PlayerRestartedError();
+		}
 		if (this._ended && this._loadedUrl) {
 			// Play pressed on a finished episode: replay from the top.
 			this._ended = false;
@@ -609,7 +663,12 @@ export class MpvBackend implements AudioBackend {
 			this._loadedPaused = false;
 		}
 		this._ended = false;
-		await this.send(["set_property", "pause", false]);
+		const resp = await this.send(["set_property", "pause", false]);
+		// Never claim success when the unpause didn't land: a dead/restarted
+		// daemon would otherwise leave the UI "playing" with no audio.
+		if (resp.error && resp.error !== "success") {
+			throw new Error(`mpv resume failed: ${resp.error}`);
+		}
 		this._intentPlaying = true;
 	}
 

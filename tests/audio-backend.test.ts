@@ -12,6 +12,10 @@
  *    it by unpausing — the boot-restore fast path with no second load.
  * 6. EOF: the episode ends → isPlaying() goes false on its own; pressing
  *    resume() afterwards replays from the top.
+ * 7. Daemon death: a killed/crashed mpv is detected (isAlive drops);
+ *    resume() refuses to unpause the fresh idle daemon (throws
+ *    PlayerRestartedError) and play() recovers by respawning a fresh
+ *    daemon and loading the file.
  *
  * All playback runs silent (volume 0). Requires a real mpv on PATH;
  * tests skip where it is missing.
@@ -19,7 +23,10 @@
 import { test, expect } from "bun:test";
 import { tmpdir } from "os";
 import { join } from "path";
-import { MpvBackend } from "../src/utils/audio-player";
+import {
+	MpvBackend,
+	PlayerRestartedError,
+} from "../src/utils/audio-player";
 
 const SAMPLE_RATE = 22050;
 const FREQ = 440;
@@ -157,6 +164,46 @@ test.skipIf(!hasMpv)(
 			await waitFor(
 				"preload fast path plays",
 				async () => (await backend.getPosition()) > parkedPos + 0.3,
+			);
+		} finally {
+			await cleanup(backend);
+		}
+	},
+	{ timeout: 20000 },
+);
+
+test.skipIf(!hasMpv)(
+	"daemon killed mid-play: resume() rejects on the fresh idle daemon; play() recovers a new one",
+	async () => {
+		fixtureWavs();
+		const backend = new MpvBackend();
+		try {
+			await backend.play(wavA, { volume: 0, speed: 1, startPosition: 0 });
+			await waitFor("playing", () => backend.isPlaying());
+			await waitFor(
+				"position advances",
+				async () => (await backend.getPosition()) > 0.5,
+			);
+
+			// Simulate a crash: SIGKILL the daemon out from under us.
+			const proc = (backend as unknown as { proc: { pid: number } }).proc;
+			expect(proc).toBeTruthy();
+			process.kill(proc.pid, "SIGKILL");
+			await waitFor("death observed", () => !backend.isAlive());
+
+			// resume() must NOT silently no-op on the dead daemon: it
+			// respawns, finds the fresh daemon idle (no file loaded), and
+			// throws — the hook falls back to the full play path.
+			await expect(backend.resume()).rejects.toThrow(PlayerRestartedError);
+
+			// play() (the hook's recovery) reuses the respawned daemon and
+			// plays the file — audio must actually advance again.
+			await backend.play(wavA, { volume: 0, speed: 1, startPosition: 0 });
+			expect(backend.isAlive()).toBe(true);
+			await waitFor(
+				"recovered playback advances",
+				async () =>
+					(await backend.getPosition()) > 0.5 && backend.isPlaying(),
 			);
 		} finally {
 			await cleanup(backend);
