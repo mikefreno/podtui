@@ -9,23 +9,14 @@
 
 import { emit } from "./event-bus"
 
-/**
- * Emit a theme reload event.
- */
 function emitThemeReload(): void {
   emit("theme.reload", {})
 }
 
-/**
- * Emit a theme changed event.
- */
 export function emitThemeChanged(theme: string, mode: "dark" | "light"): void {
   emit("theme.changed", { theme, mode })
 }
 
-/**
- * Emit a theme mode changed event.
- */
 export function emitThemeModeChanged(mode: "dark" | "light"): void {
   emit("theme.mode.changed", { mode })
 }

@@ -297,6 +297,34 @@ function stopPolling(): void {
 // from `--cover-art-files`. Shared helper (utils/cover-art.ts) fetches the
 // podcast cover to a temp file BEFORE playback starts, bounded to 3s.
 
+/** Resolve cover art to a local path for mpv's --cover-art-files, per the
+ *  call site's latency budget:
+ *  "cache"   — disk cache only (sync): resume paths must never wait on the
+ *              network, so a miss plays artless and warms for next time.
+ *  "bounded" — disk hit, else fetch capped at 1.2s: cold play needs the art
+ *              at file LOAD, but a slow cover server must not stall audio.
+ *  "await"   — disk hit, else full (8s-bounded) fetch: boot restore preloads
+ *              while feeds/progress load anyway, so the wait is free and the
+ *              cover must be present when the file loads.
+ * fetchCoverArt already short-circuits on the disk cache, so "await" costs
+ * nothing on a warm cache. */
+async function resolveCoverArt(
+	coverUrl: string | undefined,
+	mode: "cache" | "bounded" | "await",
+): Promise<string | null> {
+	if (!coverUrl) return null;
+	if (mode === "cache") return cachedCoverPath(coverUrl);
+	if (mode === "bounded") {
+		const cached = cachedCoverPath(coverUrl);
+		if (cached) return cached;
+		return Promise.race([
+			fetchCoverArt(coverUrl),
+			new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+		]);
+	}
+	return fetchCoverArt(coverUrl);
+}
+
 async function play(episode: Episode): Promise<void> {
 	const b = ensureBackend();
 	setError(null);
@@ -321,21 +349,15 @@ async function play(episode: Episode): Promise<void> {
 		// episode's own image (feeds added by URL may lack a channel cover).
 		const downloadStore = useDownloadStore();
 		const url = downloadStore.getDownloadedFilePath(episode.id) ?? episode.audioUrl;
-		const coverUrl = feed?.podcast.coverUrl ?? episode.imageUrl;
 		// Cover art only applies at file LOAD (the runtime video-add fallback
 		// never becomes an albumart track), so a cold-cache play must wait for
 		// the fetch or play artless. Serve the disk cache synchronously; on a
-		// miss, await the single-flight fetch with a 1.2s cap (covers fetch in
-		// ~300ms typically) — past the cap, play bare and let the fetch warm
-		// the cache for next time.
-		let coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
-		if (coverUrl && !coverArtPath) {
-			const path = await Promise.race([
-				fetchCoverArt(coverUrl),
-				new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
-			]);
-			if (path) coverArtPath = path;
-		}
+		// miss, await the bounded fetch (covers fetch in ~300ms typically) —
+		// past the 1.2s cap, play bare and let the fetch warm the cache.
+		const coverArtPath = await resolveCoverArt(
+			feed?.podcast.coverUrl ?? episode.imageUrl,
+			"bounded",
+		);
 
 		// Resume from saved progress if available and not completed
 		const savedProgress = progressStore.get(episode.id);
@@ -436,8 +458,10 @@ async function load(episode: Episode): Promise<void> {
 		// on feeds/progress at boot, so the bounded fetch (~300ms typical,
 		// 8s worst case) is free. Falls back to the episode's own image when
 		// the feed has no channel cover.
-		const coverUrl = feed?.podcast.coverUrl ?? episode.imageUrl;
-		const coverArtPath = coverUrl ? await fetchCoverArt(coverUrl) : null;
+		const coverArtPath = await resolveCoverArt(
+			feed?.podcast.coverUrl ?? episode.imageUrl,
+			"await",
+		);
 		const backendSnap = backend;
 		backendSnap
 			.preload(url, {
@@ -612,8 +636,10 @@ async function switchBackend(name: BackendName): Promise<void> {
 			const podcastTitle = feed?.customName || feed?.podcast.title || "";
 			const url =
 				useDownloadStore().getDownloadedFilePath(ep.id) ?? ep.audioUrl;
-			const coverUrl = feed?.podcast.coverUrl ?? ep.imageUrl;
-			const coverArtPath = coverUrl ? cachedCoverPath(coverUrl) : null;
+			const coverArtPath = await resolveCoverArt(
+				feed?.podcast.coverUrl ?? ep.imageUrl,
+				"cache",
+			);
 			await backend.play(url, {
 				startPosition: pos,
 				volume: vol,

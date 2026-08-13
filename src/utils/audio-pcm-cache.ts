@@ -23,9 +23,16 @@
  * pass over just that region) — earlier segments stay valid, mp3 decode of
  * the same file is deterministic so abutting segments agree.
  *
- * Memory: 22050 Hz mono s16 ≈ 44 KB/s ≈ 2.6 MB/min (~80 MB per 30 min),
- * freed on stop(). 22050 Hz covers Nyquist 11 kHz, above the default 10 kHz
- * high-cutoff of the visualizer's FFT config.
+ * Memory: 22050 Hz mono s16 ≈ 44 KB/s ≈ 2.6 MB/min. The cache is a
+ * SLIDING WINDOW around the playback position — the decode pass stops
+ * once it is maxAheadSec ahead of the cursor and segments entirely older
+ * than keepBehindSec behind it are dropped (both re-filled/restarted on
+ * demand). Steady state is bounded by (maxAheadSec + keepBehindSec) of
+ * audio (~40 MB at the defaults) INDEPENDENT of episode length; the old
+ * whole-episode cache grew ~160 MB per hour of audio and hit 2.5 GB on
+ * long-form episodes. Fully freed on stop(). 22050 Hz covers Nyquist
+ * 11 kHz, above the default 10 kHz high-cutoff of the visualizer's FFT
+ * config.
  *
  * Downloads via ffmpeg's own http stack with reconnect flags, matching the
  * old reader; local files skip them (ffmpeg rejects http-only options for
@@ -48,6 +55,24 @@ const INITIAL_CAPACITY_SAMPLES = 4 * 1024 * 1024;
  * request for a fresh ffmpeg pass. Beyond the gap, restart at the target.
  */
 const CLOSE_IN_PLACE_GAP_SEC = 15;
+
+/**
+ * Default decode-head budget: the ffmpeg pass pauses once it is this far
+ * ahead of the playback cursor. Bounds RAM (~26 MB of s16 at 22050 Hz) AND
+ * the network pull — the old cache decoded the whole episode at 4x, so a
+ * 3h show pinned ~500 MB (2.5 GB+ for long-form) and dragged the entire
+ * remote file even when only the first 10 minutes were listened to. At 4x
+ * pacing a refill costs ~150s of background decode, one ffmpeg spawn per
+ * ~10 min of playback.
+ */
+const DEFAULT_DECODE_AHEAD_SEC = 600;
+
+/**
+ * Default retention behind the cursor: decoded audio entirely older than
+ * this is dropped. Keeps pause/resume and small backward seeks instant
+ * without letting the window grow with playback time.
+ */
+const DEFAULT_KEEP_BEHIND_SEC = 300;
 
 /**
  * Monotonically increasing generation counter.
@@ -73,6 +98,10 @@ export interface EpisodePcmCacheOptions {
 	url: string;
 	/** Sample rate (default: 22050) */
 	sampleRate?: number;
+	/** Decode-head budget in seconds ahead of the cursor (default: 600). */
+	maxAheadSec?: number;
+	/** Retention in seconds behind the cursor (default: 300). */
+	keepBehindSec?: number;
 }
 
 export class EpisodePcmCache {
@@ -84,10 +113,15 @@ export class EpisodePcmCache {
 	private activeSegment: Segment | null = null;
 	readonly url: string;
 	readonly sampleRate: number;
+	/** Sliding-window budgets (see maintainWindow). */
+	readonly maxAheadSec: number;
+	readonly keepBehindSec: number;
 
 	constructor(options: EpisodePcmCacheOptions) {
 		this.url = options.url;
 		this.sampleRate = options.sampleRate ?? PCM_SAMPLE_RATE;
+		this.maxAheadSec = options.maxAheadSec ?? DEFAULT_DECODE_AHEAD_SEC;
+		this.keepBehindSec = options.keepBehindSec ?? DEFAULT_KEEP_BEHIND_SEC;
 	}
 
 	/** Whether an ffmpeg decode pass is currently running. */
@@ -238,11 +272,20 @@ export class EpisodePcmCache {
 	 * new segment at `sec` (seek into a hole / resume past cached audio).
 	 */
 	ensureDecodeAround(sec: number): void {
+		// Enforce the sliding-window budget first (head cap, prune, refill)
+		// so a resume or seek never leaves stale segments behind the cursor.
+		this.maintainWindow(sec);
+
 		// Data already on hand: nothing needed here; only keep the tail
-		// filling if the decode is idle and the episode is unfinished.
+		// filling if the decode is idle, the episode is unfinished, AND the
+		// head is inside its budget. A head-capped cache ("we're maxAheadSec
+		// ahead, enough decoded") is NOT a stalled decode — restarting it
+		// here would fight maintainWindow's cap on every resume call.
 		if (this.covers(sec)) {
 			if (this._decoding || this.decodeFinished) return;
-			this.startDecode(this.coverageEndSec > sec ? this.coverageEndSec : sec);
+			const end = this.coverageEndSec;
+			if (end >= sec + this.maxAheadSec) return;
+			this.startDecode(end > sec ? end : sec);
 			return;
 		}
 
@@ -266,6 +309,48 @@ export class EpisodePcmCache {
 	}
 
 	/**
+	 * Sliding-window budget for the in-memory cache, driven by the live
+	 * playback position. Runs on every read (the render loop is the only
+	 * consumer that knows the cursor continuously) and on resume/seek:
+	 * - capHead: the decode pass pauses once it is maxAheadSec ahead of the
+	 *   cursor (pauseDecode keeps the decoded data — a plain startDecode
+	 *   from the frontier refills it later).
+	 * - prune: segments entirely keepBehindSec behind the cursor are
+	 *   dropped. A backward seek past the window restarts a segment there —
+	 *   the same mechanism as a seek into an undecoded hole, so no new
+	 *   failure mode.
+	 * - topUp: when the cursor has outrun the head, restart the tail decode
+	 *   from the frontier (one ffmpeg spawn per maxAheadSec of playback).
+	 * Together these bound memory to (maxAheadSec + keepBehindSec) of audio
+	 * regardless of episode length.
+	 */
+	private maintainWindow(atSec: number): void {
+		const pos = Math.max(0, atSec);
+
+		if (this._decoding && this.coverageEndSec >= pos + this.maxAheadSec) {
+			this.pauseDecode();
+		}
+
+		const keepFromSec = pos - this.keepBehindSec;
+		if (
+			this.segments.some(
+				(seg) => seg.baseSec + seg.written / this.sampleRate < keepFromSec,
+			)
+		) {
+			this.segments = this.segments.filter(
+				(seg) => seg.baseSec + seg.written / this.sampleRate >= keepFromSec,
+			);
+		}
+
+		if (!this._decoding && !this.decodeFinished) {
+			const end = this.coverageEndSec;
+			if (end < pos + this.maxAheadSec) {
+				this.startDecode(Math.max(end, pos));
+			}
+		}
+	}
+
+	/**
 	 * Read the PCM window ENDING at `atSec` of playback into `out`
 	 * (Int16 magnitudes widened to f64, the scale cavacore expects).
 	 *
@@ -275,6 +360,7 @@ export class EpisodePcmCache {
 	 */
 	readWindow(out: Float64Array, atSec: number): number {
 		if (out.length === 0) return 0;
+		this.maintainWindow(atSec);
 		const endIdx = Math.round(atSec * this.sampleRate);
 		const startIdx = endIdx - out.length + 1;
 		for (const seg of this.segments) {

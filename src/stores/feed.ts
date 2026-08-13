@@ -49,6 +49,16 @@ const DEFAULT_REFRESH_INTERVAL_MINUTES = 30;
  *  feeds) can't stall the renderer. */
 const PARSE_CHUNK_SIZE = 5;
 
+/** Hard ceiling on the in-memory full-parse cache per feed (newest first).
+ *  The cache exists so fetch-more can page deeper without a refetch; without
+ *  a ceiling a 5,000-episode archive pins tens of MB of Episode objects in
+ *  RAM for the whole session (the old cache held EVERY parsed episode of
+ *  every feed, contributing hundreds of MB for archive-heavy
+ *  subscriptions). 1000 covers any realistic show's entire history —
+ *  beyond it, hasMoreEpisodes flips false and the visible list is bounded
+ *  by the user's cache preference as usual. */
+const MAX_CACHED_EPISODES_PER_FEED = 1000;
+
 /** Yield to the event loop (task queue) so the renderer can paint between
  *  parse chunks. MessageChannel instead of setTimeout/setImmediate because
  *  bun:test fake timers trap those (feed-refresh/pagination tests run under
@@ -214,7 +224,6 @@ async function mapWithConcurrency<T, R>(
 	return results;
 }
 
-/** Create feed store */
 function createFeedStore() {
 	const [feeds, setFeeds] = createSignal<Feed[]>([]);
 	const [sources, setSources] = createSignal<PodcastSource[]>([
@@ -262,7 +271,6 @@ function createFeedStore() {
 		saveFeeds(feeds());
 	};
 
-	/** Get filtered and sorted feeds */
 	const getFilteredFeeds = (): Feed[] => {
 		let result = [...feeds()];
 		const f = filter();
@@ -320,7 +328,6 @@ function createFeedStore() {
 		return result;
 	};
 
-	/** Get episodes in reverse chronological order across all feeds */
 	const getAllEpisodesChronological = (): Array<{
 		episode: Episode;
 		feed: Feed;
@@ -341,7 +348,6 @@ function createFeedStore() {
 		return allEpisodes;
 	};
 
-	/** Sort episodes in reverse chronological order (newest first) */
 	const sortEpisodesReverseChronological = (episodes: Episode[]): Episode[] => {
 		return [...episodes].sort(
 			(a, b) => b.pubDate.getTime() - a.pubDate.getTime(),
@@ -384,8 +390,14 @@ function createFeedStore() {
 			if (feedId) {
 				// Cache the FULL parse — the bound is applied when reading,
 				// not when writing, so a preference change takes effect
-				// without a refetch.
-				fullEpisodeCache.set(feedId, allEpisodes);
+				// without a refetch. Capped at MAX_CACHED_EPISODES_PER_FEED
+				// so an archive-heavy feed can't pin its entire history in
+				// RAM for the session (the visible window below is bounded
+				// by the user's preference regardless).
+				fullEpisodeCache.set(
+					feedId,
+					allEpisodes.slice(0, MAX_CACHED_EPISODES_PER_FEED),
+				);
 			}
 
 			// Bound the visible window by the user's cache preference.
@@ -410,7 +422,6 @@ function createFeedStore() {
 		}
 	};
 
-	/** Check if a feed with this URL already exists */
 	const hasFeedByUrl = (feedUrl: string): boolean => {
 		return feeds().some((f) => f.podcast.feedUrl === feedUrl);
 	};
@@ -675,7 +686,6 @@ function createFeedStore() {
 	};
 	scheduleNextRefresh();
 
-	/** Remove a feed */
 	const removeFeed = (feedId: string) => {
 		fullEpisodeCache.delete(feedId);
 		episodeLoadCount.delete(feedId);
@@ -706,7 +716,6 @@ function createFeedStore() {
 		}
 	};
 
-	/** Update a feed */
 	const updateFeed = (feedId: string, updates: Partial<Feed>) => {
 		setFeeds((prev) => {
 			const updated = prev.map((f) =>
@@ -717,7 +726,6 @@ function createFeedStore() {
 		});
 	};
 
-	/** Toggle feed pinned status */
 	const togglePinned = (feedId: string) => {
 		setFeeds((prev) => {
 			const updated = prev.map((f) =>
@@ -728,7 +736,6 @@ function createFeedStore() {
 		});
 	};
 
-	/** Add a source */
 	const addSource = (source: Omit<PodcastSource, "id">) => {
 		const newSource: PodcastSource = {
 			...source,
@@ -742,7 +749,6 @@ function createFeedStore() {
 		return newSource;
 	};
 
-	/** Update a source */
 	const updateSource = (sourceId: string, updates: Partial<PodcastSource>) => {
 		setSources((prev) => {
 			const updated = prev.map((source) =>
@@ -753,7 +759,6 @@ function createFeedStore() {
 		});
 	};
 
-	/** Remove a source */
 	const removeSource = (sourceId: string) => {
 		// Don't remove default sources
 		if (DEFAULT_SOURCES.some((s) => s.id === sourceId)) return false;
@@ -766,7 +771,6 @@ function createFeedStore() {
 		return true;
 	};
 
-	/** Toggle source enabled status */
 	const toggleSource = (sourceId: string) => {
 		setSources((prev) => {
 			const updated = prev.map((s) =>
@@ -777,7 +781,6 @@ function createFeedStore() {
 		});
 	};
 
-	/** Get feed by ID */
 	const getFeed = (feedId: string): Feed | undefined => {
 		return feeds().find((f) => f.id === feedId);
 	};
@@ -792,7 +795,6 @@ function createFeedStore() {
 		return undefined;
 	};
 
-	/** Get selected feed */
 	const getSelectedFeed = (): Feed | undefined => {
 		const id = selectedFeedId();
 		return id ? getFeed(id) : undefined;
@@ -853,6 +855,9 @@ function createFeedStore() {
 			// is its own sync block).
 			await yieldToUI();
 			cached = sortEpisodesReverseChronological(cached);
+			// Same ceiling as fetchEpisodes: the cache (and the paging
+			// window below) never exceeds MAX_CACHED_EPISODES_PER_FEED.
+			cached = cached.slice(0, MAX_CACHED_EPISODES_PER_FEED);
 			fullEpisodeCache.set(feedId, cached);
 			// Set current load count to match what's already displayed
 			episodeLoadCount.set(feedId, feed.episodes.length);
@@ -900,7 +905,6 @@ function createFeedStore() {
 		}
 	};
 
-	/** True if any feed still has cached episodes beyond its loaded window. */
 	const hasMoreAcrossAll = (): boolean => {
 		return feeds().some((f) => hasMoreEpisodes(f.id));
 	};
@@ -920,7 +924,6 @@ function createFeedStore() {
 		}
 	};
 
-	/** Run the global auto-download pass (see runAutoDownload above). */
 	const runAutoDownloadNow = (): void => {
 		runAutoDownload();
 	};
@@ -969,7 +972,6 @@ function createFeedStore() {
 	};
 }
 
-/** Singleton feed store */
 let feedStoreInstance: ReturnType<typeof createFeedStore> | null = null;
 
 export function useFeedStore() {

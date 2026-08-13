@@ -22,7 +22,6 @@ import { useDownloadStore } from "@/stores/download";
 import { useAppStore } from "@/stores/app";
 import { prefetchCoverArt } from "@/utils/cover-art";
 import { DownloadStatus } from "@/types/episode";
-import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 import {
@@ -33,14 +32,19 @@ import {
 } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { on, off } from "@/utils/event-bus";
-import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
+import { supportsNerdFonts } from "@/utils/nerd-fonts";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { Episode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
+import {
+	EpisodeRow,
+	FetchMoreRow,
+	EpisodePreview,
+	FetchMorePreview,
+} from "@/components/EpisodeList";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
-import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { useSelectionMarker } from "@/hooks/useSelectionMarker";
 
 export const FeedPaneCount = 1;
@@ -87,7 +91,6 @@ function FeedPage() {
 	const app = useAppStore();
 	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "auto";
 	const showFetchMore = () => feedStore.hasMoreAcrossAll();
-	// Total navigable rows: episodes + the optional Fetch More row.
 	const rowCount = () => episodes().length + (showFetchMore() ? 1 : 0);
 	const focus = () => nav.depthFocus(0);
 	const focusedRow = () =>
@@ -103,7 +106,6 @@ function FeedPage() {
 	const focusedItem = (): EpItem | undefined =>
 		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
 	const curLen = () => rowCount();
-	const moreRef = useScrollIntoView(() => focusedOnMore());
 
 	const ensureFocus = () => {
 		if (rowCount() > 0 && focus() >= rowCount())
@@ -129,12 +131,6 @@ function FeedPage() {
 	});
 
 	// ── helpers ────────────────────────────────────────────────────────────────
-	const formatDate = (d: Date) => format(d, "MMM d, yyyy");
-	const formatDuration = (s: number) => {
-		const mins = Math.floor(s / 60);
-		const hrs = Math.floor(mins / 60);
-		return hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
-	};
 	const downloadLabel = (id: string) => {
 		switch (downloadStore.getDownloadStatus(id)) {
 			case DownloadStatus.QUEUED:
@@ -229,19 +225,6 @@ function FeedPage() {
 
 	// ── render ──────────────────────────────────────────────────────────────────
 	const isActive = () => nav.activePane() === DEPTH_CENTER_PANE;
-	// Row highlight within the list. `active=true` only for the current pane.
-	const focusBg = (i: number, listFocus: number, active: boolean) =>
-		i === listFocus && active
-			? theme.primary
-			: i === listFocus
-				? theme.border
-				: undefined;
-	const focusFg = (i: number, listFocus: number, active: boolean) =>
-		i === listFocus && active
-			? theme.surface
-			: i === listFocus
-				? theme.selectedListItemText ?? theme.text
-				: theme.text;
 
 	const currentLabel = () => `Feed · ${episodes().length}`;
 
@@ -268,108 +251,38 @@ function FeedPage() {
 			}
 		>
 			<For each={episodes()}>
-				{(item, index) => {
-					const fi = () => focusedEpIdx();
-					const ref = useScrollIntoView(() => index() === fi());
-					return (
-						<box
-							ref={ref}
-							flexDirection="column"
-							gap={0}
-							paddingRight={1}
-							backgroundColor={focusBg(index(), fi(), isActive())}
-							onMouseDown={() => {
-								nav.setActivePane(DEPTH_CENTER_PANE);
-								nav.setDepthFocus(index(), 0);
-							}}
-						>
-							<box flexDirection="row" gap={1}>
-								<text
-									flexShrink={0}
-									fg={focusFg(index(), fi(), isActive())}
-								>
-									{index() === fi() ? marker() : " "}
-								</text>
-								<text
-									wrapMode="none"
-									truncate
-									fg={focusFg(index(), fi(), isActive())}
-								>
-									{item.episode.episodeNumber
-										? `#${item.episode.episodeNumber} `
-										: ""}
-									{item.episode.title}
-								</text>
-							</box>
-							{/* podcast name on its own row — readable at a glance; the
-							    50% current pane fits it in full for typical names, and
-							    truncate keeps the row one line tall either way */}
-							<box paddingLeft={2}>
-								<text
-									wrapMode="none"
-									truncate
-									fg={index() === fi() ? theme.surface : theme.textSecondary}
-								>
-									{item.feed.customName || item.feed.podcast.title}
-								</text>
-							</box>
-							<box flexDirection="row" gap={2} paddingLeft={2}>
-								<text
-									flexShrink={0}
-									fg={index() === fi() ? theme.surface : theme.info}
-								>
-									{formatDate(item.episode.pubDate)}
-								</text>
-								<text
-									flexShrink={0}
-									fg={index() === fi() ? theme.surface : muted()}
-								>
-									{formatDuration(item.episode.duration)}
-								</text>
-								<Show when={nav.isSelected(item.episode.id)}>
-									<text flexShrink={0} fg={theme.warning}>
-										●
-									</text>
-								</Show>
-								<Show when={downloadLabel(item.episode.id)}>
-									<text flexShrink={0} fg={downloadColor(item.episode.id)}>
-										{downloadLabel(item.episode.id)}
-									</text>
-								</Show>
-							</box>
-						</box>
-					);
-				}}
+				{(item, index) => (
+					<EpisodeRow
+						episode={item.episode}
+						subtitle={() => item.feed.customName || item.feed.podcast.title}
+						index={index}
+						focused={focusedEpIdx}
+						active={isActive}
+						selected={() => nav.isSelected(item.episode.id)}
+						downloadLabel={() => downloadLabel(item.episode.id)}
+						downloadColor={() => downloadColor(item.episode.id)}
+						marker={marker}
+						onMouseDown={() => {
+							nav.setActivePane(DEPTH_CENTER_PANE);
+							nav.setDepthFocus(index(), 0);
+						}}
+					/>
+				)}
 			</For>
 			<Show when={showFetchMore()}>
-				<box
-					ref={moreRef}
-					flexDirection="row"
-					gap={1}
-					paddingRight={1}
-					backgroundColor={focusBg(episodes().length, focusedRow(), isActive())}
+				<FetchMoreRow
+					index={() => episodes().length}
+					focused={focusedRow}
+					onMore={focusedOnMore}
+					active={isActive}
+					isLoadingMore={() => feedStore.isLoadingMore()}
+					nerd={nerd}
+					marker={marker}
 					onMouseDown={() => {
 						nav.setActivePane(DEPTH_CENTER_PANE);
 						nav.setDepthFocus(episodes().length, 0);
 					}}
-				>
-					<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
-						{focusedOnMore() ? marker() : " "}
-					</text>
-					{nerd && (
-						<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
-							{NF_ICONS.more}
-						</text>
-					)}
-					<Show
-						when={!feedStore.isLoadingMore()}
-						fallback={<LoadingIndicator label="Fetching…" />}
-					>
-						<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
-							[Fetch More]
-						</text>
-					</Show>
-				</box>
+				/>
 			</Show>
 			<Show when={feedStore.isLoadingFeeds()}>
 				<box alignItems="center" paddingTop={1}>
@@ -380,23 +293,23 @@ function FeedPage() {
 	);
 
 	// ── preview pane: hovered-episode detail (or the Fetch More row) ──────────
+	const episodeHint = (item: EpItem) =>
+		`enter: play · d: download${
+			downloadStore.getDownloadStatus(item.episode.id) !== DownloadStatus.NONE
+				? " · D: delete"
+				: ""
+		} · space: select · h back`;
+
 	const previewContent = () => (
 		<>
 			<Show when={focusedOnMore()}>
-				<box flexDirection="column" gap={1} padding={1}>
-					<text fg={theme.textPrimary ?? theme.text}>
-						<strong>[Fetch More]</strong>
-					</text>
-					<text fg={muted()}>
-						{feedStore.isLoadingMore()
-							? "Loading the next batch of episodes…"
-							: fetchMoreMode() === "auto"
-								? "Auto mode: the next batch loads automatically at the bottom of the list."
-								: "Load the next batch of older episodes across all feeds (Enter)."}
-					</text>
-					<box height={1} />
-					<text fg={muted()}>enter: load more · h back</text>
-				</box>
+				<FetchMorePreview
+					isLoadingMore={() => feedStore.isLoadingMore()}
+					fetchMoreMode={fetchMoreMode}
+					manualText={() =>
+						"Load the next batch of older episodes across all feeds (Enter)."
+					}
+				/>
 			</Show>
 			<Show when={!focusedOnMore()}>
 				<Show
@@ -408,46 +321,16 @@ function FeedPage() {
 					}
 				>
 					{(item) => (
-						<box flexDirection="column" gap={1} padding={1}>
-							<text fg={theme.textPrimary ?? theme.text}>
-								<strong>
-									{item().episode.episodeNumber
-										? `#${item().episode.episodeNumber} `
-										: ""}
-									{item().episode.title}
-								</strong>
-							</text>
-							<box flexDirection="row" gap={2}>
-								<text fg={theme.info}>{formatDate(item().episode.pubDate)}</text>
-								<text fg={muted()}>{formatDuration(item().episode.duration)}</text>
-								<Show when={downloadLabel(item().episode.id)}>
-									<text fg={downloadColor(item().episode.id)}>
-										{downloadLabel(item().episode.id)}
-									</text>
-								</Show>
-							</box>
-							<text fg={muted()}>
-								{item().feed.customName || item().feed.podcast.title}
-							</text>
-							<Show when={item().feed.podcast.author}>
-								<text fg={muted()}>by {item().feed.podcast.author}</text>
-							</Show>
-							<box height={1} />
-							<text fg={theme.textSecondary}>
-								{item().episode.description?.slice(0, 400) ??
-									"No description available."}
-								{(item().episode.description?.length ?? 0) > 400 ? "…" : ""}
-							</text>
-							<box height={1} />
-							<text fg={muted()}>
-								enter: play · d: download
-								{downloadStore.getDownloadStatus(item().episode.id) !==
-								DownloadStatus.NONE
-									? " · D: delete"
-									: ""}{" "}
-								· space: select · h back
-							</text>
-						</box>
+						<EpisodePreview
+							episode={() => item().episode}
+							subtitle={() =>
+								item().feed.customName || item().feed.podcast.title
+							}
+							author={() => item().feed.podcast.author}
+							downloadLabel={() => downloadLabel(item().episode.id)}
+							downloadColor={() => downloadColor(item().episode.id)}
+							hint={() => episodeHint(item())}
+						/>
 					)}
 				</Show>
 			</Show>

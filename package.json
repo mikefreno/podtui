@@ -18,9 +18,6 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@typescript-eslint/eslint-plugin": "^8.54.0",
-    "@typescript-eslint/parser": "^8.54.0",
-    "eslint": "^9.39.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {

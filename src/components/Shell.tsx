@@ -169,7 +169,6 @@ export function Shell() {
 			nav.backspaceCommand();
 			return;
 		}
-		// printable char
 		if (evt.name && evt.name.length === 1 && !evt.ctrl && !evt.meta) {
 			evt.preventDefault();
 			nav.appendCommand(evt.name);

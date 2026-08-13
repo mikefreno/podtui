@@ -15,11 +15,11 @@
  */
 
 import { createMemo, createEffect, For, Show, onMount, onCleanup } from "solid-js";
+import type { RGBA } from "@opentui/core";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
 import { useAppStore } from "@/stores/app";
 import { DownloadStatus } from "@/types/episode";
-import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import { useAudioNavStore, AudioSource } from "@/stores/audio-nav";
 import {
@@ -31,15 +31,207 @@ import {
 } from "@/context/NavigationContext";
 import { useAudio } from "@/hooks/useAudio";
 import { on, off } from "@/utils/event-bus";
-import { NF_ICONS, supportsNerdFonts } from "@/utils/nerd-fonts";
+import { supportsNerdFonts } from "@/utils/nerd-fonts";
 import type { KeybindActionName } from "@/context/KeybindContext";
 import type { Episode, DownloadedEpisode } from "@/types/episode";
 import type { Feed } from "@/types/feed";
-import { LoadingIndicator } from "@/components/LoadingIndicator";
+import {
+	EpisodeRow,
+	FetchMoreRow,
+	EpisodePreview,
+	FetchMorePreview,
+	formatDate,
+} from "@/components/EpisodeList";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { useSelectionMarker } from "@/hooks/useSelectionMarker";
+
+// ── render components ────────────────────────────────────────────────────────
+// Depth-0 rows (subscribed shows, unsubscribed-show downloads) and their
+// preview panes are My Shows-specific; episode rows/previews are shared with
+// the Feed page (see EpisodeList.tsx).
+
+/** A subscribed-show row (depth 0). */
+function ShowRow(props: {
+	feed: Feed;
+	title: string;
+	index: () => number;
+	focused: () => number;
+	active: () => boolean;
+	marker: () => string;
+	wlScope: () => boolean;
+	wlInList: () => boolean;
+	onMouseDown: () => void;
+}) {
+	const { theme } = useTheme();
+	const muted = () => theme.muted || theme.text;
+	const ref = useScrollIntoView(() => props.index() === props.focused());
+	const isFocused = () => props.index() === props.focused();
+	const bg = () =>
+		isFocused() && props.active()
+			? theme.primary
+			: isFocused()
+				? theme.border
+				: undefined;
+	const fg = () =>
+		isFocused() && props.active()
+			? theme.surface
+			: isFocused()
+				? theme.selectedListItemText ?? theme.text
+				: theme.text;
+	return (
+		<box
+			ref={ref}
+			flexDirection="row"
+			gap={1}
+			paddingRight={1}
+			backgroundColor={bg()}
+			onMouseDown={props.onMouseDown}
+		>
+			<text fg={fg()}>{isFocused() ? props.marker() : " "}</text>
+			<text fg={fg()}>{props.title}</text>
+			<text fg={isFocused() ? theme.surface : muted()}>
+				({props.feed.episodes.length})
+			</text>
+			<Show when={props.wlScope()}>
+				<text
+					fg={
+						isFocused()
+							? theme.surface
+							: props.wlInList()
+								? theme.warning
+								: muted()
+					}
+				>
+					{props.wlInList() ? "●" : "○"}
+				</text>
+			</Show>
+		</box>
+	);
+}
+
+/** An unsubscribed-show download row (depth 0, below the shows list). */
+function UnsubscribedRow(props: {
+	d: DownloadedEpisode;
+	index: () => number;
+	focused: () => number;
+	active: () => boolean;
+	marker: () => string;
+	downloadLabel: () => string;
+	downloadColor: () => RGBA;
+	onMouseDown: () => void;
+}) {
+	const { theme } = useTheme();
+	const ref = useScrollIntoView(() => props.index() === props.focused());
+	const isFocused = () => props.index() === props.focused();
+	const bg = () =>
+		isFocused() && props.active()
+			? theme.primary
+			: isFocused()
+				? theme.border
+				: undefined;
+	const fg = () =>
+		isFocused() && props.active()
+			? theme.surface
+			: isFocused()
+				? theme.selectedListItemText ?? theme.text
+				: theme.text;
+	return (
+		<box
+			ref={ref}
+			flexDirection="column"
+			gap={0}
+			paddingRight={1}
+			backgroundColor={bg()}
+			onMouseDown={props.onMouseDown}
+		>
+			<box flexDirection="row" gap={1}>
+				<text flexShrink={0} fg={fg()}>
+					{isFocused() ? props.marker() : " "}
+				</text>
+				<text wrapMode="none" truncate fg={fg()}>
+					{props.d.episodeTitle ?? props.d.episodeId}
+				</text>
+				<Show when={props.downloadLabel()}>
+					<text flexShrink={0} fg={props.downloadColor()}>
+						{props.downloadLabel()}
+					</text>
+				</Show>
+			</box>
+			<box paddingLeft={2}>
+				<text
+					wrapMode="none"
+					truncate
+					fg={isFocused() ? theme.surface : theme.textSecondary}
+				>
+					{props.d.podcastTitle ?? props.d.feedId}
+				</text>
+			</box>
+		</box>
+	);
+}
+
+/** Depth-0 preview: the hovered subscribed show. */
+function ShowPreview(props: {
+	show: () => Feed;
+	title: () => string;
+	hint: () => string;
+}) {
+	const { theme } = useTheme();
+	const muted = () => theme.muted || theme.text;
+	const show = props.show;
+	return (
+		<box flexDirection="column" gap={1} padding={1}>
+			<text fg={theme.textPrimary ?? theme.text}>
+				<strong>{props.title()}</strong>
+			</text>
+			<Show when={show().podcast.author}>
+				<text fg={muted()}>by {show().podcast.author}</text>
+			</Show>
+			<text fg={theme.textSecondary}>{show().episodes.length} episodes</text>
+			<text fg={muted()}>
+				{show().podcast.description?.slice(0, 400) ?? "No description."}
+			</text>
+			<box height={1} />
+			<text fg={muted()}>{props.hint()}</text>
+		</box>
+	);
+}
+
+/** Depth-0 preview: the hovered unsubscribed-show download. */
+function UnsubscribedPreview(props: {
+	d: () => DownloadedEpisode;
+	downloadLabel: () => string;
+	downloadColor: () => RGBA;
+}) {
+	const { theme } = useTheme();
+	const muted = () => theme.muted || theme.text;
+	const d = props.d;
+	return (
+		<box flexDirection="column" gap={1} padding={1}>
+			<text fg={theme.textPrimary ?? theme.text}>
+				<strong>{d().episodeTitle ?? d().episodeId}</strong>
+			</text>
+			<text fg={theme.textSecondary}>{d().podcastTitle ?? d().feedId}</text>
+			<box flexDirection="row" gap={2}>
+				<Show when={d().pubDate}>
+					<text fg={theme.info}>{formatDate(new Date(d().pubDate!))}</text>
+				</Show>
+				<Show when={props.downloadLabel()}>
+					<text fg={props.downloadColor()}>
+						{props.downloadLabel()}
+					</text>
+				</Show>
+			</box>
+			<text fg={muted()}>
+				Downloaded from episode search — the show is not subscribed.
+			</text>
+			<box height={1} />
+			<text fg={muted()}>enter: play · D: delete download · h: back</text>
+		</box>
+	);
+}
 
 export const MyShowsPaneCount = 1;
 
@@ -67,7 +259,6 @@ export function MyShowsPage() {
 	// entry drops out the moment the user subscribes to its show.
 	const unsubs = () => downloadStore.getUnsubscribedDownloads();
 
-	// Total depth-0 rows: subscribed shows + unsubscribed-show downloads.
 	const depth0Count = () => shows().length + unsubs().length;
 
 	const focusedShowIdx = () =>
@@ -107,7 +298,6 @@ export function MyShowsPage() {
 		depth() >= 1 &&
 		!!drilledShowId() &&
 		feedStore.hasMoreEpisodes(drilledShowId());
-	// Total navigable rows at depth 1: episodes + the optional Fetch More row.
 	const rowCount = () => episodes().length + (showFetchMore() ? 1 : 0);
 	const focusedRow = () =>
 		rowCount() === 0 ? 0 : Math.min(focus(1), rowCount() - 1);
@@ -121,7 +311,6 @@ export function MyShowsPage() {
 			: Math.min(focusedRow(), Math.max(episodes().length - 1, 0));
 	const focusedEpisode = () =>
 		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
-	const moreRef = useScrollIntoView(() => focusedOnMore());
 
 	const curLen = () => (depth() === 0 ? depth0Count() : rowCount());
 
@@ -155,12 +344,6 @@ export function MyShowsPage() {
 	});
 
 	// ── helpers ─────────────────────────────────────────────────────────────────
-	const formatDate = (d: Date) => format(d, "MMM d, yyyy");
-	const formatDuration = (s: number) => {
-		const mins = Math.floor(s / 60);
-		const hrs = Math.floor(mins / 60);
-		return hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
-	};
 	const downloadLabel = (id: string) => {
 		switch (downloadStore.getDownloadStatus(id)) {
 			case DownloadStatus.QUEUED:
@@ -323,14 +506,6 @@ export function MyShowsPage() {
 
 	// ── render ──────────────────────────────────────────────────────────────────
 	const isActive = () => nav.activePane() === DEPTH_CENTER_PANE;
-	const focusBg = (i: number, lf: number, active: boolean) =>
-		i === lf && active ? theme.primary : i === lf ? theme.border : undefined;
-	const focusFg = (i: number, lf: number, active: boolean) =>
-		i === lf && active
-			? theme.surface
-			: i === lf
-				? theme.selectedListItemText ?? theme.text
-				: theme.text;
 	const showTitle = (f: Feed) => f.customName || f.podcast.title;
 
 	const currentLabel = () =>
@@ -349,18 +524,21 @@ export function MyShowsPage() {
 				{(feed, index) => {
 					const lf = () => nav.depthFocus(0);
 					const ref = useScrollIntoView(() => index() === lf());
+					const focused = () => index() === lf();
+					const fg = () =>
+						focused()
+							? theme.selectedListItemText ?? theme.text
+							: theme.text;
 					return (
 						<box
 							ref={ref}
 							flexDirection="row"
 							gap={1}
 							paddingRight={1}
-							backgroundColor={focusBg(index(), lf(), false)}
+							backgroundColor={focused() ? theme.border : undefined}
 						>
-							<text fg={focusFg(index(), lf(), false)}>
-								{index() === lf() ? marker() : " "}
-							</text>
-							<text fg={focusFg(index(), lf(), false)}>{showTitle(feed)}</text>
+							<text fg={fg()}>{focused() ? marker() : " "}</text>
+							<text fg={fg()}>{showTitle(feed)}</text>
 							<text fg={muted()}>({feed.episodes.length})</text>
 						</box>
 					);
@@ -385,51 +563,28 @@ export function MyShowsPage() {
 					}
 				>
 					<For each={shows()}>
-						{(feed, index) => {
-							const lf = () => focusedShowIdx();
-							const ref = useScrollIntoView(() => index() === lf());
-							const wlScope =
-								app.state().preferences.autoDownloadScope === "whitelist";
-							const wlInList = (
-								app.state().preferences.autoDownloadWhitelist ?? []
-							).includes(feed.id);
-							return (
-								<box
-									ref={ref}
-									flexDirection="row"
-									gap={1}
-									paddingRight={1}
-									backgroundColor={focusBg(index(), lf(), isActive())}
-									onMouseDown={() => {
-										nav.setActivePane(DEPTH_CENTER_PANE);
-										nav.setDepthFocus(index(), 0);
-									}}
-								>
-									<text fg={focusFg(index(), lf(), isActive())}>
-										{index() === lf() ? marker() : " "}
-									</text>
-									<text fg={focusFg(index(), lf(), isActive())}>
-										{showTitle(feed)}
-									</text>
-									<text fg={index() === lf() ? theme.surface : muted()}>
-										({feed.episodes.length})
-									</text>
-									<Show when={wlScope}>
-										<text
-											fg={
-												index() === lf()
-													? theme.surface
-													: wlInList
-														? theme.warning
-														: muted()
-											}
-										>
-											{wlInList ? "●" : "○"}
-										</text>
-									</Show>
-								</box>
-							);
-						}}
+						{(feed, index) => (
+							<ShowRow
+								feed={feed}
+								title={showTitle(feed)}
+								index={index}
+								focused={focusedShowIdx}
+								active={isActive}
+								marker={marker}
+								wlScope={() =>
+									app.state().preferences.autoDownloadScope === "whitelist"
+								}
+								wlInList={() =>
+									(app.state().preferences.autoDownloadWhitelist ?? []).includes(
+										feed.id,
+									)
+								}
+								onMouseDown={() => {
+									nav.setActivePane(DEPTH_CENTER_PANE);
+									nav.setDepthFocus(index(), 0);
+								}}
+							/>
+						)}
 					</For>
 					<Show when={unsubs().length > 0}>
 						<box paddingLeft={1} paddingTop={1}>
@@ -438,62 +593,21 @@ export function MyShowsPage() {
 							</text>
 						</box>
 						<For each={unsubs()}>
-							{(d, index) => {
-								// Rows continue after the shows list.
-								const rowIdx = () => shows().length + index();
-								const lf = () => nav.depthFocus(0);
-								const ref = useScrollIntoView(() => rowIdx() === lf());
-								return (
-									<box
-										ref={ref}
-										flexDirection="column"
-										gap={0}
-										paddingRight={1}
-										backgroundColor={focusBg(rowIdx(), lf(), isActive())}
-										onMouseDown={() => {
-											nav.setActivePane(DEPTH_CENTER_PANE);
-											nav.setDepthFocus(rowIdx(), 0);
-										}}
-									>
-										<box flexDirection="row" gap={1}>
-											<text
-												flexShrink={0}
-												fg={focusFg(rowIdx(), lf(), isActive())}
-											>
-												{rowIdx() === lf() ? marker() : " "}
-											</text>
-											<text
-												wrapMode="none"
-												truncate
-												fg={focusFg(rowIdx(), lf(), isActive())}
-											>
-												{d.episodeTitle ?? d.episodeId}
-											</text>
-											<Show when={downloadLabel(d.episodeId)}>
-												<text
-													flexShrink={0}
-													fg={downloadColor(d.episodeId)}
-												>
-													{downloadLabel(d.episodeId)}
-												</text>
-											</Show>
-										</box>
-										<box paddingLeft={2}>
-											<text
-												wrapMode="none"
-												truncate
-												fg={
-													rowIdx() === lf()
-														? theme.surface
-														: theme.textSecondary
-												}
-											>
-												{d.podcastTitle ?? d.feedId}
-											</text>
-										</box>
-									</box>
-								);
-							}}
+							{(d, index) => (
+								<UnsubscribedRow
+									d={d}
+									index={() => shows().length + index()}
+									focused={() => nav.depthFocus(0)}
+									active={isActive}
+									marker={marker}
+									downloadLabel={() => downloadLabel(d.episodeId)}
+									downloadColor={() => downloadColor(d.episodeId)}
+									onMouseDown={() => {
+										nav.setActivePane(DEPTH_CENTER_PANE);
+										nav.setDepthFocus(shows().length + index(), 0);
+									}}
+								/>
+							)}
 						</For>
 					</Show>
 				</Show>
@@ -509,98 +623,37 @@ export function MyShowsPage() {
 					}
 				>
 					<For each={episodes()}>
-						{(ep, index) => {
-							const lf = () => focusedEpIdx();
-							const ref = useScrollIntoView(() => index() === lf());
-							return (
-								<box
-									ref={ref}
-									flexDirection="column"
-									gap={0}
-									paddingRight={1}
-									backgroundColor={focusBg(index(), lf(), isActive())}
-									onMouseDown={() => {
-										nav.setActivePane(DEPTH_CENTER_PANE);
-										nav.setDepthFocus(index(), 1);
-									}}
-								>
-									<box flexDirection="row" gap={1}>
-										<text
-											flexShrink={0}
-											fg={focusFg(index(), lf(), isActive())}
-										>
-											{index() === lf() ? marker() : " "}
-										</text>
-										<text
-											wrapMode="none"
-											truncate
-											fg={focusFg(index(), lf(), isActive())}
-										>
-											{ep.episodeNumber ? `#${ep.episodeNumber} ` : ""}
-											{ep.title}
-										</text>
-									</box>
-									<box flexDirection="row" gap={2} paddingLeft={2}>
-										<text
-											flexShrink={0}
-											fg={index() === lf() ? theme.surface : theme.info}
-										>
-											{formatDate(ep.pubDate)}
-										</text>
-										<text
-											flexShrink={0}
-											fg={index() === lf() ? theme.surface : muted()}
-										>
-											{formatDuration(ep.duration)}
-										</text>
-										<Show when={nav.isSelected(ep.id)}>
-											<text flexShrink={0} fg={theme.warning}>
-												●
-											</text>
-										</Show>
-										<Show when={downloadLabel(ep.id)}>
-											<text flexShrink={0} fg={downloadColor(ep.id)}>
-												{downloadLabel(ep.id)}
-											</text>
-										</Show>
-									</box>
-								</box>
-							);
-						}}
+						{(ep, index) => (
+							<EpisodeRow
+								episode={ep}
+								index={index}
+								focused={focusedEpIdx}
+								active={isActive}
+								selected={() => nav.isSelected(ep.id)}
+								downloadLabel={() => downloadLabel(ep.id)}
+								downloadColor={() => downloadColor(ep.id)}
+								marker={marker}
+								onMouseDown={() => {
+									nav.setActivePane(DEPTH_CENTER_PANE);
+									nav.setDepthFocus(index(), 1);
+								}}
+							/>
+						)}
 					</For>
 					<Show when={showFetchMore()}>
-						<box
-							ref={moreRef}
-							flexDirection="row"
-							gap={1}
-							paddingRight={1}
-							backgroundColor={focusBg(
-								episodes().length,
-								focusedRow(),
-								isActive(),
-							)}
+						<FetchMoreRow
+							index={() => episodes().length}
+							focused={focusedRow}
+							onMore={focusedOnMore}
+							active={isActive}
+							isLoadingMore={() => feedStore.isLoadingMore()}
+							nerd={nerd}
+							marker={marker}
 							onMouseDown={() => {
 								nav.setActivePane(DEPTH_CENTER_PANE);
 								nav.setDepthFocus(episodes().length, 1);
 							}}
-						>
-							<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
-								{focusedOnMore() ? marker() : " "}
-							</text>
-							{nerd && (
-								<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
-									{NF_ICONS.more}
-								</text>
-							)}
-							<Show
-								when={!feedStore.isLoadingMore()}
-								fallback={<LoadingIndicator label="Fetching…" />}
-							>
-								<text fg={focusFg(episodes().length, focusedRow(), isActive())}>
-									[Fetch More]
-								</text>
-							</Show>
-						</box>
+						/>
 					</Show>
 				</Show>
 			</Show>
@@ -608,6 +661,30 @@ export function MyShowsPage() {
 	);
 
 	// ── preview pane ───────────────────────────────────────────────────────────
+	const episodeHint = (epId: string) =>
+		`enter: play · d: download${
+			downloadStore.getDownloadStatus(epId) !== DownloadStatus.NONE
+				? " · D: delete"
+				: ""
+		}${
+			app.state().preferences.autoDownloadScope === "whitelist"
+				? (app.state().preferences.autoDownloadWhitelist ?? []).includes(
+						drilledShowId(),
+					)
+					? " · w: un-whitelist"
+					: " · w: whitelist"
+				: ""
+		} · space: select · h: back`;
+
+	const showHint = (show: Feed) =>
+		`enter/l: open · h: back · x: unsubscribe${
+			app.state().preferences.autoDownloadScope === "whitelist"
+				? (app.state().preferences.autoDownloadWhitelist ?? []).includes(show.id)
+					? " · w: un-whitelist"
+					: " · w: whitelist"
+				: ""
+		}`;
+
 	const previewContent = () =>
 		depth() === 0 ? (
 			// depth 0 preview: hovered unsubscribed-show download, else the
@@ -624,86 +701,34 @@ export function MyShowsPage() {
 						}
 					>
 						{(show) => (
-							<box flexDirection="column" gap={1} padding={1}>
-								<text fg={theme.textPrimary ?? theme.text}>
-									<strong>{showTitle(show())}</strong>
-								</text>
-								<Show when={show().podcast.author}>
-									<text fg={muted()}>by {show().podcast.author}</text>
-								</Show>
-								<text fg={theme.textSecondary}>
-									{show().episodes.length} episodes
-								</text>
-								<text fg={muted()}>
-									{show().podcast.description?.slice(0, 400) ??
-										"No description."}
-								</text>
-								<box height={1} />
-								<text fg={muted()}>
-									enter/l: open · h: back · x: unsubscribe
-									{app.state().preferences.autoDownloadScope ===
-									"whitelist"
-										? (app.state().preferences.autoDownloadWhitelist ??
-											[]
-										  ).includes(show().id)
-											? " · w: un-whitelist"
-											: " · w: whitelist"
-										: ""}
-								</text>
-							</box>
+							<ShowPreview
+								show={() => show()}
+								title={() => showTitle(show())}
+								hint={() => showHint(show())}
+							/>
 						)}
 					</Show>
 				}
 			>
 				{(d) => (
-					<box flexDirection="column" gap={1} padding={1}>
-						<text fg={theme.textPrimary ?? theme.text}>
-							<strong>{d().episodeTitle ?? d().episodeId}</strong>
-						</text>
-						<text fg={theme.textSecondary}>
-							{d().podcastTitle ?? d().feedId}
-						</text>
-						<box flexDirection="row" gap={2}>
-							<Show when={d().pubDate}>
-								<text fg={theme.info}>
-									{formatDate(new Date(d().pubDate!))}
-								</text>
-							</Show>
-							<Show when={downloadLabel(d().episodeId)}>
-								<text fg={downloadColor(d().episodeId)}>
-									{downloadLabel(d().episodeId)}
-								</text>
-							</Show>
-						</box>
-						<text fg={muted()}>
-							Downloaded from episode search — the show is not
-							subscribed.
-						</text>
-						<box height={1} />
-						<text fg={muted()}>
-							enter: play · D: delete download · h: back
-						</text>
-					</box>
+					<UnsubscribedPreview
+						d={() => d()}
+						downloadLabel={() => downloadLabel(d().episodeId)}
+						downloadColor={() => downloadColor(d().episodeId)}
+					/>
 				)}
 			</Show>
 		) : (
 			// depth ≥1 preview: hovered episode (or the Fetch More row)
 			<>
 				<Show when={focusedOnMore()}>
-					<box flexDirection="column" gap={1} padding={1}>
-						<text fg={theme.textPrimary ?? theme.text}>
-							<strong>[Fetch More]</strong>
-						</text>
-						<text fg={muted()}>
-							{feedStore.isLoadingMore()
-								? "Loading the next batch of episodes…"
-								: fetchMoreMode() === "auto"
-									? "Auto mode: the next batch loads automatically at the bottom of the list."
-									: "Load the next batch of older episodes for this show (Enter)."}
-						</text>
-						<box height={1} />
-						<text fg={muted()}>enter: load more · h back</text>
-					</box>
+					<FetchMorePreview
+						isLoadingMore={() => feedStore.isLoadingMore()}
+						fetchMoreMode={fetchMoreMode}
+						manualText={() =>
+							"Load the next batch of older episodes for this show (Enter)."
+						}
+					/>
 				</Show>
 				<Show when={!focusedOnMore()}>
 					<Show
@@ -714,53 +739,19 @@ export function MyShowsPage() {
 							</box>
 						}
 					>
-				{(ep) => (
-					<box flexDirection="column" gap={1} padding={1}>
-						<text fg={theme.textPrimary ?? theme.text}>
-							<strong>
-								{ep().episodeNumber ? `#${ep().episodeNumber} ` : ""}
-								{ep().title}
-							</strong>
-						</text>
-						<box flexDirection="row" gap={2}>
-							<text fg={theme.info}>{formatDate(ep().pubDate)}</text>
-							<text fg={muted()}>{formatDuration(ep().duration)}</text>
-							<Show when={downloadLabel(ep().id)}>
-								<text fg={downloadColor(ep().id)}>
-									{downloadLabel(ep().id)}
-								</text>
-							</Show>
-						</box>
-						<Show when={selectedShow()?.podcast.author}>
-							<text fg={muted()}>by {selectedShow()!.podcast.author}</text>
-						</Show>
-						<box height={1} />
-						<text fg={theme.textSecondary}>
-							{ep().description?.slice(0, 400) ?? "No description available."}
-							{(ep().description?.length ?? 0) > 400 ? "…" : ""}
-						</text>
-						<box height={1} />
-						<text fg={muted()}>
-							enter: play · d: download
-							{downloadStore.getDownloadStatus(ep().id) !==
-							DownloadStatus.NONE
-								? " · D: delete"
-								: ""}
-							{app.state().preferences.autoDownloadScope === "whitelist"
-								? (app.state().preferences.autoDownloadWhitelist ?? []).includes(
-										drilledShowId(),
-									)
-									? " · w: un-whitelist"
-									: " · w: whitelist"
-								: ""}{" "}
-							· space: select · h: back
-						</text>
-					</box>
-				)}
+						{(ep) => (
+							<EpisodePreview
+								episode={() => ep()}
+								author={() => selectedShow()?.podcast.author}
+								downloadLabel={() => downloadLabel(ep().id)}
+								downloadColor={() => downloadColor(ep().id)}
+								hint={() => episodeHint(ep().id)}
+							/>
+						)}
+					</Show>
 				</Show>
-			</Show>
-		</>
-	);
+			</>
+		);
 
 	return (
 		<PaneRow

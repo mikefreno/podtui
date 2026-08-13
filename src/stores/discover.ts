@@ -85,7 +85,6 @@ function syncSubscriptionState(
 	}));
 }
 
-/** Create discover store */
 export function createDiscoverStore() {
 	const [selectedCategory, setSelectedCategory] = createSignal<string>("all");
 	const [isLoading, setIsLoading] = createSignal(false);
@@ -107,7 +106,6 @@ export function createDiscoverStore() {
 	const refresh = async () => {
 		setIsLoading(true);
 		try {
-			// Skip if cache is still fresh
 			const now = Date.now();
 			if (now - cachedAt < FEATURED_CACHE_TTL_MS) {
 				syncSubscriptions();
@@ -131,7 +129,6 @@ export function createDiscoverStore() {
 			cachedAt = now;
 			setPodcasts(fetched);
 
-			// Reflect current feed-store subscriptions
 			syncSubscriptions();
 		} catch {
 			// Network failure — keep whatever we have (stale or empty)
@@ -140,7 +137,6 @@ export function createDiscoverStore() {
 		}
 	};
 
-	/** Get filtered podcasts by category */
 	const filteredPodcasts = () => {
 		const category = selectedCategory();
 		if (category === "all") {
@@ -155,7 +151,6 @@ export function createDiscoverStore() {
 		});
 	};
 
-	/** Subscribe to a podcast */
 	const subscribe = (podcastId: string) => {
 		const podcast = podcasts().find((p) => p.id === podcastId);
 		if (podcast) {
@@ -168,7 +163,6 @@ export function createDiscoverStore() {
 		);
 	};
 
-	/** Unsubscribe from a podcast */
 	const unsubscribe = (podcastId: string) => {
 		const podcast = podcasts().find((p) => p.id === podcastId);
 		if (podcast) {
@@ -180,7 +174,6 @@ export function createDiscoverStore() {
 		);
 	};
 
-	/** Toggle subscription */
 	const toggleSubscription = (podcastId: string) => {
 		const podcast = podcasts().find((p) => p.id === podcastId);
 		if (podcast?.isSubscribed) {
@@ -207,7 +200,6 @@ export function createDiscoverStore() {
 	};
 }
 
-/** Singleton discover store */
 let discoverStoreInstance: ReturnType<typeof createDiscoverStore> | null = null;
 
 export function useDiscoverStore() {

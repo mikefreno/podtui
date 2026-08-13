@@ -95,7 +95,6 @@ export async function copyKeybindsIfNeeded(): Promise<void> {
 	}
 }
 
-/** Load keybinds from JSONC file */
 export async function loadKeybindsFromFile(): Promise<KeybindsResolved> {
 	try {
 		const filePath = getConfigFilePath(KEYBINDS_FILE);

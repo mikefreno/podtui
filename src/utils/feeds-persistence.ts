@@ -134,7 +134,6 @@ export function saveFeedsToFile(feeds: Feed[], windowDays?: number): void {
 		}
 	})().catch(() => {});
 }
-/** Load sources from config.json */
 export async function loadSourcesFromFile<T>(): Promise<T[] | null> {
 	try {
 		const cfg = await loadConfig();
@@ -144,7 +143,6 @@ export async function loadSourcesFromFile<T>(): Promise<T[] | null> {
 		return null;
 	}
 }
-/** Save sources to config.json */
 export function saveSourcesToFile<T>(sources: T[]): void {
 	updateConfig({ sources: sources as unknown as PodcastSource[] });
 }

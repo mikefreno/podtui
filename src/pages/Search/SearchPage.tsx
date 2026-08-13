@@ -77,30 +77,15 @@ function SearchPage() {
 	const submittedQuery = (): string => stack()[1]?.ctx ?? searchStore.query();
 
 	// ── input focusing ────────────────────────────────────────────────────────
-	// `inputFocused` is true while the query input is being typed in. The Shell
-	// router yields keys to the <input> while this is true; Escape (in Shell)
-	// sets it false so navigation resumes; `s` (search action) sets it true.
-	//
-	// The input's REAL focus is the source of truth for the flag:
-	// useInputFocusNav (the same hook the Settings forms use) flips
-	// `inputFocused` from the input's FOCUSED/BLURRED events, keeping the flag
-	// and the renderable in lockstep. That matters when the user clicks OFF the
-	// input: opentui's mouse dispatch auto-focuses the clicked target's nearest
-	// focusable ancestor (a pane scrollbox), blurring the input. The BLURRED
-	// event drops the flag, so the Shell router immediately resumes j/k/h
-	// instead of swallowing keys with no input to receive them — no more
-	// stuck "typing" state where Esc/j/k/s all do nothing.
-	//
-	// The depth stack still SEEDS the flag on transitions, since the query
-	// depth defaults to typing: re-entering depth 0 (h back from results, or a
-	// fresh mount) focuses the input; mounting at depth 1 (returning to the
-	// tab after a search) stays list-navigation — a stuck-on flag there would
-	// have the Shell yield j/k to a non-existent input. The depth STACK signal
-	// is also written by focus moves (setDepthFocus), so gate the seed on the
-	// depth VALUE via a memo: the effect must re-run only on an actual depth
-	// transition. Without the memo every j/k at the query depth re-focuses the
-	// input (undoing Escape), which keeps the recents list unreachable by
-	// keyboard.
+	// `inputFocused` tells the Shell router to yield keys to the query input.
+	// The input's REAL focus is the source of truth: useInputFocusNav flips
+	// the flag from the input's FOCUSED/BLURRED events, so clicking off the
+	// input drops it and the router resumes j/k/h — no stuck "typing" state.
+	// The depth stack only SEEDS it on transitions (re-entering depth 0
+	// focuses the input; mounting at depth 1 stays list-nav), gated on the
+	// depth VALUE via a memo because setDepthFocus also writes the stack
+	// signal — without the memo every j/k at query depth re-focuses the input
+	// and strands the recents list.
 	onMount(() => nav.setInputFocused(depth() === 0));
 	onCleanup(() => nav.setInputFocused(false));
 	const focusNavRef = useInputFocusNav();

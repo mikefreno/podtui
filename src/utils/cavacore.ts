@@ -52,7 +52,6 @@ const DEFAULTS: Required<CavaCoreConfig> = {
 	scalingMode: 0,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type CavaLib = {
 	symbols: Record<string, (...args: any[]) => any>;
 	close(): void;
@@ -102,7 +101,6 @@ export class CavaCore {
 		this.lib = lib;
 	}
 
-	/** Number of frequency bars configured. */
 	get bars(): number {
 		return this._bars;
 	}

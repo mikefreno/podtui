@@ -278,3 +278,87 @@ test.skipIf(!hasFfmpeg)(
 	},
 	{ timeout: 20000 },
 );
+
+test.skipIf(!hasFfmpeg)(
+	"decode head caps at maxAheadSec ahead of the cursor — the cache is a window, not a whole-episode dump",
+	async () => {
+		const wav = tmpWav();
+		writeSineWav(wav, 30);
+		const cache = new EpisodePcmCache({
+			url: wav,
+			maxAheadSec: 4,
+			keepBehindSec: 2,
+		});
+		try {
+			cache.startDecode(0);
+			// The 8s initial burst delivers the front of the file instantly.
+			await waitForCoverage(cache, 5);
+
+			// Park the cursor at 0 and drive the cap (the render loop reads
+			// every frame; the cap applies on the first read past the head).
+			const out = new Float64Array(512);
+			for (let i = 0; i < 30 && cache.decoding; i++) {
+				cache.readWindow(out, 0);
+				await Bun.sleep(20);
+			}
+
+			// Paused at the head budget (4s) + one 8s burst of slack — NOT
+			// decoded to the 30s EOF.
+			expect(cache.decoding).toBe(false);
+			expect(cache.coverageEndSec).toBeGreaterThanOrEqual(4);
+			expect(cache.coverageEndSec).toBeLessThanOrEqual(4 + 8 + 1);
+			expect(cache.decodeFinished).toBe(false);
+
+			// A parked cursor keeps the cap: more reads must not restart
+			// the pass or grow the cache.
+			const cappedAt = cache.coverageEndSec;
+			for (let i = 0; i < 10; i++) {
+				cache.readWindow(out, 0);
+				await Bun.sleep(20);
+			}
+			expect(cache.decoding).toBe(false);
+			expect(cache.coverageEndSec).toBeLessThanOrEqual(cappedAt + 1);
+		} finally {
+			cache.stop();
+			await Bun.$`rm -f ${wav}`.quiet();
+		}
+	},
+	{ timeout: 20000 },
+);
+
+test.skipIf(!hasFfmpeg)(
+	"the window prunes segments behind the cursor as playback advances",
+	async () => {
+		const wav = tmpWav();
+		writeSineWav(wav, 30);
+		const cache = new EpisodePcmCache({
+			url: wav,
+			maxAheadSec: 4,
+			keepBehindSec: 2,
+		});
+		try {
+			// Two segments: the back half [10, ~18] and, after the seek,
+			// the front [2, ~10].
+			cache.startDecode(10);
+			await waitForCoverage(cache, 11);
+			cache.ensureDecodeAround(2);
+			await waitForCoverage(cache, 2.2);
+			expect(cache.covers(2.5)).toBe(true);
+			expect(cache.covers(10.5)).toBe(true);
+
+			// Cursor advances past the front segment's end + keepBehind:
+			// the front must fall out of the window, the back must survive.
+			const out = new Float64Array(512);
+			for (let i = 0; i < 40 && cache.covers(2.5); i++) {
+				cache.readWindow(out, 13);
+				await Bun.sleep(25);
+			}
+			expect(cache.covers(2.5)).toBe(false);
+			expect(cache.covers(10.5)).toBe(true);
+		} finally {
+			cache.stop();
+			await Bun.$`rm -f ${wav}`.quiet();
+		}
+	},
+	{ timeout: 20000 },
+);

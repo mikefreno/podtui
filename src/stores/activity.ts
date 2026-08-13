@@ -10,7 +10,6 @@
 
 import { createSignal } from "solid-js";
 
-/** Create activity store */
 function createActivityStore() {
 	const [count, setCount] = createSignal(0);
 	const [labels, setLabels] = createSignal<string[]>([]);
@@ -64,7 +63,6 @@ function createActivityStore() {
 	};
 }
 
-/** Singleton activity store */
 let activityStoreInstance: ReturnType<typeof createActivityStore> | null = null;
 
 export function useActivityStore() {

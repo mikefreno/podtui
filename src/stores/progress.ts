@@ -64,16 +64,10 @@ function createProgressStore() {
 		 */
 		whenReady: () => progressInit,
 
-		/**
-		 * Get progress for a specific episode.
-		 */
 		get(episodeId: string): Progress | undefined {
 			return progressMap()[episodeId];
 		},
 
-		/**
-		 * Get all progress entries.
-		 */
 		all(): Record<string, Progress> {
 			return progressMap();
 		},
@@ -102,18 +96,12 @@ function createProgressStore() {
 			persist();
 		},
 
-		/**
-		 * Check if an episode is completed.
-		 */
 		isCompleted(episodeId: string): boolean {
 			const p = progressMap()[episodeId];
 			if (!p || p.duration <= 0) return false;
 			return p.position / p.duration >= COMPLETION_THRESHOLD;
 		},
 
-		/**
-		 * Get progress percentage (0-100) for an episode.
-		 */
 		getPercent(episodeId: string): number {
 			const p = progressMap()[episodeId];
 			if (!p || p.duration <= 0) return 0;
@@ -151,9 +139,6 @@ function createProgressStore() {
 			persist();
 		},
 
-		/**
-		 * Clear all progress data.
-		 */
 		clear(): void {
 			setProgressMap({});
 			persist();

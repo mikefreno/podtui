@@ -62,7 +62,6 @@ const defaultState: AppState = {
 
 // ── App State (config.json) ─────────────────────────────────────────────────
 
-/** Load app state from config.json */
 export async function loadAppStateFromFile(): Promise<AppState> {
 	try {
 		const cfg = await loadConfig();
@@ -88,7 +87,6 @@ export async function loadAppStateFromFile(): Promise<AppState> {
 	}
 }
 
-/** Save app state to config.json */
 export function saveAppStateToFile(state: AppState): void {
 	updateConfig({
 		settings: state.settings,
@@ -109,7 +107,6 @@ interface ProgressEntry {
 	playbackSpeed?: number;
 }
 
-/** Load progress map from JSON file */
 export async function loadProgressFromFile(): Promise<
 	Record<string, ProgressEntry>
 > {
@@ -145,7 +142,6 @@ export function saveProgressToFile(data: Record<string, unknown>): void {
 
 const SEARCH_HISTORY_FILE = "search-history.json";
 
-/** Load search history from JSON file */
 export async function loadSearchHistoryFromFile(): Promise<string[]> {
 	try {
 		const file = Bun.file(getConfigFilePath(SEARCH_HISTORY_FILE));
@@ -159,7 +155,6 @@ export async function loadSearchHistoryFromFile(): Promise<string[]> {
 	}
 }
 
-/** Save search history to JSON file (overwrite, no backup) */
 export function saveSearchHistoryToFile(history: string[]): void {
 	(async () => {
 		try {
@@ -178,7 +173,6 @@ export function saveSearchHistoryToFile(history: string[]): void {
 
 const AUDIO_NAV_FILE = "audio-nav.json";
 
-/** Load audio navigation state from JSON file */
 export async function loadAudioNavFromFile<T>(): Promise<T | null> {
 	try {
 		const file = Bun.file(getConfigFilePath(AUDIO_NAV_FILE));

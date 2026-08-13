@@ -60,7 +60,6 @@ function saveScope(scope: SearchScope): void {
 	}
 }
 
-/** Create search store */
 export function createSearchStore() {
 	const feedStore = useFeedStore();
 	const [query, setQuery] = createSignal("");
@@ -167,7 +166,6 @@ export function createSearchStore() {
 		}
 	};
 
-	/** Add query to history */
 	const addToHistory = (q: string) => {
 		setHistory((prev) => {
 			const updated = sanitizeHistory([q, ...prev]);
@@ -176,13 +174,11 @@ export function createSearchStore() {
 		});
 	};
 
-	/** Clear search history */
 	const clearHistory = () => {
 		setHistory([]);
 		saveSearchHistoryToFile([]);
 	};
 
-	/** Remove single history item */
 	const removeFromHistory = (q: string) => {
 		setHistory((prev) => {
 			const updated = prev.filter((h) => h !== q);
@@ -191,14 +187,12 @@ export function createSearchStore() {
 		});
 	};
 
-	/** Clear results */
 	const clearResults = () => {
 		setResults([]);
 		setQuery("");
 		setError(null);
 	};
 
-	/** Mark a podcast as subscribed in results */
 	const markSubscribed = (podcastId: string, feedUrl?: string) => {
 		setResults((prev) =>
 			prev.map((result) => {
@@ -262,7 +256,6 @@ export function createSearchStore() {
 	};
 }
 
-/** Singleton search store */
 let searchStoreInstance: ReturnType<typeof createSearchStore> | null = null;
 
 export function useSearchStore() {

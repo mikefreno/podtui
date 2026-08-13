@@ -156,9 +156,6 @@ function init() {
 				setRegistrations((arr) => arr.filter((x) => x !== results));
 			});
 		},
-		/**
-		 * Get all visible options.
-		 */
 		get options() {
 			return visibleOptions();
 		},
@@ -195,9 +192,6 @@ export function CommandProvider(props: ParentProps) {
 	return <ctx.Provider value={value}>{props.children}</ctx.Provider>;
 }
 
-/**
- * Command palette dialog component.
- */
 function CommandDialog(props: {
 	options: CommandOption[];
 	suggestedOptions: CommandOption[];

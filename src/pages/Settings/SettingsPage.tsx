@@ -140,7 +140,6 @@ export function SettingsPage() {
 	function open() {
 		const d = depth();
 		if (d === 0) {
-			// drill into the focused section's items
 			const id = focusedSection().id;
 			nav.pushDepth({
 				kind: `settings:${id}`,
@@ -206,7 +205,6 @@ export function SettingsPage() {
 	function step(delta: number) {
 		const d = depth();
 		if (d === 2) {
-			// editor: j/k nudges the value
 			const it = editorItem();
 			if (it?.kind === "number" || it?.kind === "select")
 				it.cycle?.(delta as -1 | 1);
@@ -220,7 +218,6 @@ export function SettingsPage() {
 		pane: PaneId;
 		mode: NavMode;
 	}) => {
-		// ignore actions meant for non-center panes
 		if (data.pane !== DEPTH_CENTER_PANE) return;
 		if (nav.activePane() !== DEPTH_CENTER_PANE) return;
 		const handler = PAGE_ACTIONS[data.action];

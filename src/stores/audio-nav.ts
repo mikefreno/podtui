@@ -9,14 +9,12 @@ import {
 	saveAudioNavToFile,
 } from "../utils/app-persistence";
 
-/** Source type for audio navigation */
 export enum AudioSource {
 	FEED = "feed",
 	MY_SHOWS = "my_shows",
 	SEARCH = "search",
 }
 
-/** Audio navigation state */
 export interface AudioNavState {
 	/** Current source type */
 	source: AudioSource;
@@ -28,14 +26,12 @@ export interface AudioNavState {
 	lastUpdated: Date;
 }
 
-/** Default navigation state */
 const defaultNavState: AudioNavState = {
 	source: AudioSource.FEED,
 	currentIndex: 0,
 	lastUpdated: new Date(),
 };
 
-/** Create audio navigation store */
 function createAudioNavStore() {
 	const [navState, setNavState] = createSignal<AudioNavState>(defaultNavState);
 
@@ -56,12 +52,10 @@ function createAudioNavStore() {
 	init();
 
 	return {
-		/** Get current navigation state */
 		get state(): AudioNavState {
 			return navState();
 		},
 
-		/** Update source type */
 		setSource: (source: AudioSource, podcastId?: string) => {
 			setNavState((prev) => ({
 				...prev,
@@ -72,7 +66,6 @@ function createAudioNavStore() {
 			persist();
 		},
 
-		/** Move to next episode */
 		next: (currentIndex: number) => {
 			setNavState((prev) => ({
 				...prev,
@@ -82,7 +75,6 @@ function createAudioNavStore() {
 			persist();
 		},
 
-		/** Move to previous episode */
 		prev: (currentIndex: number) => {
 			setNavState((prev) => ({
 				...prev,
@@ -92,23 +84,19 @@ function createAudioNavStore() {
 			persist();
 		},
 
-		/** Reset to default state */
 		reset: () => {
 			setNavState(defaultNavState);
 			persist();
 		},
 
-		/** Get current index */
 		getCurrentIndex: (): number => {
 			return navState().currentIndex;
 		},
 
-		/** Get current source */
 		getSource: (): AudioSource => {
 			return navState().source;
 		},
 
-		/** Get current podcast ID */
 		getPodcastId: (): string | undefined => {
 			return navState().podcastId;
 		},

@@ -42,7 +42,6 @@ if (cliArgs.version) {
 
 // ── CLI handlers ──────────────────────────────────────────────────────
 
-/** Find the most recent episode across all feeds */
 function findLatestEpisode(
 	feeds: Feed[],
 ): { feed: Feed; episode: Episode } | null {

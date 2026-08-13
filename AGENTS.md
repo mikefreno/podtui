@@ -15,7 +15,7 @@
 - `bun tests/cavacore-smoke.ts` - Run specific native library smoke test
 
 ### Linting
-- `bun run lint` - Run ESLint with TypeScript rules
+- `bun run lint` - Run the TypeScript typecheck (`bun tsc --noEmit`)
 
 ## Code Style Guidelines
 

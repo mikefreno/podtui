@@ -98,9 +98,6 @@ function init() {
   })
 
   return {
-    /**
-     * Clear all dialogs from the stack.
-     */
     clear() {
       for (const item of store.stack) {
         if (item.onClose) item.onClose()
@@ -113,9 +110,6 @@ function init() {
       emit("dialog.close", {})
     },
 
-    /**
-     * Replace all dialogs with a new one.
-     */
     replace(input: JSX.Element | (() => JSX.Element), onClose?: () => void) {
       if (store.stack.length === 0) {
         focus = renderer.currentFocusedRenderable
@@ -130,9 +124,6 @@ function init() {
       emit("dialog.open", { dialogId: "dialog" })
     },
 
-    /**
-     * Push a new dialog onto the stack.
-     */
     push(input: JSX.Element | (() => JSX.Element), onClose?: () => void) {
       if (store.stack.length === 0) {
         focus = renderer.currentFocusedRenderable
@@ -143,9 +134,6 @@ function init() {
       emit("dialog.open", { dialogId: "dialog" })
     },
 
-    /**
-     * Pop the top dialog from the stack.
-     */
     pop() {
       if (store.stack.length === 0) return
       const current = store.stack.at(-1)!

@@ -100,24 +100,20 @@ export const parseRSSItem = (item: string, feedUrl: string, index: number): Epis
   const epDescription = cleanField(getTagValue(item, "description"))
   const pubDate = new Date(getTagValue(item, "pubDate") || Date.now())
 
-  // Audio URL + file size + MIME type from <enclosure>
   const enclosure = item.match(/<enclosure[^>]*url=["']([^"']+)["'][^>]*>/i)
   const audioUrl = enclosure?.[1] ?? ""
   const fileSizeStr = getAttr(item, "enclosure", "length")
   const fileSize = fileSizeStr ? parseInt(fileSizeStr, 10) : undefined
   const mimeType = getAttr(item, "enclosure", "type") || undefined
 
-  // Duration from <itunes:duration>
   const durationRaw = getTagValue(item, "itunes:duration")
   const duration = parseDuration(durationRaw)
 
-  // Episode & season numbers
   const episodeNumRaw = getTagValue(item, "itunes:episode")
   const episodeNumber = episodeNumRaw ? parseInt(episodeNumRaw, 10) : undefined
   const seasonNumRaw = getTagValue(item, "itunes:season")
   const seasonNumber = seasonNumRaw ? parseInt(seasonNumRaw, 10) : undefined
 
-  // Episode type & explicit
   const episodeType = parseEpisodeType(getTagValue(item, "itunes:episodeType"))
   const explicitRaw = getTagValue(item, "itunes:explicit").toLowerCase()
   const explicit = explicitRaw === "yes" || explicitRaw === "true" ? true : undefined
@@ -135,7 +131,6 @@ export const parseRSSItem = (item: string, feedUrl: string, index: number): Epis
     pubDate,
   }
 
-  // Only set optional fields if present
   if (episodeNumber !== undefined && !isNaN(episodeNumber)) ep.episodeNumber = episodeNumber
   if (seasonNumber !== undefined && !isNaN(seasonNumber)) ep.seasonNumber = seasonNumber
   if (episodeType) ep.episodeType = episodeType

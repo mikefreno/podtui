@@ -43,7 +43,6 @@ function createEventBus(): EventBusInstance {
 			}
 			handlers.get(event)!.add(handler as EventHandler);
 
-			// Return unsubscribe function
 			return () => {
 				this.off(event, handler);
 			};

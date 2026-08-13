@@ -10,7 +10,8 @@ import {
   generateSyntax,
   generateSubtleSyntax,
 } from "../utils/syntax-highlighter";
-import { resolveTerminalTheme, loadThemes } from "../utils/theme";
+import { resolveTerminalTheme } from "../utils/theme";
+import { getCustomThemes } from "../utils/custom-themes";
 import { detectModeFromBackground } from "../utils/system-theme";
 import { createSimpleContext } from "./helper";
 import {
@@ -175,7 +176,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
 
     function init() {
       resolveSystemTheme();
-      loadThemes()
+      getCustomThemes()
         .then((custom) => {
           setStore(
             produce((draft) => {
@@ -187,7 +188,6 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
           setStore("active", "catppuccin");
         })
         .finally(() => {
-          // Only set ready if not waiting for system theme
           if (store.active !== "system") {
             setStore("ready", true);
           }

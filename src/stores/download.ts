@@ -63,7 +63,62 @@ interface QueueItem {
 	episodeTitle: string;
 }
 
-/** Create download store */
+// ── post-download decoration ─────────────────────────────────────────────────
+/** Write the podcast cover beside the audio so mpv's --cover-art-auto=exact
+ *  picks it up for Now Playing art when the local file plays (same basename,
+ *  .jpg extension — verified against mpv 0.41). curl, NOT fetch: Bun's fetch
+ *  hangs in compiled binaries, so the shipped app never wrote this file. */
+function writeCoverArt(filePath: string, coverUrl: string): void {
+	const dot = filePath.lastIndexOf(".");
+	if (dot <= 0) return;
+	const coverPath = filePath.slice(0, dot) + ".jpg";
+	Bun.spawn([
+		"curl",
+		"-sS",
+		"--fail",
+		"-m",
+		"8",
+		"--max-filesize",
+		"2097152",
+		"-o",
+		coverPath,
+		coverUrl,
+	])
+		.exited.catch(() => {});
+}
+
+/** Tag the local file (codec-copy, no re-encode) so mpv's Now Playing
+ *  metadata for local playback is title=episode, artist=podcast — the source
+ *  streams carry no usable tags and macOS composes "title - artist" from
+ *  exactly these fields. Atomic: ffmpeg writes a temp file, then renames
+ *  into place. */
+function tagLocalFile(
+	filePath: string,
+	episode: Episode,
+	podcastTitle: string,
+): void {
+	const tmp = `${filePath}.tag.mp3`;
+	Bun.spawn([
+		"ffmpeg",
+		"-y",
+		"-i",
+		filePath,
+		"-c",
+		"copy",
+		"-metadata",
+		`title=${episode.title}`,
+		"-metadata",
+		`artist=${podcastTitle}`,
+		tmp,
+	])
+		.exited.then(async (code) => {
+			if (code !== 0) return;
+			const { renameSync } = await import("node:fs");
+			renameSync(tmp, filePath);
+		})
+		.catch(() => {});
+}
+
 function createDownloadStore() {
 	const [downloads, setDownloads] = createSignal<
 		Map<string, DownloadedEpisode>
@@ -195,7 +250,6 @@ function createDownloadStore() {
 		}
 	}
 
-	/** Execute a single download */
 	async function executeDownload(item: QueueItem): Promise<void> {
 		const controller = new AbortController();
 		abortControllers.set(item.episodeId, controller);
@@ -236,70 +290,23 @@ function createDownloadStore() {
 				error: null,
 			});
 
-			// Write the podcast cover beside the audio so mpv's
-			// --cover-art-auto=exact picks it up for Now Playing art when the
-			// local file plays (same basename, .jpg extension — verified
-			// against mpv 0.41). curl, NOT fetch: Bun's fetch hangs in
-			// compiled binaries, so the shipped app never wrote this file.
-			// Falls back to the episode's own image when the feed has no
-			// channel cover (URL-added feeds).
+			// Decorate the local file: cover art + ID3 tags (see the
+			// module-level helpers above) — the source streams carry neither.
+			// Cover falls back to the episode's own image when the feed has
+			// no channel cover (URL-added feeds).
 			const feedStore = useFeedStore();
 			const episode = feedStore.findEpisode(item.episodeId);
-			const coverUrl =
-				feedStore
-					.feeds()
-					.find((f) => f.id === item.feedId)?.podcast.coverUrl ??
-				episode?.imageUrl;
-			if (coverUrl && result.filePath) {
-				const dot = result.filePath.lastIndexOf(".");
-				if (dot > 0) {
-					const coverPath = result.filePath.slice(0, dot) + ".jpg";
-					Bun.spawn([
-						"curl",
-						"-sS",
-						"--fail",
-						"-m",
-						"8",
-						"--max-filesize",
-						"2097152",
-						"-o",
-						coverPath,
-						coverUrl,
-					])
-						.exited.catch(() => {});
-				}
+			const feed = feedStore.feeds().find((f) => f.id === item.feedId);
+			const coverUrl = feed?.podcast.coverUrl ?? episode?.imageUrl;
+			if (result.filePath && coverUrl) {
+				writeCoverArt(result.filePath, coverUrl);
 			}
-
-			// Tag the local file (codec-copy, no re-encode) so mpv's Now
-			// Playing metadata for local playback is title=episode,
-			// artist=podcast — the source streams carry no usable tags and
-			// macOS composes "title - artist" from exactly these fields.
-			// Atomic: ffmpeg writes a temp file, then renames into place.
 			if (result.filePath && episode) {
 				const podcastTitle =
-					feedStore.feeds().find((f) => f.id === item.feedId)?.podcast.title ??
+					feed?.podcast.title ??
 					downloads().get(item.episodeId)?.podcastTitle;
 				if (podcastTitle) {
-					const tmp = `${result.filePath}.tag.mp3`;
-					Bun.spawn([
-						"ffmpeg",
-						"-y",
-						"-i",
-						result.filePath,
-						"-c",
-						"copy",
-						"-metadata",
-						`title=${episode.title}`,
-						"-metadata",
-						`artist=${podcastTitle}`,
-						tmp,
-					])
-						.exited.then(async (code) => {
-							if (code !== 0) return;
-							const { renameSync } = await import("node:fs");
-							renameSync(tmp, result.filePath);
-						})
-						.catch(() => {});
+					tagLocalFile(result.filePath, episode, podcastTitle);
 				}
 			}
 		} else {
@@ -315,22 +322,18 @@ function createDownloadStore() {
 		processQueue();
 	}
 
-	/** Get download status for an episode */
 	const getDownloadStatus = (episodeId: string): DownloadStatus => {
 		return downloads().get(episodeId)?.status ?? DownloadStatus.NONE;
 	};
 
-	/** Get download progress for an episode (0-100) */
 	const getDownloadProgress = (episodeId: string): number => {
 		return downloads().get(episodeId)?.progress ?? 0;
 	};
 
-	/** Get full download info for an episode */
 	const getDownload = (episodeId: string): DownloadedEpisode | undefined => {
 		return downloads().get(episodeId);
 	};
 
-	/** Get the local file path for a completed download */
 	const getDownloadedFilePath = (episodeId: string): string | null => {
 		const dl = downloads().get(episodeId);
 		if (dl?.status === DownloadStatus.COMPLETED && dl.filePath) {
@@ -347,7 +350,6 @@ function createDownloadStore() {
 		podcastFeedUrl?: string;
 	}
 
-	/** Start downloading an episode */
 	const startDownload = (
 		episode: Episode,
 		feedId: string,
@@ -411,7 +413,6 @@ function createDownloadStore() {
 		});
 	};
 
-	/** Cancel a download */
 	const cancelDownload = (episodeId: string): void => {
 		// Abort active download
 		const controller = abortControllers.get(episodeId);
@@ -432,7 +433,6 @@ function createDownloadStore() {
 		saveDownloads().catch(() => {});
 	};
 
-	/** Remove a completed download (delete file and metadata) */
 	const removeDownload = async (episodeId: string): Promise<void> => {
 		const dl = downloads().get(episodeId);
 		if (dl?.filePath) {
@@ -478,7 +478,6 @@ function createDownloadStore() {
 		}
 	};
 
-	/** Get all downloads as an array */
 	const getAllDownloads = (): DownloadedEpisode[] => {
 		return Array.from(downloads().values());
 	};
@@ -501,12 +500,10 @@ function createDownloadStore() {
 		});
 	};
 
-	/** Get the current queue */
 	const getQueue = (): QueueItem[] => {
 		return queue();
 	};
 
-	/** Get count of active downloads */
 	const getActiveCount = (): number => {
 		return activeCount();
 	};
@@ -531,7 +528,6 @@ function createDownloadStore() {
 	};
 }
 
-/** Singleton download store */
 let downloadStoreInstance: ReturnType<typeof createDownloadStore> | null = null;
 
 export function useDownloadStore() {
