@@ -89,13 +89,23 @@ function ShowRow(props: {
 			backgroundColor={bg()}
 			onMouseDown={props.onMouseDown}
 		>
-			<text fg={fg()}>{isFocused() ? props.marker() : " "}</text>
-			<text fg={fg()}>{props.title}</text>
-			<text fg={isFocused() ? theme.surface : muted()}>
+			<text flexShrink={0} fg={fg()}>
+				{isFocused() ? props.marker() : " "}
+			</text>
+			{/* Long titles truncate with middle-ellipsis instead of wrapping —
+			    a wrapped title grows the row to 2+ lines and shifts every row
+			    below (see EpisodeList for the same guard). The episode-count
+			    and watchlist cells are flexShrink=0 so they never shrink or
+			    wrap; the flexible title takes the remaining width. */}
+			<text wrapMode="none" truncate fg={fg()}>
+				{props.title}
+			</text>
+			<text flexShrink={0} fg={isFocused() ? theme.surface : muted()}>
 				({props.feed.episodes.length})
 			</text>
 			<Show when={props.wlScope()}>
 				<text
+					flexShrink={0}
 					fg={
 						isFocused()
 							? theme.surface
@@ -311,6 +321,30 @@ export function MyShowsPage() {
 			: Math.min(focusedRow(), Math.max(episodes().length - 1, 0));
 	const focusedEpisode = () =>
 		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
+
+	// ── Render window ────────────────────────────────────────────────────────
+	// The drilled show's list grows deep after repeated fetch-more presses;
+	// rendering every row per frame froze the UI. Render only a bounded slice
+	// around the focus (real indexes preserved) — the scrollbox still keeps
+	// the focused row in view. Spacers above/below the window restore the
+	// full content height so the scrollbar tracks the real list.
+	// Each episode row is 2 lines tall (title, date) — no subtitle here.
+	const LIST_WINDOW = 30;
+	const ROW_HEIGHT = 2;
+	const listWindow = createMemo<[number, number]>(() => {
+		const len = episodes().length;
+		// Focusing the Fetch More button keeps the window anchored at the
+		// last episode — no jump when the focus crosses onto the button.
+		const f = focusedOnMore() ? len - 1 : focusedEpIdx();
+		return [
+			Math.max(0, f - LIST_WINDOW),
+			Math.min(len, f + LIST_WINDOW + 1),
+		];
+	});
+	const visibleEpisodes = createMemo(() => {
+		const [start, end] = listWindow();
+		return episodes().slice(start, end);
+	});
 
 	const curLen = () => (depth() === 0 ? depth0Count() : rowCount());
 
@@ -537,9 +571,17 @@ export function MyShowsPage() {
 							paddingRight={1}
 							backgroundColor={focused() ? theme.border : undefined}
 						>
-							<text fg={fg()}>{focused() ? marker() : " "}</text>
-							<text fg={fg()}>{showTitle(feed)}</text>
-							<text fg={muted()}>({feed.episodes.length})</text>
+							<text flexShrink={0} fg={fg()}>
+								{focused() ? marker() : " "}
+							</text>
+							{/* 20%-wide parent pane truncates hard — same
+							    middle-ellipsis guard as the depth-0 rows. */}
+							<text wrapMode="none" truncate fg={fg()}>
+								{showTitle(feed)}
+							</text>
+							<text flexShrink={0} fg={muted()}>
+								({feed.episodes.length})
+							</text>
 						</box>
 					);
 				}}
@@ -622,11 +664,17 @@ export function MyShowsPage() {
 						</box>
 					}
 				>
-					<For each={episodes()}>
+					{/* Spacers keep the scrollbox content at the FULL list
+					    height so the scrollbar reflects the real list, not the
+					    render window. */}
+					<Show when={listWindow()[0] > 0}>
+						<box height={listWindow()[0] * ROW_HEIGHT} />
+					</Show>
+					<For each={visibleEpisodes()}>
 						{(ep, index) => (
 							<EpisodeRow
 								episode={ep}
-								index={index}
+								index={() => listWindow()[0] + index()}
 								focused={focusedEpIdx}
 								active={isActive}
 								selected={() => nav.isSelected(ep.id)}
@@ -635,11 +683,14 @@ export function MyShowsPage() {
 								marker={marker}
 								onMouseDown={() => {
 									nav.setActivePane(DEPTH_CENTER_PANE);
-									nav.setDepthFocus(index(), 1);
+									nav.setDepthFocus(listWindow()[0] + index(), 1);
 								}}
 							/>
 						)}
 					</For>
+					<Show when={episodes().length - listWindow()[1] > 0}>
+						<box height={(episodes().length - listWindow()[1]) * ROW_HEIGHT} />
+					</Show>
 					<Show when={showFetchMore()}>
 						<FetchMoreRow
 							index={() => episodes().length}

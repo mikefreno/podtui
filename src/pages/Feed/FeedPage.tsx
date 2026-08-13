@@ -107,6 +107,30 @@ function FeedPage() {
 		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
 	const curLen = () => rowCount();
 
+	// ── Render window ────────────────────────────────────────────────────────
+	// The union grows to thousands of episodes after repeated fetch-more
+	// presses; rendering every row per frame froze the UI. Render only a
+	// bounded slice around the focus (real indexes preserved) — the scrollbox
+	// still keeps the focused row in view. Spacers above/below the window
+	// restore the full content height so the scrollbar tracks the real list.
+	// Each EpisodeRow is 3 lines tall (title, subtitle, date).
+	const LIST_WINDOW = 30;
+	const ROW_HEIGHT = 3;
+	const listWindow = createMemo<[number, number]>(() => {
+		const len = episodes().length;
+		// Focusing the Fetch More button keeps the window anchored at the
+		// last episode — no jump when the focus crosses onto the button.
+		const f = focusedOnMore() ? len - 1 : focusedEpIdx();
+		return [
+			Math.max(0, f - LIST_WINDOW),
+			Math.min(len, f + LIST_WINDOW + 1),
+		];
+	});
+	const visibleEpisodes = createMemo(() => {
+		const [start, end] = listWindow();
+		return episodes().slice(start, end);
+	});
+
 	const ensureFocus = () => {
 		if (rowCount() > 0 && focus() >= rowCount())
 			nav.setDepthFocus(rowCount() - 1, 0);
@@ -245,17 +269,22 @@ function FeedPage() {
 							</text>
 						}
 					>
-						<LoadingIndicator label="Refreshing…" />
+						<LoadingIndicator />
 					</Show>
 				</box>
 			}
 		>
-			<For each={episodes()}>
+			{/* Spacers keep the scrollbox content at the FULL list height so
+			    the scrollbar reflects the real list, not the render window. */}
+			<Show when={listWindow()[0] > 0}>
+				<box height={listWindow()[0] * ROW_HEIGHT} />
+			</Show>
+			<For each={visibleEpisodes()}>
 				{(item, index) => (
 					<EpisodeRow
 						episode={item.episode}
 						subtitle={() => item.feed.customName || item.feed.podcast.title}
-						index={index}
+						index={() => listWindow()[0] + index()}
 						focused={focusedEpIdx}
 						active={isActive}
 						selected={() => nav.isSelected(item.episode.id)}
@@ -264,11 +293,14 @@ function FeedPage() {
 						marker={marker}
 						onMouseDown={() => {
 							nav.setActivePane(DEPTH_CENTER_PANE);
-							nav.setDepthFocus(index(), 0);
+							nav.setDepthFocus(listWindow()[0] + index(), 0);
 						}}
 					/>
 				)}
 			</For>
+			<Show when={episodes().length - listWindow()[1] > 0}>
+				<box height={(episodes().length - listWindow()[1]) * ROW_HEIGHT} />
+			</Show>
 			<Show when={showFetchMore()}>
 				<FetchMoreRow
 					index={() => episodes().length}
@@ -286,7 +318,7 @@ function FeedPage() {
 			</Show>
 			<Show when={feedStore.isLoadingFeeds()}>
 				<box alignItems="center" paddingTop={1}>
-					<LoadingIndicator label="Refreshing…" />
+					<LoadingIndicator />
 				</box>
 			</Show>
 		</Show>
