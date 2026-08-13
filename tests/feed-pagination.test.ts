@@ -3,12 +3,10 @@
  * row in a drilled show's episode list (My Shows depth 1) and the Feed
  * page's row.
  *
- * addFeed caches every episode inside the lifecycle window (the last
- * EPISODE_WINDOW_DAYS days — the date bound, not a count) while exposing
- * only the first MAX_EPISODES_SUBSCRIBE (20) episodes. `hasMoreEpisodes`
- * reports when the cache holds more than the loaded window;
- * `loadMoreEpisodes` advances that window in MAX_EPISODES_REFRESH (50)
- * chunks until it is exhausted. This pins:
+ * Runs in COUNT cache mode: `loadMoreEpisodes` advances the loaded window in
+ * fixed MAX_EPISODES_REFRESH (50) chunks until the cache is exhausted.
+ * (Date-mode fetch-more steps by a two-week window instead — that contract
+ * is pinned in feed-volatile-merge.test.ts.) This pins:
  *   1. A freshly subscribed feed with a longer cache reports hasMoreEpisodes.
  *   2. loadMoreEpisodes grows that feed's episodes from the cache (no refetch
  *      needed) and hasMoreEpisodes flips false once the window reaches the end.
@@ -26,6 +24,7 @@ const configHome = mkdtempSync(join(tmpdir(), "podtui-pagination-"));
 process.env.XDG_CONFIG_HOME = configHome;
 
 import { useFeedStore } from "../src/stores/feed";
+import { useAppStore } from "../src/stores/app";
 import type { Podcast } from "../src/types/podcast";
 
 const HOUR = 3600 * 1000;
@@ -73,6 +72,11 @@ const makePodcast = (feedUrl: string): Podcast => ({
 });
 
 beforeAll(() => {
+	// Chunk-based stepping is count-mode behavior (see header comment).
+	useAppStore().updatePreferences({
+		episodeCacheMode: "count",
+		episodeCacheCount: 25,
+	});
 	server = Bun.serve({
 		port: 0,
 		fetch(req) {
@@ -89,6 +93,7 @@ beforeAll(() => {
 
 afterAll(() => {
 	// Leave the shared singleton as we found it (see addedFeedIds note).
+	useAppStore().updatePreferences({ episodeCacheMode: "date" });
 	const store = useFeedStore();
 	for (const id of addedFeedIds) store.removeFeed(id);
 	server?.stop(true);

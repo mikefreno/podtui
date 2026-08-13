@@ -221,7 +221,7 @@ export function usePreferencesItems(): SettingItem[] {
 			kind: "select",
 			display: () => cacheModeLabel(prefs().episodeCacheMode),
 			help: () =>
-				`How the Feed and My Shows episode lists are bounded.\nDate: keep episodes from the last N days (see Cache Days below).\nCount: keep the N most recent episodes (see Cache Count below).\nFetch More always pages beyond this bound — these episodes are volatile and don't persist.\nType: select\nDefault: date\nCurrent: ${cacheModeLabel(prefs().episodeCacheMode)}\nCycle with j/k; Enter to apply.`,
+				`How the Feed and My Shows episode lists are bounded.\nDate: keep episodes from the last N days (see Cache Days below); Fetch More reveals the next 2 weeks per press.\nCount: keep the N most recent episodes (see Cache Count below); Fetch More pages in 50-episode chunks.\nFetch More always pages beyond this bound — these episodes are volatile and don't persist.\nType: select\nDefault: date\nCurrent: ${cacheModeLabel(prefs().episodeCacheMode)}\nCycle with j/k; Enter to apply.`,
 			cycle: (dir) => {
 				const idx = CACHE_MODE_LABELS.findIndex(
 					(s) => s.value === prefs().episodeCacheMode,

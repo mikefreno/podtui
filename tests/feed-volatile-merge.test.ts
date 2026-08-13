@@ -296,6 +296,41 @@ test("date mode boundary: 25 days in, 70 days out", async () => {
 
 // ── count mode ────────────────────────────────────────────────────────────
 
+test("date mode: fetch-more steps by a two-week window, not a count", async () => {
+	const store = useFeedStore();
+	const now = Date.now();
+	// 30 episodes at 3-day spacing span 87 days. The 60-day cache window
+	// holds the first 21 (subscribe shows 20); fetch-more then reveals the
+	// next 2-week band per press — 3-day cadence → ~4 episodes per band —
+	// NOT a fixed 50-episode chunk (which would load all 30 at once).
+	servedEpisodes = Array.from({ length: 30 }, (_, i) => ({
+		title: `Ep ${30 - i}`,
+		date: new Date(now - i * 3 * DAY).toISOString(),
+	}));
+	const feedUrl = `http://127.0.0.1:${server!.port}/date-step.xml`;
+	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
+	expect(feed).not.toBeNull();
+	const id = feed!.id;
+	addedFeedIds.push(id);
+
+	expect(store.getFeed(id)!.episodes.length).toBe(20);
+
+	// Press 1: oldest loaded is 57d old → cutoff 71d → i=20..23 (60–69d).
+	await store.loadMoreEpisodes(id);
+	expect(store.getFeed(id)!.episodes.length).toBe(24);
+	expect(store.hasMoreEpisodes(id)).toBe(true);
+
+	// Press 2: oldest loaded is 69d old → cutoff 83d → i=24..27 (72–81d).
+	await store.loadMoreEpisodes(id);
+	expect(store.getFeed(id)!.episodes.length).toBe(28);
+	expect(store.hasMoreEpisodes(id)).toBe(true);
+
+	// Press 3: oldest loaded is 81d old → cutoff 95d → i=28..29 (84–87d).
+	await store.loadMoreEpisodes(id);
+	expect(store.getFeed(id)!.episodes.length).toBe(30);
+	expect(store.hasMoreEpisodes(id)).toBe(false);
+});
+
 test("count mode: only N most-recent episodes are visible, but fetch-more goes beyond", async () => {
 	const store = useFeedStore();
 	const app = useAppStore();

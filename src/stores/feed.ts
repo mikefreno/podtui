@@ -26,11 +26,16 @@ import { useDownloadStore } from "./download";
 import { useAppStore } from "./app";
 import { DownloadStatus } from "../types/episode";
 
-/** Max episodes to load per page/chunk */
+/** Max episodes to load per page/chunk (count mode only — date mode steps
+ *  by FETCH_MORE_WINDOW_DAYS instead). */
 const MAX_EPISODES_REFRESH = 50;
 
 /** Max episodes to fetch on initial subscribe */
 const MAX_EPISODES_SUBSCRIBE = 20;
+
+/** Fetch-more step in date mode: each press reveals the next two weeks of
+ *  episodes past the oldest loaded one, instead of a fixed episode count. */
+const FETCH_MORE_WINDOW_DAYS = 14;
 
 /** Per-feed fetch timeout — a hung feed must not stall a refresh batch or
  *  the background refresh loop. */
@@ -126,6 +131,13 @@ function episodeKeepFn(prefs: {
 	const days = Math.max(1, prefs.episodeCacheDays);
 	return (ep: Episode) => episodeInWindow(ep, now, days);
 }
+
+/** Timestamp for window math — undated episodes sort/compare as NEWEST
+ *  (Infinity) so they can never be excluded by a date cutoff. */
+const epTs = (ep: Episode): number => {
+	const t = ep.pubDate?.getTime();
+	return t === undefined || Number.isNaN(t) ? Infinity : t;
+};
 
 /** Save feeds to file (async, fire-and-forget). */
 function saveFeeds(feeds: Feed[]): void {
@@ -864,10 +876,36 @@ function createFeedStore() {
 		}
 
 		const currentCount = episodeLoadCount.get(feedId) ?? feed.episodes.length;
-		const newCount = Math.min(
-			currentCount + MAX_EPISODES_REFRESH,
-			cached.length,
-		);
+		const prefs = useAppStore().state().preferences;
+
+		// Date mode: each press reveals the next FETCH_MORE_WINDOW_DAYS band
+		// past the oldest loaded episode — a daily show gains ~2 weeks of
+		// episodes, a weekly show gains its next 2, never a fixed count.
+		// Count mode keeps the fixed MAX_EPISODES_REFRESH chunk.
+		let newCount: number;
+		if (prefs.episodeCacheMode === "date") {
+			const ref = cached[Math.max(0, currentCount - 1)];
+			const refTs = ref ? epTs(ref) : Infinity;
+			if (Number.isFinite(refTs)) {
+				const cutoff = refTs - FETCH_MORE_WINDOW_DAYS * 24 * 3600 * 1000;
+				newCount = currentCount;
+				while (
+					newCount < cached.length &&
+					epTs(cached[newCount]) >= cutoff
+				) {
+					newCount++;
+				}
+			} else {
+				newCount = currentCount;
+			}
+			// Date mode always advances at least one episode: a sparse band
+			// (a show that went quiet) must not wedge the button into a
+			// no-op while hasMoreEpisodes still reports true.
+			newCount = Math.max(newCount, currentCount + 1);
+		} else {
+			newCount = currentCount + MAX_EPISODES_REFRESH;
+		}
+		newCount = Math.min(newCount, cached.length);
 
 		if (newCount <= currentCount) return; // nothing more to load
 

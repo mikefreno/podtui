@@ -36,7 +36,7 @@ deliverables:
     - Unchanged detection must compare the FETCHED window against the corresponding prefix of the existing list, i.e. keep a small `sameRefreshWindow(existing: Episode[], fetched: Episode[])` helper next to (and replacing the use of) `sameEpisodes`: `fetched.length === 0 → true`; otherwise compare id-sets of `fetched` and `existing.slice(0, fetched.length)`. Rationale: with union semantics `merged` legitimately contains episodes beyond the fetched window, so comparing full lists would bump `lastUpdated` on every refresh and resurrect the order-flapping bug `tests/feed-refresh.test.ts` guards.
     - Return unmodified `prev` when every feed's window is unchanged (preserve the existing identity-no-save contract); on change, set `{ ...f, episodes: merged, lastUpdated: new Date() }`.
     - Delete the now-unused `sameEpisodes` if nothing else references it (grep first: `grep sameEpisodes src tests`).
-  - `loadMoreEpisodesForFeed`: window-filter the cold-refetch cache the same way after `parseEpisodesIncremental` (it's unsorted there — wrap with `sortEpisodesReverseChronological` before filtering); everything else (window growth by `MAX_EPISODES_REFRESH`, `hasMoreEpisodes` comparing `episodeLoadCount < cached.length`) works unchanged against the filtered cache.
+  - `loadMoreEpisodesForFeed`: window-filter the cold-refetch cache the same way after `parseEpisodesIncremental` (it's unsorted there — wrap with `sortEpisodesReverseChronological` before filtering). Fetch-more stepping is mode-dependent: DATE mode advances the loaded window by a `FETCH_MORE_WINDOW_DAYS` (14) band past the oldest loaded episode — a daily show gains ~2 weeks of episodes per press, not a fixed count — with a +1 minimum so a sparse band can't wedge the button into a no-op; COUNT mode keeps the fixed `MAX_EPISODES_REFRESH` (50) chunk. `hasMoreEpisodes` still compares `episodeLoadCount < cached.length`.
 - `tests/feed-volatile-merge.test.ts` (reworked) — see tests section.
 
 steps:
@@ -57,7 +57,8 @@ tests:
     - input arrays not mutated.
   - Store integration (harness per `tests/feed-refresh.test.ts`: temp `XDG_CONFIG_HOME` BEFORE imports, `Bun.serve` on port 0 serving generated RSS, fake timers):
     - Refresh-keeps-volatile-window: serve 3 episodes at t0, `addFeed`; then serve the same 3 plus 2 new ones, `refreshFeed`. Assert `feed.episodes.length === 5` AND `lastUpdated` advanced AND a second identical refresh leaves `lastUpdated` untouched (window-compare, not union-compare).
-    - Boundary: a 25-day-old episode loads; a 31-day-old episode is neither visible nor cached.
+    - Boundary: a 25-day-old episode loads; a 70-day-old episode is neither visible nor cached initially, but fetch-more surfaces it (volatile).
+    - Date stepping: 30 episodes at 3-day spacing — each fetch-more press reveals the next 2-week band (24 → 28 → 30), NOT a fixed 50-chunk.
     - Out-of-window never cached: 600 items at 2h spacing span ~50 days — only the in-window tail is loadable (fewer than the old 500 cap), `hasMoreEpisodes` flips false there.
     - No count ceiling: 600 items at 1h spacing (all within 25 days) are ALL loadable — the bound is the date, not a number.
   - Clock constraint: these tests run under fake timers, and a large `vi.advanceTimersByTime` (past ~5 days of fake time) makes Bun 1.3.8 hang every subsequent network fetch — the boundary is pinned with relative pubDates, never by moving the clock across it.
