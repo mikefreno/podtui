@@ -4,6 +4,8 @@
  */
 
 import { createSignal } from "solid-js";
+import { Effect } from "effect";
+import { refreshFeedsBatch } from "../effects/feed-refresh";
 import { FeedVisibility } from "../types/feed";
 import type { Feed, FeedFilter, FeedSortField } from "../types/feed";
 import type { Podcast } from "../types/podcast";
@@ -247,31 +249,6 @@ export function sameRefreshWindow(
 	if (prefix.length !== fetched.length) return false;
 	const signatures = new Set(prefix.map(episodeSignature));
 	return fetched.every((e) => signatures.has(episodeSignature(e)));
-}
-
-/** Run `fn` over every item with at most `limit` executions in flight — a
- *  classic worker pool. Workers pull indexes from a shared counter, so the
- *  first `limit` calls start immediately and each completion frees its slot
- *  for the next item; results are assembled in INPUT order regardless of
- *  completion order. A hung `fn` holds at most one slot. */
-async function mapWithConcurrency<T, R>(
-	items: T[],
-	limit: number,
-	fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-	const results = new Array<R>(items.length);
-	let nextIndex = 0;
-	const workers = Array.from(
-		{ length: Math.min(limit, items.length) },
-		async () => {
-			let i: number;
-			while ((i = nextIndex++) < items.length) {
-				results[i] = await fn(items[i]);
-			}
-		},
-	);
-	await Promise.all(workers);
-	return results;
 }
 
 function createFeedStore() {
@@ -644,40 +621,40 @@ function createFeedStore() {
 		})(), "Refreshing");
 	};
 
-	/** Refresh all feeds — bounded concurrency (at most FETCH_CONCURRENCY
-	 *  in-flight requests), and each feed's refreshed episodes are applied
-	 *  AS ITS OWN FETCH LANDS (no Promise.all barrier). Per-feed apply is
-	 *  safe because applyRefreshedEpisodes keeps unchanged feeds' object
-	 *  identity and lastUpdated (union merge), so each feed's refreshed
-	 *  episodes render as its own fetch resolves — the order flapping the
-	 *  old atomic barrier existed to hide can no longer happen. */
+	/** Refresh all feeds via the Effect batch program (effects/feed-refresh):
+	 *  bounded concurrency (at most FETCH_CONCURRENCY in-flight requests)
+	 *  and each feed's refreshed episodes applied AS ITS OWN FETCH LANDS
+	 *  (no barrier — the apply runs inside the feed's own fiber). Per-feed
+	 *  apply is safe because applyRefreshedEpisodes keeps unchanged feeds'
+	 *  object identity and lastUpdated (union merge), so each feed's
+	 *  refreshed episodes render as its own fetch resolves — the order
+	 *  flapping the old atomic barrier existed to hide can no longer
+	 *  happen. A failed or timed-out fetch (null episodes) leaves that
+	 *  feed untouched. */
 	const refreshAllFeeds = async () => {
 		setIsLoadingFeeds(true);
 		try {
-			await mapWithConcurrency(
-				feeds(),
-				FETCH_CONCURRENCY,
-				async (feed) => {
-					const { episodes, coverUrl } = await fetchEpisodes(
-						feed.podcast.feedUrl,
-						MAX_EPISODES_REFRESH,
-						feed.id,
-					);
-					// A failed fetch (null) leaves that feed untouched.
-					if (!episodes) return;
-					setFeeds((prev) => {
-						let updated = applyRefreshedEpisodes(prev, feed.id, episodes);
-						if (coverUrl) {
-							updated = updated.map((f) =>
-								f.id === feed.id && !f.podcast.coverUrl && coverUrl
-									? { ...f, podcast: { ...f.podcast, coverUrl } }
-									: f,
-							);
-						}
-						if (updated !== prev) scheduleSaveFeeds();
-						return updated;
-					});
-				},
+			await Effect.runPromise(
+				refreshFeedsBatch(
+					feeds(),
+					(feed) =>
+						fetchEpisodes(feed.podcast.feedUrl, MAX_EPISODES_REFRESH, feed.id),
+					(feed, { episodes, coverUrl }) => {
+						setFeeds((prev) => {
+							let updated = applyRefreshedEpisodes(prev, feed.id, episodes);
+							if (coverUrl) {
+								updated = updated.map((f) =>
+									f.id === feed.id && !f.podcast.coverUrl && coverUrl
+										? { ...f, podcast: { ...f.podcast, coverUrl } }
+										: f,
+								);
+							}
+							if (updated !== prev) scheduleSaveFeeds();
+							return updated;
+						});
+					},
+					{ concurrency: FETCH_CONCURRENCY, timeoutMs: FETCH_TIMEOUT_MS },
+				),
 			);
 			// Global auto-download: one idempotent pass after the batch.
 			runAutoDownload();
