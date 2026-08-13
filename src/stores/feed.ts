@@ -13,8 +13,12 @@ import { DEFAULT_SOURCES } from "../types/source";
 import { getRSSItems, parseRSSItem, parseChannelCoverUrl } from "../api/rss-parser";
 import { resolveItunesFeedUrl } from "../utils/itunes-feed-resolver";
 import { savePodcastIndexCredentials } from "../utils/source-credentials";
-import { mergeEpisodesBounded } from "../utils/episode-merge";
 import {
+	episodeSignature,
+	mergeEpisodesBounded,
+} from "../utils/episode-merge";
+import {
+	DEFAULT_EPISODE_WINDOW_DAYS,
 	episodeInWindow,
 	loadFeedsFromFile,
 	saveFeedsToFile,
@@ -139,6 +143,31 @@ const epTs = (ep: Episode): number => {
 	return t === undefined || Number.isNaN(t) ? Infinity : t;
 };
 
+/** Date-mode fetch-more cutoff: the oldest loaded episode's pubDate minus the
+ *  2-week band. With nothing loaded (a show whose episodes all fall outside
+ *  the cache window), the band anchors at the cache-window edge (now minus
+ *  the configured days) — a dormant show can't drag in arbitrarily old
+ *  episodes just because the button is pressed. */
+const dateFetchMoreCutoff = (
+	cached: Episode[],
+	loaded: number,
+	windowDays: number,
+): number => {
+	if (loaded > 0) {
+		const t = epTs(cached[loaded - 1]);
+		if (Number.isFinite(t)) {
+			return t - FETCH_MORE_WINDOW_DAYS * 24 * 3600 * 1000;
+		}
+	}
+	// Nothing loaded: the band extends FETCH_MORE_WINDOW_DAYS before the
+	// cache-window edge (e.g. 60d → reveals the 60–74d slice).
+	return (
+		Date.now() -
+		Math.max(1, windowDays) * 24 * 3600 * 1000 -
+		FETCH_MORE_WINDOW_DAYS * 24 * 3600 * 1000
+	);
+};
+
 /** Save feeds to file (async, fire-and-forget). */
 function saveFeeds(feeds: Feed[]): void {
 	const prefs = useAppStore().state().preferences;
@@ -203,12 +232,21 @@ async function migratePlaintextCredentials(
  *  union semantics the merged list legitimately contains episodes BEYOND the
  *  fetched window, so unchanged-detection must compare the fetched window
  *  against the existing list's prefix — comparing full lists would bump
- *  `lastUpdated` on every refresh. */
-function sameRefreshWindow(existing: Episode[], fetched: Episode[]): boolean {
+ *  `lastUpdated` on every refresh. When ids drifted between refreshes (the
+ *  one-time positional-id migration, or a feed that rotates enclosure URLs)
+ *  the id sets differ for the SAME content, so a content-signature
+ *  comparison decides: an unchanged feed stays unchanged. */
+export function sameRefreshWindow(
+	existing: Episode[],
+	fetched: Episode[],
+): boolean {
 	if (fetched.length === 0) return true;
 	const prefix = existing.slice(0, fetched.length);
 	const ids = new Set(prefix.map((e) => e.id));
-	return fetched.every((e) => ids.has(e.id));
+	if (fetched.every((e) => ids.has(e.id))) return true;
+	if (prefix.length !== fetched.length) return false;
+	const signatures = new Set(prefix.map(episodeSignature));
+	return fetched.every((e) => signatures.has(episodeSignature(e)));
 }
 
 /** Run `fn` over every item with at most `limit` executions in flight — a
@@ -249,6 +287,11 @@ function createFeedStore() {
 	const [selectedFeedId, setSelectedFeedId] = createSignal<string | null>(null);
 	const [isLoadingMore, setIsLoadingMore] = createSignal(false);
 	const [isLoadingFeeds, setIsLoadingFeeds] = createSignal(false);
+	/** Feed-page fetch-more presses in COUNT mode: the global list is capped
+	 *  at episodeCacheCount × (presses + 1) episodes, so one press reveals
+	 *  exactly N more of the NEWEST episodes across all shows — it can never
+	 *  dump deep history (see getAllEpisodesChronological). */
+	const [countFetchMorePresses, setCountFetchMorePresses] = createSignal(0);
 
 	// ── Debounced persistence ───────────────────────────────────────────────
 	/** Trailing-edge debounce window for config.json writes. */
@@ -356,6 +399,20 @@ function createFeedStore() {
 		allEpisodes.sort(
 			(a, b) => b.episode.pubDate.getTime() - a.episode.pubDate.getTime(),
 		);
+
+		// COUNT mode: the Feed page is a GLOBAL top-K list — the newest
+		// `episodeCacheCount × (fetch-more presses + 1)` episodes across ALL
+		// shows, not N per show. A press reveals exactly N more recent
+		// episodes; deep history never surfaces in one jump. The cap stays
+		// even once every cache is exhausted (the button hides) — lifting it
+		// rendered the full deep union and froze the UI.
+		const prefs = useAppStore().state().preferences;
+		if (prefs.episodeCacheMode === "count") {
+			const limit =
+				Math.max(1, prefs.episodeCacheCount ?? 25) *
+				(countFetchMorePresses() + 1);
+			return allEpisodes.slice(0, limit);
+		}
 
 		return allEpisodes;
 	};
@@ -814,15 +871,25 @@ function createFeedStore() {
 
 	/** Check if a feed has more episodes available beyond what's currently
 	 *  loaded. The full parse cache holds ALL episodes (including beyond the
-	 *  cache bound), so fetch-more can always page deeper — the bound limits
-	 *  what the Feed/My Shows list shows initially, not what fetch-more can
-	 *  reach. When the loaded window reaches the cache length, this flips
-	 *  false. */
+	 *  cache bound), so fetch-more can page deeper — but in DATE mode only
+	 *  when the next unloaded episode falls inside the next 2-week band: a
+	 *  sparse/dormant show whose band is empty reports false, so fetch-more
+	 *  never drags in arbitrarily old episodes just because the parse cache
+	 *  holds them. When the loaded window reaches the cache length (or the
+	 *  band is empty), this flips false. */
 	const hasMoreEpisodes = (feedId: string): boolean => {
 		const cached = fullEpisodeCache.get(feedId);
 		if (!cached) return false;
 		const loaded = episodeLoadCount.get(feedId) ?? 0;
-		return loaded < cached.length;
+		if (loaded >= cached.length) return false;
+		const prefs = useAppStore().state().preferences;
+		if (prefs.episodeCacheMode === "count") return true;
+		const cutoff = dateFetchMoreCutoff(
+			cached,
+			loaded,
+			prefs.episodeCacheDays ?? DEFAULT_EPISODE_WINDOW_DAYS,
+		);
+		return epTs(cached[loaded]) >= cutoff;
 	};
 
 	/** Load the next chunk of episodes for one feed from the full parse
@@ -879,29 +946,26 @@ function createFeedStore() {
 		const prefs = useAppStore().state().preferences;
 
 		// Date mode: each press reveals the next FETCH_MORE_WINDOW_DAYS band
-		// past the oldest loaded episode — a daily show gains ~2 weeks of
-		// episodes, a weekly show gains its next 2, never a fixed count.
+		// past the oldest loaded episode (or the cache-window edge when
+		// nothing is loaded) — a daily show gains ~2 weeks of episodes, a
+		// weekly show gains its next 2, never a fixed count. An empty band
+		// is a genuine stop (hasMoreEpisodes hides the button) — no minimum,
+		// so a sparse/dormant show can't grab arbitrarily old episodes.
 		// Count mode keeps the fixed MAX_EPISODES_REFRESH chunk.
 		let newCount: number;
 		if (prefs.episodeCacheMode === "date") {
-			const ref = cached[Math.max(0, currentCount - 1)];
-			const refTs = ref ? epTs(ref) : Infinity;
-			if (Number.isFinite(refTs)) {
-				const cutoff = refTs - FETCH_MORE_WINDOW_DAYS * 24 * 3600 * 1000;
-				newCount = currentCount;
-				while (
-					newCount < cached.length &&
-					epTs(cached[newCount]) >= cutoff
-				) {
-					newCount++;
-				}
-			} else {
-				newCount = currentCount;
+			const cutoff = dateFetchMoreCutoff(
+				cached,
+				currentCount,
+				prefs.episodeCacheDays ?? DEFAULT_EPISODE_WINDOW_DAYS,
+			);
+			newCount = currentCount;
+			while (
+				newCount < cached.length &&
+				epTs(cached[newCount]) >= cutoff
+			) {
+				newCount++;
 			}
-			// Date mode always advances at least one episode: a sparse band
-			// (a show that went quiet) must not wedge the button into a
-			// no-op while hasMoreEpisodes still reports true.
-			newCount = Math.max(newCount, currentCount + 1);
 		} else {
 			newCount = currentCount + MAX_EPISODES_REFRESH;
 		}
@@ -947,15 +1011,78 @@ function createFeedStore() {
 		return feeds().some((f) => hasMoreEpisodes(f.id));
 	};
 
-	/** Advance the loaded window by MAX_EPISODES_REFRESH for every feed that
-	 *  still has cached episodes — powers the Feed page's "[Fetch More]". */
+	/** Power the Feed page's "[Fetch More]".
+	 *  Date mode: advance each feed's window by its 2-week band (empty bands
+	 *  — sparse/dormant shows — are skipped).
+	 *  Count mode: the global list cap grows by one count (see
+	 *  getAllEpisodesChronological) and every feed's window deepens by one
+	 *  count so the growing cap has material; one press reveals exactly N
+	 *  more RECENT episodes, never a far-back dump.
+	 *  Both modes compute every feed's new window FIRST (yielding between
+	 *  feeds so the renderer keeps painting) and apply ONE setFeeds — the
+	 *  Feed list rebuilds once per press instead of once per feed (the
+	 *  per-feed storms froze the UI). */
 	const loadMoreAllFeeds = async () => {
 		if (isLoadingMore()) return;
 		setIsLoadingMore(true);
 		try {
-			const pending = feeds().filter((f) => hasMoreEpisodes(f.id));
-			for (const feed of pending) {
-				await loadMoreEpisodesForFeed(feed.id);
+			const prefs = useAppStore().state().preferences;
+			const count = Math.max(1, prefs.episodeCacheCount ?? 25);
+			if (prefs.episodeCacheMode === "count") {
+				setCountFetchMorePresses((p) => p + 1);
+			}
+			const windowDays =
+				prefs.episodeCacheDays ?? DEFAULT_EPISODE_WINDOW_DAYS;
+
+			const updates: Array<{ feedId: string; episodes: Episode[] }> = [];
+			for (const feed of feeds()) {
+				const cached = fullEpisodeCache.get(feed.id);
+				if (!cached) continue;
+				const currentCount =
+					episodeLoadCount.get(feed.id) ?? feed.episodes.length;
+				if (currentCount >= cached.length) continue;
+				let newCount: number;
+				if (prefs.episodeCacheMode === "count") {
+					newCount = Math.min(currentCount + count, cached.length);
+				} else {
+					// Date mode: skip feeds whose next band is empty — the
+					// button must not surface arbitrarily old episodes.
+					const cutoff = dateFetchMoreCutoff(
+						cached,
+						currentCount,
+						windowDays,
+					);
+					if (epTs(cached[currentCount]) < cutoff) continue;
+					newCount = currentCount;
+					while (
+						newCount < cached.length &&
+						epTs(cached[newCount]) >= cutoff
+					) {
+						newCount++;
+					}
+				}
+				if (newCount <= currentCount) continue;
+				episodeLoadCount.set(feed.id, newCount);
+				updates.push({
+					feedId: feed.id,
+					episodes: cached.slice(0, newCount),
+				});
+				// Yield so the renderer paints between feed computations.
+				await yieldToUI();
+			}
+
+			if (updates.length > 0) {
+				const byId = new Map(
+					updates.map((u) => [u.feedId, u.episodes]),
+				);
+				setFeeds((prev) =>
+					prev.map((f) =>
+						byId.has(f.id)
+							? { ...f, episodes: byId.get(f.id)! }
+							: f,
+					),
+				);
+				scheduleSaveFeeds();
 			}
 		} finally {
 			setIsLoadingMore(false);
@@ -990,6 +1117,11 @@ function createFeedStore() {
 		// Actions
 		setFilter,
 		setSelectedFeedId,
+		/** Fetch + parse an RSS feed WITHOUT subscribing or touching any feed
+		 *  record (Discover's episode preview). Pass no feedId to skip the
+		 *  full-parse cache; the visible window is bounded by the user's
+		 *  cache preference and `limit`. */
+		fetchEpisodes,
 		addFeed,
 		hasFeedByUrl,
 		removeFeed,

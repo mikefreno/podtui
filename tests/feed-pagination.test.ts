@@ -42,7 +42,7 @@ let servedEpisodes: ServedEpisode[] = [];
 // store (execution order between files is not guaranteed).
 const addedFeedIds: string[] = [];
 
-/** XML for the current served episode list (episode ids = feedUrl#index). */
+/** XML for the current served episode list (episode ids derive from enclosure URLs). */
 function feedXml(episodes: ServedEpisode[], origin: string): string {
 	const items = episodes
 		.map(
@@ -71,7 +71,10 @@ const makePodcast = (feedUrl: string): Podcast => ({
 	isSubscribed: true,
 });
 
-beforeAll(() => {
+beforeAll(async () => {
+	// The app store loads its persisted prefs asynchronously at import; wait
+	// for that so our count-mode override isn't clobbered by the load.
+	await useAppStore().whenReady();
 	// Chunk-based stepping is count-mode behavior (see header comment).
 	useAppStore().updatePreferences({
 		episodeCacheMode: "count",

@@ -62,7 +62,7 @@ const addedFeedIds: string[] = [];
 /** Feed created by the debounce test, reused by the flushPendingSave test. */
 let debounceFeedId = "";
 
-/** XML for the current served episode list (episode ids = feedUrl#index). */
+/** XML for the current served episode list (episode ids derive from enclosure URLs). */
 function feedXml(episodes: ServedEpisode[], origin: string): string {
 	const items = episodes
 		.map(

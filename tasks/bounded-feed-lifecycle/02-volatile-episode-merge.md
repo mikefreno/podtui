@@ -59,6 +59,7 @@ tests:
     - Refresh-keeps-volatile-window: serve 3 episodes at t0, `addFeed`; then serve the same 3 plus 2 new ones, `refreshFeed`. Assert `feed.episodes.length === 5` AND `lastUpdated` advanced AND a second identical refresh leaves `lastUpdated` untouched (window-compare, not union-compare).
     - Boundary: a 25-day-old episode loads; a 70-day-old episode is neither visible nor cached initially, but fetch-more surfaces it (volatile).
     - Date stepping: 30 episodes at 3-day spacing — each fetch-more press reveals the next 2-week band (24 → 28 → 30), NOT a fixed 50-chunk.
+    - Count-mode global step: two feeds with staggered dates — one Feed-page press adds the configured N most-recent UNLOADED episodes across ALL shows (N total, not N per show), via the k-way frontier merge in `loadMoreAllFeedsByCount`.
     - Out-of-window never cached: 600 items at 2h spacing span ~50 days — only the in-window tail is loadable (fewer than the old 500 cap), `hasMoreEpisodes` flips false there.
     - No count ceiling: 600 items at 1h spacing (all within 25 days) are ALL loadable — the bound is the date, not a number.
   - Clock constraint: these tests run under fake timers, and a large `vi.advanceTimersByTime` (past ~5 days of fake time) makes Bun 1.3.8 hang every subsequent network fetch — the boundary is pinned with relative pubDates, never by moving the clock across it.

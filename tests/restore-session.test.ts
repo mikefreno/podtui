@@ -31,7 +31,7 @@ process.env.XDG_CONFIG_HOME = CONFIG;
 process.env.XDG_DATA_HOME = DATA;
 process.env.PODTUI_AUDIO_BACKEND = "none";
 
-// ── Local RSS feed server (episode ids = feedUrl#index) ────────────────────
+// ── Local RSS feed server (episode ids derive from enclosure URLs) ─────────
 let server: ReturnType<typeof Bun.serve> | null = null;
 function feedXml(origin: string): string {
 	const items = ["Episode One", "Episode Two"]

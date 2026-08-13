@@ -42,7 +42,7 @@ let feedAId = "";
 /** When set, the server 503s this path — simulates a feed going down. */
 let failPath: string | null = null;
 
-/** XML for the current served episode list (episode ids = feedUrl#index). */
+/** XML for the current served episode list (episode ids derive from enclosure URLs). */
 function feedXml(episodes: ServedEpisode[], origin: string): string {
 	const items = episodes
 		.map(
@@ -78,6 +78,18 @@ beforeAll(() => {
 			const url = new URL(req.url);
 			if (failPath && url.pathname === failPath) {
 				return new Response("feed unavailable", { status: 503 });
+			}
+			// A dedicated single-episode feed for the failed-refresh test:
+			// it must not depend on (or shrink) the shared servedEpisodes
+			// list, which other tests' feeds read on refreshAllFeeds.
+			if (url.pathname === "/flaky.xml") {
+				return new Response(
+					feedXml(
+						[{ title: "Ep 1", date: "2026-08-01T00:00:00Z" }],
+						url.origin,
+					),
+					{ headers: { "Content-Type": "application/rss+xml" } },
+				);
 			}
 			if (url.pathname.endsWith(".xml")) {
 				return new Response(feedXml(servedEpisodes, url.origin), {
@@ -139,8 +151,9 @@ test("refresh with a genuinely new episode bumps lastUpdated", async () => {
 
 test("a failed refresh does not wipe the feed's episodes", async () => {
 	const store = useFeedStore();
-	const savedEpisodes = servedEpisodes;
-	servedEpisodes = [{ title: "Ep 1", date: "2026-08-01T00:00:00Z" }];
+	// /flaky.xml serves its own fixed single-episode feed (see server route)
+	// so the shared servedEpisodes list stays untouched for feedA, which
+	// refreshAllFeeds below also refreshes.
 	const feedUrl = `http://127.0.0.1:${server!.port}/flaky.xml`;
 	const feed = await store.addFeed(makePodcast(feedUrl), "test-source");
 	expect(feed).not.toBeNull();
@@ -161,11 +174,6 @@ test("a failed refresh does not wipe the feed's episodes", async () => {
 
 	failPath = null;
 	store.removeFeed(feedId);
-	// Restore the shared served content: with union merge semantics (volatile
-	// episodes survive refreshes) this feed keeps its larger in-memory window,
-	// so later tests must serve the same episodes they added — a shrink here
-	// would make the next test's "unchanged" refresh genuinely different.
-	servedEpisodes = savedEpisodes;
 });
 
 test("refreshAllFeeds keeps unchanged feeds' order and timestamps", async () => {
