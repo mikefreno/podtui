@@ -74,6 +74,43 @@ const parseEpisodeType = (raw: string): EpisodeType | undefined => {
   return undefined
 }
 
+/** FNV-1a 32-bit hash. Deterministic across processes and Bun versions
+ *  (unlike Bun.hash) — used to derive stable episode ids from audio URLs so
+ *  a feed's episode ids never change between refreshes. */
+const fnv1a = (input: string): number => {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return hash >>> 0
+}
+
+/**
+ * Stable per-episode identity. The old positional id (`feedUrl#index`) was
+ * invalidated by ANY feed change: a new episode or a pruned one shifted
+ * every episode's index, so progress/downloads saved under `feedUrl#5`
+ * attached to whatever episode now sat at index 5 — new episodes resumed
+ * minutes in. Identity derives from stable content instead:
+ *   1. `<guid>` — the canonical per-episode identifier (required by Apple
+ *      Podcasts; nearly universal).
+ *   2. The enclosure URL, hashed to keep the id compact (hosts serve
+ *      permanent per-episode URLs; guids can be absent in hand-rolled feeds).
+ *   3. Positional index as a last resort: no guid AND no audio URL means
+ *      the episode cannot be played, so nothing persistent keys off it.
+ */
+const stableEpisodeId = (
+  feedUrl: string,
+  item: string,
+  audioUrl: string,
+  index: number,
+): string => {
+  const guid = getTagValue(item, "guid")
+  if (guid) return `${feedUrl}#guid:${guid}`
+  if (audioUrl) return `${feedUrl}#url:${fnv1a(audioUrl).toString(36)}`
+  return `${feedUrl}#${index}`
+}
+
 /** Extract the `<item>` blocks from an RSS document. Matches items directly
  *  on the full XML string — scoping to <channel> first is a redundant 5MB
  *  regex pass that doubles parse cost with no practical benefit (well-formed
@@ -122,7 +159,7 @@ export const parseRSSItem = (item: string, feedUrl: string, index: number): Epis
   const imageUrl = getAttr(item, "itunes:image", "href") || undefined
 
   const ep: Episode = {
-    id: `${feedUrl}#${index}`,
+    id: stableEpisodeId(feedUrl, item, audioUrl, index),
     podcastId: feedUrl,
     title: epTitle,
     description: epDescription,
