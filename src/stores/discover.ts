@@ -11,6 +11,7 @@
 
 import { createSignal } from "solid-js";
 import type { Podcast } from "../types/podcast";
+import type { Episode } from "../types/episode";
 import { useFeedStore } from "./feed";
 
 export interface DiscoverCategory {
@@ -41,6 +42,10 @@ const FEATURED_JSON_URL =
 
 /** Cache window for the remote featured list (24 hours) */
 const FEATURED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Max episodes to load when previewing an unsubscribed show's episode list
+ *  from Discover (drill-in, no subscription). Mirrors the refresh window. */
+const PREVIEW_EPISODE_LIMIT = 50;
 
 /** Shape of a single entry in the remote JSON */
 interface FeaturedEntry {
@@ -89,6 +94,19 @@ export function createDiscoverStore() {
 	const [selectedCategory, setSelectedCategory] = createSignal<string>("all");
 	const [isLoading, setIsLoading] = createSignal(false);
 	const [podcasts, setPodcasts] = createSignal<Podcast[]>([]);
+
+	// Episodes fetched for an unsubscribed show's preview list (drill-in from
+	// a podcast result, no subscription). Cached per podcast id for the
+	// session; keyed by id so switching shows never clobbers another's list.
+	const [previewEpisodes, setPreviewEpisodes] = createSignal<
+		Record<string, Episode[]>
+	>({});
+	const [previewLoading, setPreviewLoading] = createSignal<Set<string>>(
+		new Set(),
+	);
+	const [previewErrors, setPreviewErrors] = createSignal<
+		Record<string, string>
+	>({});
 
 	// In-memory cache timestamp for the remote manifest (within 24h, skip refetch)
 	let cachedAt = 0;
@@ -174,13 +192,64 @@ export function createDiscoverStore() {
 		);
 	};
 
-	const toggleSubscription = (podcastId: string) => {
-		const podcast = podcasts().find((p) => p.id === podcastId);
-		if (podcast?.isSubscribed) {
-			unsubscribe(podcastId);
-		} else {
-			subscribe(podcastId);
+	// ── episode preview (drill-in, no subscription) ──────────────────────────
+	/** Cached episode list for a previewed show (empty until first drill-in). */
+	const episodesForPodcast = (podcastId: string): Episode[] =>
+		previewEpisodes()[podcastId] ?? [];
+
+	const isLoadingEpisodesFor = (podcastId: string): boolean =>
+		previewLoading().has(podcastId);
+
+	const previewError = (podcastId: string): string | undefined =>
+		previewErrors()[podcastId];
+
+	/** Fetch a show's episode list WITHOUT subscribing (Discover preview).
+	 *  The list is cached per podcast id; a failed fetch records an error
+	 *  and keeps any previous cache (a retry via refreshEpisodes clears it). */
+	const openEpisodes = async (podcast: Podcast): Promise<void> => {
+		if (previewEpisodes()[podcast.id] || previewLoading().has(podcast.id))
+			return;
+		if (!podcast.feedUrl) {
+			setPreviewErrors((prev) => ({
+				...prev,
+				[podcast.id]: "No RSS feed listed for this show.",
+			}));
+			return;
 		}
+		setPreviewLoading((prev) => new Set(prev).add(podcast.id));
+		const feedStore = useFeedStore();
+		const { episodes } = await feedStore.fetchEpisodes(
+			podcast.feedUrl,
+			PREVIEW_EPISODE_LIMIT,
+		);
+		if (episodes) {
+			setPreviewEpisodes((prev) => ({ ...prev, [podcast.id]: episodes }));
+		} else {
+			setPreviewErrors((prev) => ({
+				...prev,
+				[podcast.id]: "Couldn't load episodes.",
+			}));
+		}
+		setPreviewLoading((prev) => {
+			const next = new Set(prev);
+			next.delete(podcast.id);
+			return next;
+		});
+	};
+
+	/** Re-fetch a previewed show's episode list (`r` on the episodes depth). */
+	const refreshEpisodes = async (podcast: Podcast): Promise<void> => {
+		setPreviewErrors((prev) => {
+			const next = { ...prev };
+			delete next[podcast.id];
+			return next;
+		});
+		setPreviewEpisodes((prev) => {
+			const next = { ...prev };
+			delete next[podcast.id];
+			return next;
+		});
+		await openEpisodes(podcast);
 	};
 
 	return {
@@ -195,8 +264,14 @@ export function createDiscoverStore() {
 		setSelectedCategory,
 		subscribe,
 		unsubscribe,
-		toggleSubscription,
 		refresh,
+
+		// Episode preview (drill-in, no subscription)
+		episodesForPodcast,
+		isLoadingEpisodesFor,
+		previewError,
+		openEpisodes,
+		refreshEpisodes,
 	};
 }
 
