@@ -8,8 +8,9 @@
  *
  * This component only subscribes to store state, reports the width-derived
  * bar count (terminal resize re-inits the running pipeline), and renders:
- * a braille spinner while the pipeline is loading its first frames, the
- * frequency bars once frames arrive, and a dotted placeholder when idle.
+ * a braille spinner while the pipeline is loading its first frames or the
+ * player is stalled (re-buffering), the frequency bars once frames arrive,
+ * and a dotted placeholder when idle.
  */
 
 import { createEffect, on } from "solid-js";
@@ -53,12 +54,13 @@ export function RealtimeWaveform() {
 		const bars = viz.barData();
 		const count = numBars();
 
-		// Loading state: the braille spinner shows while the pipeline warms
-		// up — but only when there are no bars to render yet (first play /
-		// after an unload). On resume/seek the last bars stay on screen
-		// until fresh frames arrive, so the waveform never blanks out for
-		// the (multi-second, network-bound) cold start.
-		if (bars.length === 0 && viz.isLoading()) {
+		// Loading state: the braille spinner shows while the pipeline is
+		// warming up — cold start (first play / after an unload), resume
+		// into undecoded audio, or a stalled position clock (mpv
+		// re-buffering after a long pause on a network stream). The store
+		// clears it the moment the first fresh frame renders, so stale
+		// bars never masquerade as live data while the pipeline re-arms.
+		if (viz.isLoading() || viz.isStalled()) {
 			return <LoadingIndicator />;
 		}
 

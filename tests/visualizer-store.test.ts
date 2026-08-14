@@ -230,10 +230,113 @@ test.skipIf(skip)(
 		app.updateVisualizer({ enabled: false });
 		await waitFor(() => !viz.isRunning(), 10000);
 		expect(viz.isLoading()).toBe(false);
+		// Stopping the pipeline must drop the last rendered frame — a cold
+		// restart (re-enable, unload, episode change) would otherwise show
+		// stale bars from the previous run and never reach the loading
+		// state (the spinner only shows while bars are empty).
+		expect(viz.barData().length).toBe(0);
 
 		app.updateVisualizer({ enabled: true });
-		await waitFor(() => viz.isRunning(), 10000);
+		// The restart surfaces the loading state before the first frame.
+		await waitFor(() => viz.isLoading(), 5000);
 		await waitFor(() => !viz.isLoading() && viz.barData().length > 0, 10000);
+		expect(viz.barData().length).toBe(64);
+	},
+	{ timeout: 20000 },
+);
+
+// A pause followed by a seek while paused, then resume, lands OUTSIDE the
+// decoded sliding window: the cache can't serve bars instantly, so the
+// store must surface the warm-up as a loading state instead of silently
+// holding the stale pre-pause frame. Regression: resumeVisualization never
+// set isLoading, so the last frame froze with no feedback until the
+// re-decode's first frame landed.
+test.skipIf(skip)(
+	"resume into undecoded audio shows the loading state until bars land",
+	async () => {
+		const viz = useVisualizer();
+		await startPlaying();
+		expect(viz.barData().length).toBe(64);
+
+		// Pause, then seek far ahead while paused (outside the ~10s of
+		// decoded coverage), then resume.
+		setIsPlaying(false);
+		await waitFor(() => !viz.isRunning(), 10000);
+		setPosition(30);
+		setIsPlaying(true);
+
+		// The resume position isn't decoded yet — loading, not frozen bars.
+		await waitFor(() => viz.isLoading(), 5000);
+		expect(viz.isRunning()).toBe(true);
+
+		// Playback advances past the resume point (mpv moves the clock);
+		// once the re-decode covers it, fresh bars replace the stale
+		// pre-pause frame (chirp spectrum at 30s ≠ 2s) and the loading
+		// state clears.
+		setPosition(31);
+		const barsBefore = viz.barData();
+		await waitFor(
+			() => !viz.isLoading() && viz.barData() !== barsBefore,
+			15000,
+		);
+		expect(viz.barData().length).toBe(64);
+	},
+	{ timeout: 30000 },
+);
+
+// After a long pause on a network stream, the player (mpv) re-buffers:
+// `isPlaying` stays true but the position clock freezes. Without
+// detection the waveform rendered the same cached window forever — static
+// bars and no feedback. The render loop must report the stall as a
+// loading state and clear it the moment the clock moves again.
+test.skipIf(skip)(
+	"a frozen position clock while playing surfaces a stall; recovery clears it",
+	async () => {
+		const viz = useVisualizer();
+		await startPlaying();
+		expect(viz.isStalled()).toBe(false);
+
+		// Freeze the position: isPlaying stays true, the clock never moves.
+		await waitFor(() => viz.isStalled(), 10000);
+
+		// Player recovers — the clock advances again.
+		setPosition(4);
+		await waitFor(() => !viz.isStalled(), 3000);
+		expect(viz.isRunning()).toBe(true);
+	},
+	{ timeout: 20000 },
+);
+
+// Resume re-arms a pipeline whose ffmpeg pass was killed at pause: the
+// stale pre-pause bars must not masquerade as live data while the player
+// recovers. The spinner shows IN THEIR PLACE until the position clock
+// advances past the resume point — a frozen clock (mpv re-buffering after
+// a long pause) keeps the spinner even though the cache can serve the
+// same window.
+test.skipIf(skip)(
+	"resume shows the loading state in place of stale bars until the position clock advances",
+	async () => {
+		const viz = useVisualizer();
+		await startPlaying();
+		expect(viz.isLoading()).toBe(false);
+
+		// Pause, then resume against the still-covered position.
+		setIsPlaying(false);
+		await waitFor(() => !viz.isRunning(), 10000);
+		setIsPlaying(true);
+
+		// The spinner replaces the bars immediately on resume.
+		await waitFor(() => viz.isLoading(), 5000);
+		expect(viz.isRunning()).toBe(true);
+
+		// Position clock stays frozen at the resume point (re-buffering):
+		// the loading state must persist, not yield to static cached bars.
+		await Bun.sleep(250);
+		expect(viz.isLoading()).toBe(true);
+
+		// Player recovers — the clock advances → fresh bars, spinner gone.
+		setPosition(3);
+		await waitFor(() => !viz.isLoading(), 3000);
 		expect(viz.barData().length).toBe(64);
 	},
 	{ timeout: 20000 },

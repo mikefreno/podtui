@@ -25,6 +25,12 @@
  * after the Player tab stops being focused it tears down. Reads outside
  * decoded coverage return empty — the renderer simply holds the last frame
  * until the decode frontier arrives.
+ *
+ * Loading semantics: `isLoading` is true from any pipeline start (cold
+ * start, resume into undecoded audio) until the first complete FFT frame,
+ * and `isStalled` while playback claims to be live but the position clock
+ * is frozen (player re-buffering). The component renders the spinner for
+ * either; bars replace it the moment fresh frames arrive.
  */
 
 import {
@@ -55,6 +61,14 @@ const FRAME_INTERVAL = 33;
 /** Number of PCM samples to read per frame (512 is a good FFT window) */
 const SAMPLES_PER_FRAME = 512;
 
+/**
+ * How long the position clock may stay frozen while the UI believes
+ * playback is live before the waveform reports a stall (loading state).
+ * mpv polls time-pos every ~150ms, so a frozen clock means the player is
+ * re-buffering — the long-pause-then-resume case on network streams.
+ */
+const STALL_DETECT_MS = 2000;
+
 /** Timer handle as returned by setTimeout/setInterval in this runtime. */
 type TimerHandle = ReturnType<typeof setTimeout>;
 
@@ -65,6 +79,10 @@ export interface VisualizerStore {
 	barData: () => number[];
 	/** True from pipeline start until the first complete FFT frame renders. */
 	isLoading: () => boolean;
+	/** True while playback claims to be live but the position clock has
+	 *  been frozen past STALL_DETECT_MS (player re-buffering, e.g. after a
+	 *  long pause on a network stream). */
+	isStalled: () => boolean;
 	/** True while the ~30fps render loop is armed. */
 	isRunning: () => boolean;
 	/** Report whether the Player tab is the visible tab. */
@@ -81,6 +99,10 @@ function createVisualizerStore(): VisualizerStore {
 
 	// True from pipeline start until the first complete FFT frame renders.
 	const [isLoading, setIsLoading] = createSignal(false);
+
+	// True while playback is live but the position clock is frozen
+	// (player re-buffering) — see STALL_DETECT_MS.
+	const [isStalled, setIsStalled] = createSignal(false);
 
 	// Whether the Player tab is the visible tab (fed by PlayerPage).
 	const [focused, setFocused] = createSignal(false);
@@ -102,6 +124,20 @@ function createVisualizerStore(): VisualizerStore {
 	let frameTimer: TimerHandle | null = null;
 	let sampleBuffer: Float64Array | null = null;
 	let unloadTimer: TimerHandle | null = null;
+
+	// Stall tracker: last observed position-signal value and when it moved.
+	// Any change (forward, backward, seek) re-arms the clock; a frozen
+	// signal while playing trips isStalled after STALL_DETECT_MS.
+	let lastRenderPos = -1;
+	let lastPosMoveAt = 0;
+
+	// Resume point: the position a paused pipeline was re-armed at. The
+	// loading state set by resume only clears once the position clock has
+	// advanced PAST this — while the player is still re-buffering, the
+	// cache can serve the same window forever and the stale pre-pause bars
+	// must not masquerade as live data. -1 = cold start (clear on the
+	// first produced frame, regardless of the clock).
+	let resumePos = -1;
 
 	// What the running pipeline was started with — lets the playback effect
 	// tell "nothing changed, stay warm" from "must restart".
@@ -200,9 +236,19 @@ function createVisualizerStore(): VisualizerStore {
 		lastPolledPosition = position;
 		lastPolledAt = performance.now();
 
+		// Seed the stall tracker: a fresh pipeline should not report a
+		// stall just because the first position poll hasn't landed.
+		lastRenderPos = position;
+		lastPosMoveAt = performance.now();
+
+		// Cold start: the loading state clears on the first produced frame
+		// (see renderFrame) — no resume-position gating.
+		resumePos = -1;
+
 		activeUrl = url;
 		activeBars = barCount();
 		setIsLoading(true);
+		setIsStalled(false);
 		frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
 	};
 
@@ -224,6 +270,14 @@ function createVisualizerStore(): VisualizerStore {
 		}
 		sampleBuffer = null;
 		setIsLoading(false);
+		setIsStalled(false);
+		// Drop the last rendered frame: after a stop the bars are stale (a
+		// different episode, a different position) and would masquerade as
+		// live data while the next cold start warms up — and, because the
+		// component only shows the spinner while bars are empty, they'd
+		// also suppress the loading state. Cold restarts re-render fresh
+		// bars within the first frame.
+		setBarData([]);
 	};
 
 	// ── Pause: freeze the loop, keep the cache ──────────────────────────
@@ -248,6 +302,7 @@ function createVisualizerStore(): VisualizerStore {
 		// (still cold-starting when paused), the component should fall back
 		// to the placeholder, not freeze on a spinner.
 		setIsLoading(false);
+		setIsStalled(false);
 	};
 
 	// ── Resume: re-arm the render loop, top up the cache ───────────────
@@ -269,6 +324,20 @@ function createVisualizerStore(): VisualizerStore {
 
 		lastPolledPosition = pos;
 		lastPolledAt = performance.now();
+		// Re-arm the stall tracker from the resume position (a long pause
+		// left the old timestamps stale — they'd trip the stall detector on
+		// the very first frame otherwise).
+		lastRenderPos = pos;
+		lastPosMoveAt = performance.now();
+
+		// Resume re-arms a pipeline whose ffmpeg pass was killed at pause:
+		// the pre-pause bars are stale until fresh frames flow, so show the
+		// loading state IN THEIR PLACE. It clears only once the position
+		// clock has advanced past the resume point (see renderFrame) — a
+		// player still re-buffering after a long pause keeps the spinner
+		// instead of serving static cached bars.
+		resumePos = pos;
+		setIsLoading(true);
 		frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
 		return true;
 	};
@@ -282,6 +351,26 @@ function createVisualizerStore(): VisualizerStore {
 		// coverage (decode cold start, seek into a hole) the read is empty
 		// and the LAST FRAME simply holds — never clamped/repeated junk.
 		const target = smoothPosition();
+
+		// Stall detection: while the UI believes playback is live, the
+		// position signal must keep advancing (useAudio polls it every
+		// ~150ms). A frozen clock with a warm pipeline means the player is
+		// re-buffering — the classic long-pause-then-resume on a network
+		// stream — and without this the waveform shows dead-looking static
+		// bars for the whole stall. Report it as loading; the first frame
+		// after the clock moves again clears it.
+		const rawPos = audioPlaybackSignals.position();
+		if (rawPos !== lastRenderPos) {
+			lastRenderPos = rawPos;
+			lastPosMoveAt = performance.now();
+			if (isStalled()) setIsStalled(false);
+		} else if (
+			audioPlaybackSignals.isPlaying() &&
+			performance.now() - lastPosMoveAt > STALL_DETECT_MS
+		) {
+			setIsStalled(true);
+		}
+
 		const count = pcm.readWindow(sampleBuffer, target);
 		// Never feed a partial FFT window to cava.
 		if (count < sampleBuffer.length) return;
@@ -290,7 +379,14 @@ function createVisualizerStore(): VisualizerStore {
 
 		// Normalize against the running peak and copy to a new array
 		setBarData(scaler(output));
-		if (isLoading()) setIsLoading(false);
+		// Fresh frames only count once the position clock has moved past
+		// the resume point: while the player is still re-buffering after a
+		// long pause, the cache serves the same window and the spinner must
+		// stay in place of the stale bars. Cold starts (resumePos < 0)
+		// clear on the first frame as before.
+		if (isLoading() && (resumePos < 0 || rawPos > resumePos)) {
+			setIsLoading(false);
+		}
 	};
 
 	// ── Playback subscription ──────────────────────────────────────────
@@ -425,6 +521,7 @@ function createVisualizerStore(): VisualizerStore {
 		// state
 		barData,
 		isLoading,
+		isStalled,
 		isRunning: () => frameTimer !== null,
 		// inputs
 		setFocused,
