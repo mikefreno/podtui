@@ -121,6 +121,14 @@ const EMPTY_TERMINAL_COLORS: TerminalColors = {
 let cachedOsMode: "dark" | "light" | null = null;
 
 /**
+ * How often to re-query the terminal for theme changes (OSC 10/11/12).
+ * Terminals only answer these queries — they never push a color change —
+ * so detection is a slow poll. 60 s keeps CPU cost unmeasurable while
+ * still tracking theme flips within a reasonable delay.
+ */
+const SYSTEM_THEME_POLL_MS = 60_000;
+
+/**
  * Detect the terminal's dark/light mode.
  *
  * Priority:
@@ -215,7 +223,12 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       });
     }
 
-    async function resolveSystemTheme() {
+    /**
+     * Query the terminal's colors via OSC (palette + default fg/bg), with a
+     * legacy-tmux fallback for servers < 3.6 that don't forward OSC replies.
+     * Returns null when the terminal cannot answer.
+     */
+    async function queryTerminalColors(): Promise<TerminalColors | null> {
       if (process.env.TMUX) {
         await waitForCapabilities();
       }
@@ -253,6 +266,12 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
           detector.cleanup();
         }
       }
+
+      return colors;
+    }
+
+    async function resolveSystemTheme() {
+      const colors = await queryTerminalColors();
 
       // ── dark/light mode detection ─────────────────────────────────────────
       // The provider starts with a hardcoded mode (e.g. "dark"); detect the
@@ -299,7 +318,54 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       }
     }
 
+    /**
+     * Poll for terminal theme changes: re-query OSC colors, update the
+     * system palette when it differs, and re-detect dark/light mode.
+     * Runs on a slow timer (see SYSTEM_THEME_POLL_MS); most polls change
+     * nothing and only pay the idle query round-trip.
+     */
+    async function pollSystemTheme() {
+      if (!store.ready) return;
+      const colors = await queryTerminalColors();
+      if (!colors) return;
+
+      const current = store.system;
+      const changed =
+        !current ||
+        current.defaultBackground !== colors.defaultBackground ||
+        current.defaultForeground !== colors.defaultForeground ||
+        current.palette.join(",") !== colors.palette.join(",");
+
+      if (changed) {
+        setStore(
+          produce((draft) => {
+            draft.system = colors;
+          }),
+        );
+      }
+
+      // Refresh the OS-appearance fallback only when the terminal cannot
+      // report a background (e.g. tmux without OSC forwarding), so the
+      // common path never spawns a subprocess.
+      if (process.platform === "darwin" && !colors.defaultBackground) {
+        cachedOsMode = null;
+      }
+      const detectedMode = detectSystemMode(colors);
+      if (detectedMode && detectedMode !== store.mode) {
+        setStore("mode", detectedMode);
+        emitThemeModeChanged(detectedMode);
+      }
+    }
+
     onMount(init);
+
+    // Poll the terminal for theme changes (see pollSystemTheme). Registered
+    // once per provider init — SIGUSR2 re-runs the inner `init`, not this
+    // closure, so the timer cannot stack.
+    const pollTimer = setInterval(() => {
+      void pollSystemTheme();
+    }, SYSTEM_THEME_POLL_MS);
+    onCleanup(() => clearInterval(pollTimer));
 
     // Setup SIGUSR2 signal handler for dynamic theme reload
     // This allows external tools to trigger a theme refresh by sending:
