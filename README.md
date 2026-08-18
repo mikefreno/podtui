@@ -16,6 +16,8 @@ external player with full transport control — all from your terminal.
 - **Search** across your subscribed shows.
 - **Audio playback** through an external player with full transport control:
   play/pause, next/previous, seek, speed, and per-episode resume progress.
+  When an episode finishes, the next one plays automatically, continuing
+  down the list you started it from (search results, a show, or the Feed).
 - **Themeable** and **remappable keybindings**.
 - Ships as a **standalone compiled binary** — no runtime or install step beyond
   a system audio player.
@@ -208,7 +210,9 @@ entry. Releases are compiled with bunfig autoload disabled
 entirely. If you still hit it, you're on an old release — upgrade.
 
 **No audio — playback is a silent no-op** — PodTui needs **mpv** on your
-`PATH`. Install it (`brew install mpv`, `pacman -S mpv`, …) and relaunch.
+`PATH`. Homebrew and AUR installs pull it in automatically; if you used the
+standalone tarball, install it yourself (`brew install mpv`, `pacman -S mpv`,
+…) and relaunch.
 
 **Homebrew prints a dylib warning** — “load commands do not fit in the header
 … needs `-headerpad`” is benign: the app loads its libraries by path, the
