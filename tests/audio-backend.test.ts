@@ -173,6 +173,76 @@ test.skipIf(!hasMpv)(
 );
 
 test.skipIf(!hasMpv)(
+	"play() of the already-playing url does NOT reload (no audible skip-back)",
+	async () => {
+		fixtureWavs();
+		const backend = new MpvBackend();
+		try {
+			// Start mid-episode (as a resume would) and let it advance.
+			await backend.play(wavA, { volume: 0, speed: 1, startPosition: 1 });
+			await waitFor(
+				"position advances past the start offset",
+				async () => (await backend.getPosition()) > 1.8,
+			);
+			const before = await backend.getPosition();
+
+			// Re-selecting the SAME episode (Enter in a list, key-repeat)
+			// calls play() with the STALE saved progress. The file is
+			// already loaded — this must not reload from that earlier
+			// position, or the listener hears already-played audio again.
+			await backend.play(wavA, { volume: 0, speed: 1, startPosition: 1 });
+
+			// A reload would drop the position back to ~1; a correct no-op
+			// keeps advancing from where it was.
+			await waitFor(
+				"playback continues past the pre-play position",
+				async () => (await backend.getPosition()) > before + 0.3,
+			);
+			expect(backend.isPlaying()).toBe(true);
+			// And the position never fell back toward the stale offset.
+			expect(await backend.getPosition()).toBeGreaterThan(1.8);
+		} finally {
+			await cleanup(backend);
+		}
+	},
+	{ timeout: 20000 },
+);
+
+test.skipIf(!hasMpv)(
+	"play() of the same url while user-paused resumes at the current position",
+	async () => {
+		fixtureWavs();
+		const backend = new MpvBackend();
+		try {
+			await backend.play(wavB, { volume: 0, speed: 1, startPosition: 1 });
+			await waitFor(
+				"position advances",
+				async () => (await backend.getPosition()) > 2,
+			);
+			await backend.pause();
+			await waitFor(
+				"paused observed",
+				async () => (await backend.getPauseState()) === true,
+			);
+			const pausedAt = await backend.getPosition();
+
+			// Re-selecting the paused episode resumes where it PAUSED — the
+			// stale saved progress must not become a backward seek target.
+			await backend.play(wavB, { volume: 0, speed: 1, startPosition: 1 });
+			expect(backend.isPlaying()).toBe(true);
+			await waitFor(
+				"resumed at the paused position",
+				async () => (await backend.getPosition()) > pausedAt + 0.3,
+			);
+			expect(await backend.getPosition()).toBeGreaterThan(1.5);
+		} finally {
+			await cleanup(backend);
+		}
+	},
+	{ timeout: 20000 },
+);
+
+test.skipIf(!hasMpv)(
 	"daemon killed mid-play: resume() rejects on the fresh idle daemon; play() recovers a new one",
 	async () => {
 		fixtureWavs();

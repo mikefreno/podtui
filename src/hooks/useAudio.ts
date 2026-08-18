@@ -55,10 +55,15 @@ import {
 	saveLastPlayerSync,
 } from "../utils/app-persistence";
 import type { Episode, Progress } from "../types/episode";
-import type { Feed } from "../types/feed";
-import { useAudioNavStore, AudioSource } from "../stores/audio-nav";
+import { useAudioNavStore } from "../stores/audio-nav";
 import { useDownloadStore } from "../stores/download";
 import { useFeedStore } from "../stores/feed";
+import { useSearchStore } from "../stores/search";
+import {
+	nextStep,
+	prevStep,
+	queueForSource,
+} from "../utils/audio-queue";
 
 export interface AudioControls {
 	// Signals (reactive getters)
@@ -180,14 +185,22 @@ const PAUSE_WATCH_TICKS = 7;
 
 /** The player process died while we believed playback was live — track
  *  ended (mpv quits at EOF) or the process crashed. Persist the final
- *  position and stop polling. */
-function finalizeTrackEnd(): void {
+ *  position and stop polling. `autoAdvance` is true only when the track
+ *  reached its natural end with the player still alive and no stream error
+ *  — the signal to keep the queue going. */
+function finalizeTrackEnd(autoAdvance: boolean): void {
 	setIsPlaying(false);
 	stopPolling();
 	const ep = currentEpisode();
 	if (ep) {
 		const progressStore = useProgressStore();
 		progressStore.update(ep.id, position(), duration(), speed());
+	}
+	if (autoAdvance) {
+		// The episode finished: play the next one from the source that
+		// started it (search results / show / feed). No-op at the end of
+		// the list or when the episode isn't in the source list anymore.
+		void next().catch(() => {});
 	}
 }
 
@@ -235,7 +248,12 @@ function startPolling(): void {
 				// and reports pause=true there, which would otherwise be
 				// mistaken for an external pause and never finalize.
 				if (!backend.isPlaying()) {
-					finalizeTrackEnd();
+					// Natural EOF (player alive, no stream error) auto-advances
+					// to the next episode; a crashed/killed daemon or a failed
+					// stream must not start the next episode on its own.
+					finalizeTrackEnd(
+						backend.isAlive() && !backend.getPlaybackError(),
+					);
 					return;
 				}
 
@@ -270,7 +288,7 @@ function startPolling(): void {
 				// still alive: a dead player while we thought we were paused
 				// means the track ended (mpv quits at EOF) or it crashed.
 				if (!backend.isAlive()) {
-					finalizeTrackEnd();
+					finalizeTrackEnd(false);
 					return;
 				}
 				const paused = await backend.getPauseState();
@@ -335,21 +353,52 @@ async function play(episode: Episode): Promise<void> {
 		return;
 	}
 
-	try {
-		const appStore = useAppStore();
-		const progressStore = useProgressStore();
-		const storeSpeed = appStore.state().settings.playbackSpeed;
-		const vol = volume();
-		const spd = storeSpeed || speed();
+	const appStore = useAppStore();
+	const progressStore = useProgressStore();
+	const storeSpeed = appStore.state().settings.playbackSpeed;
+	const vol = volume();
+	const spd = storeSpeed || speed();
 
-		const feedStore = useFeedStore();
-		const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
-		const podcastTitle = feed?.customName || feed?.podcast.title || "";
-		// Play the downloaded file when present (offline + no network stalls);
-		// otherwise stream. Cover resolves to the feed art, falling back to the
-		// episode's own image (feeds added by URL may lack a channel cover).
-		const downloadStore = useDownloadStore();
-		const url = downloadStore.getDownloadedFilePath(episode.id) ?? episode.audioUrl;
+	const feedStore = useFeedStore();
+	const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
+	const podcastTitle = feed?.customName || feed?.podcast.title || "";
+	// Play the downloaded file when present (offline + no network stalls);
+	// otherwise stream. Cover resolves to the feed art, falling back to the
+	// episode's own image (feeds added by URL may lack a channel cover).
+	const downloadStore = useDownloadStore();
+	const url = downloadStore.getDownloadedFilePath(episode.id) ?? episode.audioUrl;
+
+	// Resume from saved progress if available and not completed
+	const savedProgress = progressStore.get(episode.id);
+	let startPos = 0;
+	if (savedProgress && !progressStore.isCompleted(episode.id)) {
+		startPos = savedProgress.position;
+	}
+
+	// Present the new episode in the UI IMMEDIATELY, before the backend load
+	// (cover fetch + loadfile can take a few hundred ms): the player tab,
+	// status bar, and OS Now Playing must not keep showing the previous
+	// episode during the swap. The previous track's poll is stopped so it
+	// can't attribute its position/progress to the new episode; polling
+	// restarts once the backend is actually playing. Mirrors load()'s
+	// synchronous presentation.
+	stopPolling();
+	setCurrentEpisode(episode);
+	setIsPlaying(false);
+	startedPlayback = false;
+	setPosition(startPos);
+	setSpeed(spd);
+	if (episode.duration) setDuration(episode.duration);
+	const media = useMediaRegistry();
+	media.setNowPlaying({
+		title: episode.title,
+		artist: podcastTitle || episode.podcastId,
+		duration: episode.duration,
+	});
+	media.setPlaybackState(false);
+	if (startPos > 0) media.setPosition(startPos);
+
+	try {
 		// Cover art only applies at file LOAD (the runtime video-add fallback
 		// never becomes an albumart track), so a cold-cache play must wait for
 		// the fetch or play artless. Serve the disk cache synchronously; on a
@@ -360,13 +409,6 @@ async function play(episode: Episode): Promise<void> {
 			"bounded",
 		);
 
-		// Resume from saved progress if available and not completed
-		const savedProgress = progressStore.get(episode.id);
-		let startPos = 0;
-		if (savedProgress && !progressStore.isCompleted(episode.id)) {
-			startPos = savedProgress.position;
-		}
-
 		await b.play(url, {
 			volume: vol,
 			speed: spd,
@@ -375,10 +417,8 @@ async function play(episode: Episode): Promise<void> {
 			coverArtPath: coverArtPath ?? undefined,
 		});
 
-		setCurrentEpisode(episode);
 		setIsPlaying(true);
 		setPosition(startPos);
-		setSpeed(spd);
 		if (episode.duration) setDuration(episode.duration);
 		startedPlayback = true;
 
@@ -387,12 +427,6 @@ async function play(episode: Episode): Promise<void> {
 		saveLastPlayerToFile({ episodeId: episode.id, timestamp: new Date() });
 
 		// Register with platform media controls
-		const media = useMediaRegistry();
-		media.setNowPlaying({
-			title: episode.title,
-			artist: podcastTitle || episode.podcastId,
-			duration: episode.duration,
-		});
 		media.setPlaybackState(true);
 		if (startPos > 0) media.setPosition(startPos);
 
@@ -728,6 +762,60 @@ export async function restoreLastSession(): Promise<void> {
  * Returns a singleton — all components share the same playback state.
  * Registers event bus listeners and cleans them up with onCleanup.
  */
+
+// ── Episode queue navigation ──────────────────────────────────────────────
+// `next`/`prev` (and the end-of-episode auto-advance in finalizeTrackEnd)
+// move within the ordered list of the source that STARTED the current
+// episode: the Feed's chronological list, the current show's episodes, or
+// the search results (see utils/audio-queue). Module-level so
+// finalizeTrackEnd can auto-advance without a mounted hook owner.
+
+const audioNav = useAudioNavStore();
+
+/** The ordered playable episodes for the source that started playback. */
+function queueForCurrentSource(): Episode[] {
+	const feedStore = useFeedStore();
+	return queueForSource(
+		audioNav.getSource(),
+		audioNav.getPodcastId(),
+		feedStore.feeds(),
+		feedStore.getAllEpisodesChronological(),
+		useSearchStore().results(),
+	);
+}
+
+async function next(): Promise<void> {
+	const current = currentEpisode();
+	if (!current) return;
+	const step = nextStep(queueForCurrentSource(), current.id);
+	// A duplicated queue entry (same episode id twice) must not make
+	// "next" replay the CURRENT episode — that would reload it from
+	// saved progress and audibly repeat already-played audio.
+	if (!step || step.episode.id === current.id) return;
+	await play(step.episode);
+	audioNav.next(step.index);
+}
+
+async function prev(): Promise<void> {
+	const current = currentEpisode();
+	if (!current) return;
+
+	// Standard transport behavior: past 30s in, "prev" restarts the current
+	// episode; before that it steps back within the source queue.
+	const NAV_START_THRESHOLD = 30;
+	const currentPos = position();
+	const currentDur = duration();
+	if (currentPos > NAV_START_THRESHOLD && currentDur > 0) {
+		await seek(NAV_START_THRESHOLD);
+		return;
+	}
+
+	const step = prevStep(queueForCurrentSource(), current.id);
+	if (!step) return;
+	await play(step.episode);
+	audioNav.prev(step.index);
+}
+
 export function useAudio(): AudioControls {
 	// Initialize backend on first use
 	ensureBackend();
@@ -792,80 +880,6 @@ export function useAudio(): AudioControls {
 		const next = speed() >= 2 ? 0.5 : Number((speed() + 0.25).toFixed(2));
 		await doSetSpeed(next);
 	});
-
-	const audioNav = useAudioNavStore();
-	const feedStore = useFeedStore();
-
-	async function prev(): Promise<void> {
-		const current = currentEpisode();
-		if (!current) return;
-
-		const currentPos = position();
-		const currentDur = duration();
-
-		const NAV_START_THRESHOLD = 30;
-
-		if (currentPos > NAV_START_THRESHOLD && currentDur > 0) {
-			await seek(NAV_START_THRESHOLD);
-		} else {
-			const source = audioNav.getSource();
-			let episodes: Array<{ episode: Episode; feed: Feed }> = [];
-
-			if (source === AudioSource.FEED) {
-				episodes = feedStore.getAllEpisodesChronological();
-			} else if (source === AudioSource.MY_SHOWS) {
-				const podcastId = audioNav.getPodcastId();
-				if (!podcastId) return;
-
-				const feed = feedStore
-					.getFilteredFeeds()
-					.find((f) => f.podcast.id === podcastId);
-				if (!feed) return;
-
-				episodes = feed.episodes.map((ep) => ({ episode: ep, feed }));
-			}
-
-			const currentIndex = audioNav.getCurrentIndex();
-			const newIndex = Math.max(0, currentIndex - 1);
-
-			if (newIndex < episodes.length && episodes[newIndex]) {
-				const { episode } = episodes[newIndex];
-				await play(episode);
-				audioNav.prev(newIndex);
-			}
-		}
-	}
-
-	async function next(): Promise<void> {
-		const current = currentEpisode();
-		if (!current) return;
-
-		const source = audioNav.getSource();
-		let episodes: Array<{ episode: Episode; feed: Feed }> = [];
-
-		if (source === AudioSource.FEED) {
-			episodes = feedStore.getAllEpisodesChronological();
-		} else if (source === AudioSource.MY_SHOWS) {
-			const podcastId = audioNav.getPodcastId();
-			if (!podcastId) return;
-
-			const feed = feedStore
-				.getFilteredFeeds()
-				.find((f) => f.podcast.id === podcastId);
-			if (!feed) return;
-
-			episodes = feed.episodes.map((ep) => ({ episode: ep, feed }));
-		}
-
-		const currentIndex = audioNav.getCurrentIndex();
-		const newIndex = Math.min(episodes.length - 1, currentIndex + 1);
-
-		if (newIndex >= 0 && episodes[newIndex]) {
-			const { episode } = episodes[newIndex];
-			await play(episode);
-			audioNav.next(newIndex);
-		}
-	}
 
 	onCleanup(() => {
 		refCount--;

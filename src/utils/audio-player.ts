@@ -82,6 +82,11 @@ export interface AudioBackend {
 	getPauseState(): Promise<boolean | undefined>;
 	/** True while the player process is running (regardless of pause). */
 	isAlive(): boolean;
+	/** Last playback error (end-file reason "error"), or null when the last
+	 *  track ended cleanly (or nothing has failed yet). Lets callers
+	 *  distinguish a natural end-of-file from a stream failure — a failed
+	 *  episode must not auto-advance the queue. */
+	getPlaybackError(): string | null;
 	dispose(): void;
 }
 
@@ -591,13 +596,22 @@ export class MpvBackend implements AudioBackend {
 		// play checks it and skips its own stale paused-load.
 		this._intentPlaying = true;
 		await this.runLoadExclusive(async () => {
-			// Fast path: this exact URL was PRELOADED paused (boot restore) —
-			// mpv has been buffering it since boot, so flipping pause off starts
-			// audio ~instantly. Re-acquire the start position only when it
-			// moved meaningfully since the preload (progress saved meanwhile).
-			if (this._loadedUrl === url && this._loadedPaused && !this._ended) {
+			// Same episode re-selected (Enter in a list, key-repeat, a
+			// second tap on the playing row): the file is ALREADY in the
+			// player. Reloading with start=<saved progress> would audibly
+			// skip BACK and repeat already-played audio (saved progress
+			// lags the live position by up to the 5s persist interval), so
+			// align in place instead:
+			//   - preload park (loaded paused at boot restore): seek only
+			//     when the caller's target moved materially since load;
+			//   - user-paused: unpause at the CURRENT position (saved
+			//     progress is stale and must not become a backward seek);
+			//   - already playing: unpause is a no-op — nothing to do.
+			// A genuinely finished episode (_ended) still falls through to
+			// a fresh load, which replays from the top via isCompleted.
+			if (this._loadedUrl === url && !this._ended) {
 				const target = opts?.startPosition ?? this._position;
-				if (Math.abs(target - this._position) > 2) {
+				if (this._loadedPaused && Math.abs(target - this._position) > 2) {
 					await this.send(["set_property", "time-pos", target]);
 					this._position = target;
 				}
@@ -781,6 +795,9 @@ class NoopBackend implements AudioBackend {
 	}
 	isAlive(): boolean {
 		return false;
+	}
+	getPlaybackError(): string | null {
+		return null;
 	}
 	dispose(): void {}
 }
