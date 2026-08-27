@@ -383,7 +383,13 @@ export class MpvBackend implements AudioBackend {
 		this.proc = Bun.spawn(
 			[
 				"mpv",
-				"--no-video",
+				// --vo=null (not --no-video): the albumart track must stay the
+				// CURRENT video track or macOS Now Playing shows no artwork.
+				// --no-video drops it to unselected (albumart:true, selected:false),
+				// so the system media center renders no cover. --vo=null is equally
+				// headless — no window, no rendering — but keeps the cover current
+				// so Now Playing gets the art.
+				"--vo=null",
 				"--no-terminal",
 				"--really-quiet",
 				// Stay alive after finishing/unloading files; PodTUI owns one mpv

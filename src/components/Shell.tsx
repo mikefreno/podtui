@@ -22,6 +22,7 @@ import { useFeedStore } from "@/stores/feed";
 import { useAppStore } from "@/stores/app";
 import { useToast } from "@/ui/toast";
 import { emit, on } from "@/utils/event-bus";
+import { feedForEpisode } from "@/utils/feed-resolve";
 import { LayerGraph } from "@/utils/layer-graph";
 import { TABS } from "@/utils/navigation";
 import { createDispatcher } from "@/utils/dispatch";
@@ -222,9 +223,7 @@ export function Shell() {
 		const ep = audio.currentEpisode();
 		if (!ep) return null;
 		const feeds = feedStore.getFilteredFeeds();
-		const feed =
-			feeds.find((f) => f.podcast.id === ep.podcastId) ??
-			feeds.find((f) => f.episodes.some((e) => e.id === ep.id));
+		const feed = feedForEpisode(feeds, ep);
 		return feed
 			? `♪ ${feed.customName || feed.podcast.title} — ${ep.title}`
 			: `♪ ${ep.title}`;

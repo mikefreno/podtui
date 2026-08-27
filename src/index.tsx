@@ -1,3 +1,5 @@
+import { onCleanup } from "solid-js";
+import { setupTerminalRecovery } from "./utils/terminal-recovery";
 import type { Feed } from "./types/feed"
 import type { Episode } from "./types/episode"
 
@@ -238,6 +240,7 @@ if (cliArgs.query !== null || cliArgs.play !== null) {
 		function RendererSetup(props: { children: unknown }) {
 			const renderer = useRenderer();
 			renderer.disableStdoutInterception();
+			onCleanup(setupTerminalRecovery(renderer));
 			return props.children;
 		}
 

@@ -55,6 +55,7 @@ import {
 	saveLastPlayerSync,
 } from "../utils/app-persistence";
 import type { Episode, Progress } from "../types/episode";
+import { feedForEpisode } from "../utils/feed-resolve";
 import { useAudioNavStore } from "../stores/audio-nav";
 import { useDownloadStore } from "../stores/download";
 import { useFeedStore } from "../stores/feed";
@@ -359,8 +360,7 @@ async function play(episode: Episode): Promise<void> {
 	const vol = volume();
 	const spd = storeSpeed || speed();
 
-	const feedStore = useFeedStore();
-	const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
+	const feed = feedForEpisode(useFeedStore().feeds(), episode);
 	const podcastTitle = feed?.customName || feed?.podcast.title || "";
 	// Play the downloaded file when present (offline + no network stalls);
 	// otherwise stream. Cover resolves to the feed art, falling back to the
@@ -468,8 +468,7 @@ async function load(episode: Episode): Promise<void> {
 	setSpeed(storeSpeed || speed());
 
 	// Surface the loaded-but-paused track to the OS media controls.
-	const feedStore = useFeedStore();
-	const feed = feedStore.feeds().find((f) => f.podcast.id === episode.podcastId);
+	const feed = feedForEpisode(useFeedStore().feeds(), episode);
 	const podcastTitle = feed?.customName || feed?.podcast.title || "";
 	const media = useMediaRegistry();
 	media.setNowPlaying({
@@ -688,10 +687,7 @@ async function switchBackend(name: BackendName): Promise<void> {
 	// Resume playback if we were playing
 	if (wasPlaying && ep && ep.audioUrl) {
 		try {
-			const feedStore = useFeedStore();
-			const feed = feedStore
-				.feeds()
-				.find((f) => f.podcast.id === ep.podcastId);
+			const feed = feedForEpisode(useFeedStore().feeds(), ep);
 			const podcastTitle = feed?.customName || feed?.podcast.title || "";
 			const url =
 				useDownloadStore().getDownloadedFilePath(ep.id) ?? ep.audioUrl;

@@ -342,6 +342,34 @@ test.skipIf(skip)(
 	{ timeout: 20000 },
 );
 
+// The post-resume loading gate must be "the clock MOVED from the resume
+// point", not "the clock moved PAST it". Gating on `>` strands the spinner
+// forever when the user seeks BACKWARD during the resume spinner (the
+// classic "missed that, rewind" while a network stream re-buffers): the
+// position never again exceeds the resume point, the cache serves live
+// frames for the new position, and the loading state never clears.
+test.skipIf(skip)(
+	"backward seek during the resume loading state clears it",
+	async () => {
+		const viz = useVisualizer();
+		await startPlaying();
+		expect(viz.isLoading()).toBe(false);
+
+		// Pause, then resume against the still-covered position: spinner.
+		setIsPlaying(false);
+		await waitFor(() => !viz.isRunning(), 10000);
+		setIsPlaying(true);
+		await waitFor(() => viz.isLoading(), 5000);
+
+		// User seeks BACKWARD while the player re-buffers. The position is
+		// inside decoded coverage, so fresh bars must replace the spinner.
+		setPosition(1);
+		await waitFor(() => !viz.isLoading() && viz.barData().length > 0, 3000);
+		expect(viz.barData().length).toBe(64);
+	},
+	{ timeout: 20000 },
+);
+
 // ── Teardown ─────────────────────────────────────────────────────────────
 
 afterAll(() => {

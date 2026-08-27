@@ -132,11 +132,11 @@ function createVisualizerStore(): VisualizerStore {
 	let lastPosMoveAt = 0;
 
 	// Resume point: the position a paused pipeline was re-armed at. The
-	// loading state set by resume only clears once the position clock has
-	// advanced PAST this — while the player is still re-buffering, the
-	// cache can serve the same window forever and the stale pre-pause bars
-	// must not masquerade as live data. -1 = cold start (clear on the
-	// first produced frame, regardless of the clock).
+	// loading state set by resume clears once the position clock has MOVED
+	// from this (either direction) — while the player is still re-buffering
+	// the clock is frozen, and the cache serving the same window must not
+	// let stale pre-pause bars masquerade as live data. -1 = cold start
+	// (clear on the first produced frame, regardless of the clock).
 	let resumePos = -1;
 
 	// What the running pipeline was started with — lets the playback effect
@@ -379,12 +379,14 @@ function createVisualizerStore(): VisualizerStore {
 
 		// Normalize against the running peak and copy to a new array
 		setBarData(scaler(output));
-		// Fresh frames only count once the position clock has moved past
+		// Fresh frames only count once the position clock has MOVED from
 		// the resume point: while the player is still re-buffering after a
 		// long pause, the cache serves the same window and the spinner must
-		// stay in place of the stale bars. Cold starts (resumePos < 0)
-		// clear on the first frame as before.
-		if (isLoading() && (resumePos < 0 || rawPos > resumePos)) {
+		// stay in place of the stale bars. Any move counts — including a
+		// backward seek, whose window is live data for the new position and
+		// would strand the spinner forever under a `>` gate. Cold starts
+		// (resumePos < 0) clear on the first frame as before.
+		if (isLoading() && (resumePos < 0 || rawPos !== resumePos)) {
 			setIsLoading(false);
 		}
 	};
