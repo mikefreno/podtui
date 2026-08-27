@@ -63,7 +63,7 @@ Grab `podtui-<platform>-<arch>.tar.gz` from the latest
 put `podtui` on your `PATH`:
 
 ```bash
-curl -sS -o /tmp/podtui.tar.gz \
+curl -sSL -o /tmp/podtui.tar.gz \
   https://github.com/mikefreno/podtui/releases/latest/download/podtui-linux-x64.tar.gz
 sudo mkdir -p /opt/podtui
 sudo tar -xzf /tmp/podtui.tar.gz -C /opt/podtui --strip-components=1
