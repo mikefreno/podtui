@@ -3,7 +3,7 @@ import { setupTerminalRecovery } from "./utils/terminal-recovery";
 import type { Feed } from "./types/feed"
 import type { Episode } from "./types/episode"
 
-const VERSION = "0.7.1";
+const VERSION = "0.7.2";
 
 interface CliArgs {
 	version: boolean;
