@@ -1,11 +1,11 @@
 /**
  * layer-graph — maps each TAB id to its page component + pane count.
  *
- * Split out of `navigation.ts` so that the nav-model primitives (TABS,
- * TabsCount, DEPTH_TABS, rootFrameFor, TabPaneCount, PANE_RATIO) in
- * `navigation.ts` stay free of any `.tsx` / JSX imports. This lets unit tests
- * import the pure navigation store without pulling the OpenTUI JSX runtime
- * (which is only provided by the build-time @opentui/solid bun-plugin).
+ * Split out of `navigation.ts` so that the navigation primitives (TABS,
+ * TabsCount, DEPTH_TABS, rootFrameFor, TabPaneCount) stay free of any
+ * `.tsx` / JSX imports. This lets unit tests import the pure navigation
+ * store without pulling the OpenTUI JSX runtime (which is only provided by
+ * the build-time @opentui/solid bun-plugin).
  *
  * The page modules live alongside their pages and export `<count>PaneCount`
  * constants describing how many focusable panes each fixed page owns.

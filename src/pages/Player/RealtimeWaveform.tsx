@@ -19,7 +19,7 @@ import { useVisualizer } from "@/stores/visualizer";
 import { useTheme } from "@/context/ThemeContext";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { BAR_LEVELS, barChars } from "@/utils/bar-mapping";
-import { PANE_RATIO } from "@/utils/navigation";
+import { usePaneLayout } from "@/stores/pane-layout";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -27,20 +27,16 @@ export function RealtimeWaveform() {
 	const { theme } = useTheme();
 	const viz = useVisualizer();
 
-	// Bar count scales with terminal width so the waveform fills its pane.
-	// The player is a 2-pane row: current column = (current+preview) of
-	// (parent+current+preview) of the terminal width. Subtract ~8 chars of
-	// chrome (scrollbox border + box padding + waveform border + padding).
-	// Falls back to 64 before the renderer reports a real size.
 	const dimensions = useTerminalDimensions();
+	const layout = usePaneLayout();
 	const numBars = () => {
-		const total = PANE_RATIO.parent + PANE_RATIO.current + PANE_RATIO.preview;
-		const current = PANE_RATIO.current + PANE_RATIO.preview; // 2-pane grows current
 		const width = dimensions().width;
 		if (!width) return 64;
+		// The player is a 2-pane row: the current column = whole width minus
+		// the parent (left split). Subtract ~8 chars of chrome.
 		return Math.max(
 			8,
-			Math.min(256, Math.floor((width * current) / total) - 8),
+			Math.min(256, Math.floor(width * (1 - layout.splits().left)) - 8),
 		);
 	};
 

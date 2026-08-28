@@ -47,11 +47,11 @@ const defaultPreferences: UserPreferences = {
 	autoDownloadScope: "all",
 	autoDownloadWhitelist: [],
 	autoJumpToPlayer: true,
-	fetchMoreMode: "auto",
 	refreshIntervalMinutes: 30,
 	episodeCacheMode: "date",
 	episodeCacheCount: 25,
 	episodeCacheDays: 60,
+	paneSplit: { left: 0.2, right: 0.7 },
 };
 
 const defaultState: AppState = {

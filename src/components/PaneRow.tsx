@@ -1,28 +1,25 @@
 /**
  * PaneRow — the shared parent | current | preview 3-pane layout primitive.
  *
- * Implements yazi's `mgr.ratio` contract: three columns grow at
- * 20% : 50% : 30% (PANE_RATIO 2:5:3) of the row width via Yoga `flexGrow`,
- * so every list tab renders an identical, layout-stable shell. Columns use
- * `flexBasis={0}` so the ratio is exact regardless of content width — a
- * column's content can never stretch its slot.
+ * Implements yazi's resizable `mgr.ratio` contract: the two borders of the
+ * CENTER (current) column are draggable and resize the neighboring panes.
+ * Split positions live in the shared pane-layout store (`@/stores/pane-layout`)
+ * as fractions of the row width; this component resolves them to pixel
+ * columns, gives each column an explicit width (so the drag strips sit
+ * exactly on the drawn borders), and renders two invisible grab handles over
+ * the border cells.
  *
  * Column semantics (per the yazi depth model):
  *   parent  — the previous-depth list. Renders a muted `—` placeholder and
- *             KEEPS its 20% slot when blank (never collapses to width 0).
- *             Borderless (no left/right/top/bottom edge). Carries the single
- *             header row: the CURRENT column's title renders top-left in the
- *             parent's slot (the panes above current/preview were removed).
- *   current — the current-depth list. The only focusable content column; it
- *             is the ONLY bordered column — left/right edges only, always
- *             muted (no active-border highlight, focused or not).
- *   preview — detail of the hovered item in `current`. Borderless, no header.
+ *             keeps a minimum 15-col slot. Borderless.
+ *   current — the current-depth list. The only focusable content column; the
+ *             ONLY bordered column — left/right edges only, always muted.
+ *   preview — detail of the hovered item in `current`. Borderless.
  *
  * The primitive is purely structural: callers pass their own JSX per column
  * (static elements or accessors) plus the current-column title. Theme colors
  * are resolved internally via `useTheme()`. Only the current column's
- * `<scrollbox>` receives `focused`, so scroll focus follows the cursor (j/k
- * stay in the current pane).
+ * `<scrollbox>` receives `focused`, so scroll focus follows the cursor.
  *
  * Example:
  *   <PaneRow
@@ -34,11 +31,16 @@
  *   />
  */
 
-import { createMemo, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import type { JSX } from "solid-js";
+import { useTerminalDimensions } from "@opentui/solid";
 import type { RGBA, BorderSides } from "@opentui/core";
 import { useTheme } from "@/context/ThemeContext";
-import { PANE_RATIO } from "@/utils/navigation";
+import {
+	MIN_PANE_WIDTH,
+	splitPixels,
+	usePaneLayout,
+} from "@/stores/pane-layout";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type PaneContent = JSX.Element | (() => JSX.Element);
@@ -46,7 +48,7 @@ type PaneLabel = string | (() => string);
 
 export type PaneRowProps = {
 	/** Parent column content (previous-depth list, or null for a muted
-	 *  placeholder — the 1/5 slot is always preserved). */
+	 *  placeholder — a minimum slot is always preserved). */
 	parent?: PaneContent;
 	/** Current column content (the focused list). */
 	current?: PaneContent;
@@ -99,7 +101,7 @@ function Placeholder(props: { color: () => RGBA }) {
 
 // ── Pane column ─────────────────────────────────────────────────────────────
 function Pane(props: {
-	grow: number;
+	width: number;
 	label: () => string;
 	content: () => JSX.Element | undefined;
 	border: boolean | BorderSides[];
@@ -116,8 +118,8 @@ function Pane(props: {
 	return (
 		<box
 			flexDirection="column"
-			flexGrow={props.grow}
-			flexBasis={0}
+			width={props.width}
+			flexShrink={0}
 			height="100%"
 		>
 			{/* ── title row: rendered only when the pane carries a label ────────── */}
@@ -158,6 +160,45 @@ function Pane(props: {
 	);
 }
 
+/** A 1-column invisible grab handle covering exactly one border of the
+ *  current pane. `onBegin` is called on mousedown; subsequent drag/drag-end
+ *  events bubble up the row and drive `usePaneLayout` there. On hover or
+ *  while dragging it overdraws the border with a full-height accent `│`
+ *  line (a bordered box would render as a blocky rectangle instead). */
+function Splitter(props: {
+	left: number;
+	active: boolean;
+	onBegin: () => void;
+}) {
+	const { theme } = useTheme();
+	const dims = useTerminalDimensions();
+	const [hovered, setHovered] = createSignal(false);
+	const highlighted = () => props.active || hovered();
+	return (
+		<box
+			position="absolute"
+			left={props.left}
+			top={0}
+			width={1}
+			height="100%"
+			onMouseDown={(e) => {
+				e.preventDefault?.();
+				props.onBegin();
+			}}
+			onMouseOver={() => setHovered(true)}
+			onMouseOut={() => setHovered(false)}
+		>
+			<Show when={highlighted()}>
+				{/* Draw the accent edge down the full pane height; the box clips
+				 * any excess rows below the row's bottom edge. */}
+				<text fg={theme.primary} selectable={false}>
+					{"│\n".repeat(dims().height)}
+				</text>
+			</Show>
+		</box>
+	);
+}
+
 // ── Row primitive ───────────────────────────────────────────────────────────
 export function PaneRow(props: PaneRowProps) {
 	/** true → the current column's scrollbox is focused (scroll follows cursor). */
@@ -179,20 +220,60 @@ export function PaneRow(props: PaneRowProps) {
 	// 2-pane mode (parent|current) grows the current column to fill the
 	// preview slot. Defaults to 3 (parent|current|preview).
 	const panes = createMemo(() => props.panes ?? 3);
-	const currentGrow = createMemo(() =>
-		panes() === 2
-			? PANE_RATIO.current + PANE_RATIO.preview
-			: PANE_RATIO.current,
-	);
 	const currentBorder = createMemo<boolean | BorderSides[]>(
 		() => props.currentBorder ?? ["left", "right"],
 	);
 
+	// Shared split state + terminal width drive explicit column widths so the
+	// drag strips sit exactly on the drawn borders.
+	const layout = usePaneLayout();
+	const dims = useTerminalDimensions();
+	const width = () => dims().width;
+	const pixels = createMemo(() => splitPixels(width(), layout.splits()));
+	const hasRoom = () =>
+		width() >=
+		MIN_PANE_WIDTH.parent + MIN_PANE_WIDTH.current + MIN_PANE_WIDTH.preview;
+
+	// Column widths in pixels (sum to the row width).
+	const parentWidth = () => pixels().leftPx;
+	const currentWidth = () =>
+		panes() === 2
+			? width() - pixels().leftPx
+			: pixels().rightPx - pixels().leftPx;
+	const previewWidth = () => width() - pixels().rightPx;
+
+	// ── Drag state ──────────────────────────────────────────────────────────
+	// onMouseDown on a Splitter records which border is being dragged; the
+	// row then lives-updates the split from the absolute drag x (bubbled up
+	// from whatever renderable the cursor captures) and commits on release.
+	const [activeSplit, setActiveSplit] = createSignal<"left" | "right" | null>(
+		null,
+	);
+	const beginDrag = (which: "left" | "right") => () => setActiveSplit(which);
+	const handleDrag = (e: { x: number }) => {
+		const which = activeSplit();
+		if (!which) return;
+		if (which === "left") layout.setLeft(e.x, width());
+		else layout.setRight(e.x, width());
+	};
+	const handleDragEnd = () => {
+		if (activeSplit()) layout.commit();
+		setActiveSplit(null);
+	};
+
 	return (
-		<box flexDirection="row" flexGrow={1} width="100%" height="100%">
-			{/* ── parent (20%) — previous-depth list; title row top-left ────────── */}
+		<box
+			flexDirection="row"
+			width="100%"
+			height="100%"
+			flexGrow={1}
+			onMouseDrag={handleDrag}
+			onMouseDragEnd={handleDragEnd}
+			onMouseUp={handleDragEnd}
+		>
+			{/* ── parent — previous-depth list; title row top-left ─────────────── */}
 			<Pane
-				grow={PANE_RATIO.parent}
+				width={parentWidth()}
 				label={currentLabel}
 				content={parentContent}
 				border={false}
@@ -200,22 +281,37 @@ export function PaneRow(props: PaneRowProps) {
 			/>
 			{/* ── current — the focused list; left/right borders only ─────────── */}
 			<Pane
-				grow={currentGrow()}
+				width={currentWidth()}
 				label={() => ""}
 				content={currentContent}
 				border={currentBorder()}
 				scrollFocused={() => focused()}
 			/>
-			{/* ── preview (30%) — hovered-item detail; no border, no header ────── */}
+			{/* ── preview (optional) — hovered-item detail; no border ─────────── */}
 			<Show when={panes() === 3}>
 				<Pane
-					grow={PANE_RATIO.preview}
+					width={previewWidth()}
 					label={() => ""}
 					content={previewContent}
 					border={false}
 					scrollFocused={() => false}
 				/>
 			</Show>
+			{/* ── drag handles over the current pane's borders ───────────────── */}
+					<Show when={hasRoom()}>
+			<Splitter
+				left={pixels().leftPx}
+				active={activeSplit() === "left"}
+				onBegin={beginDrag("left")}
+			/>
+			<Show when={panes() === 3}>
+				<Splitter
+					left={pixels().rightPx - 1}
+					active={activeSplit() === "right"}
+					onBegin={beginDrag("right")}
+				/>
+			</Show>
+		</Show>
 		</box>
 	);
 }

@@ -329,7 +329,7 @@ test("date mode: episodes outside the 60-day window never enter the list", async
 	expect(store.getFeed(id)!.episodes.length).toBe(600);
 });
 
-test("date mode boundary: 25 days in, 70 days out", async () => {
+test("date mode: the 5 newest episodes load even outside the date window", async () => {
 	const store = useFeedStore();
 	const now = Date.now();
 	servedEpisodes = [
@@ -344,13 +344,15 @@ test("date mode boundary: 25 days in, 70 days out", async () => {
 
 	expect(store.getFeed(id)!.episodes.map((e) => e.title)).toEqual([
 		"In Window",
+		"Out Window",
 	]);
-	// The 70d episode is ~45 days past the 2-week band beyond the oldest
-	// loaded episode (25d → 39d band): a sparse show must NOT drag it in.
+	// The 70d episode is the second-newest available, so the min-5 floor
+	// pulls it in despite the 60-day cache window.
 	expect(store.hasMoreEpisodes(id)).toBe(false);
 	await store.loadMoreEpisodes(id);
 	expect(store.getFeed(id)!.episodes.map((e) => e.title)).toEqual([
 		"In Window",
+		"Out Window",
 	]);
 });
 
@@ -369,17 +371,19 @@ test("date mode: a dormant show (nothing in the window or next band) never fetch
 	const id = feed!.id;
 	addedFeedIds.push(id);
 
-	expect(store.getFeed(id)!.episodes.length).toBe(0);
+	// The min-5 floor surfaces the show's only 2 episodes; it still cannot
+	// fetch-more (nothing further exists to load).
+	expect(store.getFeed(id)!.episodes.length).toBe(2);
 	expect(store.hasMoreEpisodes(id)).toBe(false);
 	await store.loadMoreEpisodes(id);
-	expect(store.getFeed(id)!.episodes.length).toBe(0);
+	expect(store.getFeed(id)!.episodes.length).toBe(2);
 });
 
 test("date mode: episodes just outside the window load via the band anchored at the window edge", async () => {
 	const store = useFeedStore();
 	const now = Date.now();
-	// Both episodes are outside the 60-day window (61d / 65d) but inside the
-	// 14-day band past its edge (60d → 74d) — fetch-more reveals them.
+	// Both episodes are outside the 60-day window (61d / 65d); the min-5
+	// floor loads them at subscribe time regardless.
 	servedEpisodes = [
 		{ title: "Just Out A", date: new Date(now - 61 * DAY).toISOString() },
 		{ title: "Just Out B", date: new Date(now - 65 * DAY).toISOString() },
@@ -390,8 +394,9 @@ test("date mode: episodes just outside the window load via the band anchored at 
 	const id = feed!.id;
 	addedFeedIds.push(id);
 
-	expect(store.getFeed(id)!.episodes.length).toBe(0);
-	expect(store.hasMoreEpisodes(id)).toBe(true);
+	// The min-5 floor loads both out-of-window episodes immediately.
+	expect(store.getFeed(id)!.episodes.length).toBe(2);
+	expect(store.hasMoreEpisodes(id)).toBe(false);
 	await store.loadMoreEpisodes(id);
 	expect(store.getFeed(id)!.episodes.map((e) => e.title)).toEqual([
 		"Just Out A",

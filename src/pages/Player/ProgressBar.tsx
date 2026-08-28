@@ -10,6 +10,7 @@ import { useTerminalDimensions } from "@opentui/solid";
 import type { Renderable } from "@opentui/core";
 import { useAudio } from "@/hooks/useAudio";
 import { useTheme } from "@/context/ThemeContext";
+import { usePaneLayout } from "@/stores/pane-layout";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -17,16 +18,19 @@ export function ProgressBar() {
 	const audio = useAudio();
 	const { theme } = useTheme();
 	const dimensions = useTerminalDimensions();
+	const layout = usePaneLayout();
 
 	// The bar's renderable, captured for its absolute left edge: MouseEvent.x
 	// is terminal-absolute (not bar-relative), so local x needs the offset
-	// of the bar inside the 2-pane row (parent pane ≈ 20% of the width).
+	// of the bar inside the 2-pane row (parent pane = left split of the width).
 	let bar: Renderable | undefined;
 
 	// Full content width of the player pane: the player is a 2-pane row
-	// (parent 1/5 + current 4/5 of the terminal width). Subtract ~8 chars
+	// (parent = left split, current = the rest of the terminal width). Track
+	// the live split so a dragged border re-sizes the bar. Subtract ~8 chars
 	// of border/padding chrome (same math as RealtimeWaveform's numBars).
-	const width = () => Math.max(8, Math.floor((dimensions().width * 4) / 5) - 8);
+	const width = () =>
+		Math.max(8, Math.floor(dimensions().width * (1 - layout.splits().left)) - 8);
 
 	const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 

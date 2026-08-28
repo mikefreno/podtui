@@ -13,10 +13,10 @@
  *
  *        parent  |  current  |  preview
  *
- * Layout ratios (20% : 50% : 30% — PANE_RATIO 2:5:3) live in
- * `@/utils/navigation` (PANE_RATIO). This module owns only the *focusable*
- * nav model — which column is focused and where its list cursor lives. The
- * parent/preview columns are always derived, never focused.
+ * Pane sizes are user-resizable (draggable borders in `PaneRow`).
+ * This module owns only the *focusable* nav model — which column is focused
+ * and where its list cursor lives. The parent/preview columns are always
+ * derived, never focused.
  *
  * The tab list is the app's ROOT and participates in the same pane flow as
  * any other pane. View renders at most three panes, `UP | CURRENT | PREVIEW`:

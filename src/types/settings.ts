@@ -90,9 +90,6 @@ export type AppSettings = {
 	visualizer: VisualizerSettings;
 };
 
-/** How the Feed and per-show episode lists load older episodes (default: auto). */
-export type FetchMoreMode = "manual" | "auto";
-
 /** Which shows the auto-download setting applies to (default: all). */
 export type AutoDownloadScope = "all" | "none" | "whitelist";
 
@@ -100,6 +97,15 @@ export type AutoDownloadScope = "all" | "none" | "whitelist";
  *  is bounded: by a rolling date window or by a count of most-recent
  *  episodes (default: date). */
 export type EpisodeCacheMode = "date" | "count";
+
+/** Left/right edges of the current (center) pane as fractions of the row
+ *  width, shared by the draggable pane borders in every depth tab. */
+export type PaneSplits = {
+	/** Left edge of the current pane (default 0.2 = 20% of the row). */
+	left: number;
+	/** Right edge of the current pane (default 0.7 = 70% of the row). */
+	right: number;
+};
 
 export type UserPreferences = {
 	showExplicit: boolean;
@@ -112,8 +118,6 @@ export type UserPreferences = {
 	autoDownloadWhitelist: string[];
 	/** Jump to the Player view automatically when playback starts (default: true) */
 	autoJumpToPlayer: boolean;
-	/** Load older episodes from the Feed list: manual button or automatic at the bottom (default: auto). */
-	fetchMoreMode: FetchMoreMode;
 	/** Minutes between automatic background feed refreshes (default: 30). */
 	refreshIntervalMinutes: number;
 	/** How the episode list cache is bounded — by date or by count (default: date). */
@@ -122,6 +126,8 @@ export type UserPreferences = {
 	episodeCacheCount: number;
 	/** Rolling window in days for the episode list when mode is "date" (default: 60). */
 	episodeCacheDays: number;
+	/** Pane split positions as fractions of the row width (default 0.2 / 0.7). */
+	paneSplit: PaneSplits;
 };
 
 export type AppState = {

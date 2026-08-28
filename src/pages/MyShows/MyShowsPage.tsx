@@ -6,15 +6,16 @@
  *   depth 1 (current) — episodes of the drilled show. Parent pane = shows.
  *   preview            — detail of the hovered item in the current column.
  *
- * Depth 1 ends with a "[Fetch More]" row (same preference-driven behavior
- * as the Feed tab) that loads the next batch of episodes for that show.
+ * Depth 0's shows list and depth 1's episode list both end with a
+ * "[Fetch More]" row that loads the next batch of episodes — depth 0 for
+ * every subscribed show, depth 1 for the drilled show.
  *
  * Renders entirely through `<PaneRow>`; no bespoke 3-column flexbox JSX
  * remains. `l`/Enter drills in (show → episodes); `h` pops a depth (noop at
  * 0). j/k move only within the current column.
  */
 
-import { createMemo, createEffect, For, Show, onMount, onCleanup } from "solid-js";
+import { createMemo, For, Show, onMount, onCleanup } from "solid-js";
 import type { RGBA } from "@opentui/core";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
@@ -269,20 +270,35 @@ export function MyShowsPage() {
 	// entry drops out the moment the user subscribes to its show.
 	const unsubs = () => downloadStore.getUnsubscribedDownloads();
 
-	const depth0Count = () => shows().length + unsubs().length;
-
+	/** True while some subscribed show has more episodes to load — shows the
+	 *  depth-0 "[Fetch More]" row. */
+	const showLoadMore = () => feedStore.hasMoreAcrossAll();
+	const depth0Count = () =>
+		shows().length + unsubs().length + (showLoadMore() ? 1 : 0);
+	const focusedRow0 = () =>
+		depth0Count() === 0 ? 0 : Math.min(focus(0), depth0Count() - 1);
+	/** True while the depth-0 cursor sits on the "[Fetch More]" row. */
+	const focusedOnMore0 = () =>
+		showLoadMore() && focusedRow0() === shows().length + unsubs().length;
 	const focusedShowIdx = () =>
-		shows().length === 0 ? 0 : Math.min(focus(0), shows().length - 1);
+		focusedOnMore0()
+			? -1
+			: Math.min(focusedRow0(), Math.max(shows().length - 1, 0));
 	/** True when the depth-0 cursor sits on an unsubscribed-show download
 	 *  row (past the shows list). */
 	const focusedOnUnsub = () =>
-		depth() === 0 && focus(0) >= shows().length && unsubs().length > 0;
+		!focusedOnMore0() &&
+		depth() === 0 &&
+		focusedRow0() >= shows().length &&
+		unsubs().length > 0;
 	const focusedUnsub = (): DownloadedEpisode | undefined => {
 		if (!focusedOnUnsub()) return undefined;
-		return unsubs()[Math.min(focus(0) - shows().length, unsubs().length - 1)];
+		return unsubs()[
+			Math.min(focusedRow0() - shows().length, unsubs().length - 1)
+		];
 	};
 	const selectedShow = (): Feed | undefined => {
-		if (focusedOnUnsub()) return undefined;
+		if (focusedOnUnsub() || focusedOnMore0()) return undefined;
 		return shows()[focusedShowIdx()];
 	};
 
@@ -300,10 +316,7 @@ export function MyShowsPage() {
 	// ── Fetch More ───────────────────────────────────────────────────────────
 	// A "[Fetch More]" row at the bottom of a drilled show's episode list
 	// advances that show's loaded window by 50 episodes — the per-show
-	// counterpart to the Feed page's row (which loads every feed). manual
-	// mode: Enter on the row. auto mode: reaching the bottom row fetches
-	// automatically (see the effect below).
-	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "auto";
+	// counterpart to the Feed page's row (which loads every feed).
 	const showFetchMore = () =>
 		depth() >= 1 &&
 		!!drilledShowId() &&
@@ -366,17 +379,6 @@ export function MyShowsPage() {
 		});
 	});
 
-	// Auto mode: reaching the bottom of a drilled show's list loads its next
-	// batch. Guarded by isLoadingMore so concurrent loads never stack.
-	createEffect(() => {
-		if (depth() < 1) return;
-		if (fetchMoreMode() !== "auto") return;
-		if (!showFetchMore()) return;
-		if (feedStore.isLoadingMore()) return;
-		if (focusedRow() < rowCount() - 1) return;
-		feedStore.loadMoreEpisodes(drilledShowId()).catch(() => {});
-	});
-
 	// ── helpers ─────────────────────────────────────────────────────────────────
 	const downloadLabel = (id: string) => {
 		switch (downloadStore.getDownloadStatus(id)) {
@@ -431,6 +433,10 @@ export function MyShowsPage() {
 	// ── drill / open ───────────────────────────────────────────────────────────
 	function open() {
 		if (depth() === 0) {
+			if (focusedOnMore0()) {
+				feedStore.loadMoreAllFeeds().catch(() => {});
+				return;
+			}
 			const d = focusedUnsub();
 			if (d) {
 				playUnsubscribedDownload(d);
@@ -639,7 +645,7 @@ export function MyShowsPage() {
 								<UnsubscribedRow
 									d={d}
 									index={() => shows().length + index()}
-									focused={() => nav.depthFocus(0)}
+									focused={focusedRow0}
 									active={isActive}
 									marker={marker}
 									downloadLabel={() => downloadLabel(d.episodeId)}
@@ -652,7 +658,22 @@ export function MyShowsPage() {
 							)}
 						</For>
 					</Show>
+				<Show when={showLoadMore()}>
+					<FetchMoreRow
+						index={() => shows().length + unsubs().length}
+						focused={focusedRow0}
+						onMore={focusedOnMore0}
+						active={isActive}
+						isLoadingMore={() => feedStore.isLoadingMore()}
+						nerd={nerd}
+						marker={marker}
+						onMouseDown={() => {
+							nav.setActivePane(DEPTH_CENTER_PANE);
+							nav.setDepthFocus(shows().length + unsubs().length, 0);
+						}}
+					/>
 				</Show>
+			</Show>
 			</Show>
 			{/* depth ≥1: episodes */}
 			<Show when={depth() >= 1}>
@@ -738,45 +759,56 @@ export function MyShowsPage() {
 
 	const previewContent = () =>
 		depth() === 0 ? (
-			// depth 0 preview: hovered unsubscribed-show download, else the
-			// hovered show.
-			<Show
-				when={focusedUnsub()}
-				fallback={
-					<Show
-						when={selectedShow()}
-						fallback={
-							<box padding={1}>
-								<text fg={muted()}>No show focused</text>
-							</box>
-						}
-					>
-						{(show) => (
-							<ShowPreview
-								show={() => show()}
-								title={() => showTitle(show())}
-								hint={() => showHint(show())}
-							/>
-						)}
-					</Show>
-				}
-			>
-				{(d) => (
-					<UnsubscribedPreview
-						d={() => d()}
-						downloadLabel={() => downloadLabel(d().episodeId)}
-						downloadColor={() => downloadColor(d().episodeId)}
-					/>
-				)}
+		// depth 0 preview: hovered "[Fetch More]" row, else the
+		// unsubscribed-show download, else the hovered show.
+		<>
+			<Show when={focusedOnMore0()}>
+				<FetchMorePreview
+					isLoadingMore={() => feedStore.isLoadingMore()}
+					manualText={() =>
+						"Load the next batch of older episodes across all subscribed shows (Enter)."
+					}
+				/>
 			</Show>
-		) : (
+			<Show when={!focusedOnMore0()}>
+				<Show
+					when={focusedUnsub()}
+					fallback={
+						<Show
+							when={selectedShow()}
+							fallback={
+								<box padding={1}>
+									<text fg={muted()}>No show focused</text>
+								</box>
+							}
+						>
+							{(show) => (
+								<ShowPreview
+									show={() => show()}
+									title={() => showTitle(show())}
+									hint={() => showHint(show())}
+								/>
+							)}
+						</Show>
+					}
+				>
+					{(d) => (
+						<UnsubscribedPreview
+							d={() => d()}
+							downloadLabel={() => downloadLabel(d().episodeId)}
+							downloadColor={() => downloadColor(d().episodeId)}
+						/>
+					)}
+				</Show>
+			</Show>
+		</>
+	) : (
 			// depth ≥1 preview: hovered episode (or the Fetch More row)
 			<>
 				<Show when={focusedOnMore()}>
 					<FetchMorePreview
-						isLoadingMore={() => feedStore.isLoadingMore()}
-						fetchMoreMode={fetchMoreMode}
-						manualText={() =>
+					isLoadingMore={() => feedStore.isLoadingMore()}
+					manualText={() =>
 							"Load the next batch of older episodes for this show (Enter)."
 						}
 					/>

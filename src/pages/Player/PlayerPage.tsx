@@ -19,6 +19,7 @@ import { useVisualizer } from "@/stores/visualizer";
 import { useAppStore } from "@/stores/app";
 import { useTheme } from "@/context/ThemeContext";
 import { useNavigation, DEPTH_CENTER_PANE } from "@/context/NavigationContext";
+import { useTerminalDimensions } from "@opentui/solid";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 
@@ -29,6 +30,7 @@ export function PlayerPage() {
 	const { theme } = useTheme();
 	const nav = useNavigation();
 	const viz = useVisualizer();
+	const dims = useTerminalDimensions();
 	const app = useAppStore();
 	const muted = () => theme.muted || theme.text;
 	// Settings master switch: off hides the waveform entirely (the store
@@ -89,9 +91,14 @@ export function PlayerPage() {
 						<text fg={theme.text}>
 							<strong>{ep().title}</strong>
 						</text>
-						<text fg={muted()}>
-							{ep().description?.slice(0, 500) ?? "No description available."}
-						</text>
+						<Show
+							when={ep().description}
+							fallback={<text fg={muted()}>No description available.</text>}
+						>
+							<scrollbox maxHeight={Math.floor(dims().height * 0.3)}>
+								<text fg={muted()}>{ep().description}</text>
+							</scrollbox>
+						</Show>
 
 						<ProgressBar />
 

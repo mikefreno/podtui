@@ -16,6 +16,7 @@
 import { Show } from "solid-js";
 import { format } from "date-fns";
 import type { RGBA } from "@opentui/core";
+import { useTerminalDimensions } from "@opentui/solid";
 import { useTheme } from "@/context/ThemeContext";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { NF_ICONS } from "@/utils/nerd-fonts";
@@ -186,6 +187,7 @@ export function EpisodePreview(props: {
 }) {
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
+	const dims = useTerminalDimensions();
 	return (
 		<box flexDirection="column" gap={1} padding={1}>
 			<text fg={theme.textPrimary ?? theme.text}>
@@ -208,10 +210,14 @@ export function EpisodePreview(props: {
 				<text fg={muted()}>by {props.author()}</text>
 			</Show>
 			<box height={1} />
-			<text fg={theme.textSecondary}>
-				{props.episode().description?.slice(0, 400) ?? "No description available."}
-				{(props.episode().description?.length ?? 0) > 400 ? "…" : ""}
-			</text>
+			<Show
+				when={props.episode().description}
+				fallback={<text fg={theme.textSecondary}>No description available.</text>}
+			>
+				<scrollbox maxHeight={Math.floor(dims().height * 0.3)}>
+					<text fg={theme.textSecondary}>{props.episode().description}</text>
+				</scrollbox>
+			</Show>
 			<box height={1} />
 			<text fg={muted()}>{props.hint()}</text>
 		</box>
@@ -221,7 +227,6 @@ export function EpisodePreview(props: {
 // ── FetchMorePreview ────────────────────────────────────────────────────────
 export function FetchMorePreview(props: {
 	isLoadingMore: () => boolean;
-	fetchMoreMode: () => string;
 	/** Manual-mode explanation line ("across all feeds" vs "for this show"). */
 	manualText: () => string;
 }) {
@@ -235,9 +240,7 @@ export function FetchMorePreview(props: {
 			<text fg={muted()}>
 				{props.isLoadingMore()
 					? "Loading the next batch of episodes…"
-					: props.fetchMoreMode() === "auto"
-						? "Auto mode: the next batch loads automatically at the bottom of the list."
-						: props.manualText()}
+					: props.manualText()}
 			</text>
 			<box height={1} />
 			<text fg={muted()}>enter: load more · h back</text>

@@ -19,7 +19,6 @@
 import { createMemo, createEffect, For, Show, onMount, onCleanup } from "solid-js";
 import { useFeedStore } from "@/stores/feed";
 import { useDownloadStore } from "@/stores/download";
-import { useAppStore } from "@/stores/app";
 import { prefetchCoverArt } from "@/utils/cover-art";
 import { DownloadStatus } from "@/types/episode";
 import { useTheme } from "@/context/ThemeContext";
@@ -86,10 +85,7 @@ function FeedPage() {
 
 	// ── Fetch More ───────────────────────────────────────────────────────────
 	// A "[Fetch More]" row at the bottom of the list advances every feed's
-	// loaded window by 50 episodes. manual mode: Enter on the row. auto mode:
-	// reaching the bottom row fetches automatically (see the effect below).
-	const app = useAppStore();
-	const fetchMoreMode = () => app.state().preferences.fetchMoreMode ?? "auto";
+	// loaded window by 50 episodes. Enter on the row to load the next batch.
 	const showFetchMore = () => feedStore.hasMoreAcrossAll();
 	const rowCount = () => episodes().length + (showFetchMore() ? 1 : 0);
 	const focus = () => nav.depthFocus(0);
@@ -136,16 +132,6 @@ function FeedPage() {
 			nav.setDepthFocus(rowCount() - 1, 0);
 	};
 	onMount(ensureFocus);
-
-	// Auto mode: reaching the bottom row loads the next batch. Guarded by
-	// isLoadingMore so concurrent loads never stack.
-	createEffect(() => {
-		if (fetchMoreMode() !== "auto") return;
-		if (!showFetchMore()) return;
-		if (feedStore.isLoadingMore()) return;
-		if (focusedRow() < rowCount() - 1) return;
-		feedStore.loadMoreAllFeeds().catch(() => {});
-	});
 
 	onMount(() => {
 		nav.registerResolver(
@@ -337,7 +323,6 @@ function FeedPage() {
 			<Show when={focusedOnMore()}>
 				<FetchMorePreview
 					isLoadingMore={() => feedStore.isLoadingMore()}
-					fetchMoreMode={fetchMoreMode}
 					manualText={() =>
 						"Load the next batch of older episodes across all feeds (Enter)."
 					}

@@ -49,22 +49,10 @@ export function rootFrameFor(
 	}
 }
 
-// The per-tab page components + pane counts live in `src/utils/layer-graph.ts`,
-// split out so this module stays free of `.tsx`/JSX imports (unit-testable).
-
-// Yazi-style pane grow ratios (parent : current : preview). Panes use
-// flexGrow (Yoga) so columns always sum to the row width regardless of
-// terminal size — more robust than fixed percentages and exactly mirrors
-// yazi's `mgr.ratio` config. Set a slot's ratio to 0 to hide it (2-pane tabs).
-//
-// Current ratios: parent : current : preview = 2 : 5 : 3, i.e. 20% / 50% / 30%
-// of the row width (2 : 5 : 3 of 10). 2-pane tabs drop the preview slot and
-// give `current` the combined 8/10 (80%).
-export const PANE_RATIO = {
-	parent: 2,
-	current: 5,
-	preview: 3,
-} as const;
+// Pane sizes are now user-resizable: the split positions (fractions of the
+// row width) live in the shared pane-layout store (`@/stores/pane-layout`),
+// which `PaneRow` consumes. `PANE_RATIO` was removed — see DEFAULT_PANE_SPLITS
+// (0.2 / 0.7) for the historical 2:5:3 start.
 
 // Number of *focusable* content panes per tab. The three visible columns
 // (parent | current | preview) are a *render* concern, NOT three panes — for

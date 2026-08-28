@@ -289,20 +289,6 @@ export function usePreferencesItems(): SettingItem[] {
 			),
 		},
 		{
-			id: "fetchMore",
-			label: "Fetch More",
-			kind: "select",
-			display: () => (prefs().fetchMoreMode === "auto" ? "Auto" : "Manual"),
-			help: () =>
-				`How the Feed and per-show episode lists load older episodes.\nManual: a "[Fetch More]" button at the bottom of the list.\nAuto: fetches automatically when reaching the bottom.\nType: select\nDefault: auto\nCurrent: ${prefs().fetchMoreMode === "auto" ? "Auto" : "Manual"}\nCycle with j/k; Enter to apply.`,
-			cycle: (dir) => {
-				const modes: Array<"manual" | "auto"> = ["manual", "auto"];
-				const idx = modes.indexOf(prefs().fetchMoreMode ?? "auto");
-				const next = modes[(idx + dir + modes.length) % modes.length];
-				app.updatePreferences({ fetchMoreMode: next });
-			},
-		},
-		{
 			id: "refreshInterval",
 			label: "Feed Refresh Interval",
 			kind: "number",

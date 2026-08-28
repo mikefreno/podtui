@@ -39,6 +39,11 @@ const MAX_EPISODES_REFRESH = 50;
 /** Max episodes to fetch on initial subscribe */
 const MAX_EPISODES_SUBSCRIBE = 20;
 
+/** Floor on the visible episode window for a subscribed show: at least this
+ *  many most-recent episodes always load, regardless of a stricter count or
+ *  date cache bound. Overridden by episodeKeepFn. */
+const MIN_EPISODES_PER_SHOW = 5;
+
 /** Fetch-more step in date mode: each press reveals the next two weeks of
  *  episodes past the oldest loaded one, instead of a fixed episode count. */
 const FETCH_MORE_WINDOW_DAYS = 14;
@@ -123,7 +128,10 @@ const fullEpisodeCache = new Map<string, Episode[]>();
 const episodeLoadCount = new Map<string, number>();
 
 /** Read the episode cache bound from preferences: a closure that decides
- *  whether the episode at `index` (0 = newest, after sort) is kept. */
+ *  whether the episode at `index` (0 = newest, after sort) is kept. The five
+ *  most-recent episodes of a subscribed show always stay (MIN_EPISODES_PER_SHOW),
+ *  overriding a stricter count or date bound so every show surfaces at least
+ *  five episodes. */
 function episodeKeepFn(prefs: {
 	episodeCacheMode: "date" | "count";
 	episodeCacheCount: number;
@@ -132,10 +140,12 @@ function episodeKeepFn(prefs: {
 	const now = new Date();
 	if (prefs.episodeCacheMode === "count") {
 		const count = Math.max(1, prefs.episodeCacheCount);
-		return (_ep: Episode, index: number) => index < count;
+		return (_ep: Episode, index: number) =>
+			index < Math.max(count, MIN_EPISODES_PER_SHOW);
 	}
 	const days = Math.max(1, prefs.episodeCacheDays);
-	return (ep: Episode) => episodeInWindow(ep, now, days);
+	return (ep: Episode, index: number) =>
+		index < MIN_EPISODES_PER_SHOW || episodeInWindow(ep, now, days);
 }
 
 /** Timestamp for window math — undated episodes sort/compare as NEWEST

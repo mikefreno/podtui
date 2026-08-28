@@ -26,6 +26,8 @@
  *   bun scripts/tui-harness.tsx type "<text>"
  *   bun scripts/tui-harness.tsx wait <ms>
  *   bun scripts/tui-harness.tsx resize <w> <h>
+ *   bun scripts/tui-harness.tsx mouse <x> <y> <down|up|click>
+ *   bun scripts/tui-harness.tsx mdrag <x1> <y1> <x2> <y2>   # border/seek drag
  *   bun scripts/tui-harness.tsx frame                        # re-render, no new action
  *   bun scripts/tui-harness.tsx state [all|nav|audio|feed|app]
  *   bun scripts/tui-harness.tsx actions                      # print action log
@@ -79,7 +81,9 @@ type Action =
 	| { t: "enter" | "escape" | "tab" | "space" | "backspace"; mods?: Mod[] }
 	| { t: "type"; s: string }
 	| { t: "wait"; ms: number }
-	| { t: "resize"; w: number; h: number };
+	| { t: "resize"; w: number; h: number }
+	| { t: "mouse"; kind: "down" | "up" | "click"; x: number; y: number }
+	| { t: "mdrag"; x1: number; y1: number; x2: number; y2: number };
 
 function loadActions(): Action[] {
 	try {
@@ -258,12 +262,32 @@ const BUILDERS: Record<string, (positional: string[]) => Action> = {
 		if (!p[0]) throw new Error("wait requires <ms>");
 		return { t: "wait", ms: parseInt(p[0], 10) || 0 };
 	},
+			
 	resize: (p) => {
 		if (!p[0] || !p[1]) throw new Error("resize requires <w> <h>");
 		return {
 			t: "resize",
-			w: parseInt(p[0], 10) || 100,
-			h: parseInt(p[1], 10) || 30,
+			w: parseInt(p[0], 10) || 0,
+			h: parseInt(p[1], 10) || 0,
+		};
+	},
+	mouse: (p) => {
+		if (!p[0] || !p[1] || !p[2]) throw new Error("mouse requires <x> <y> <down|up|click>");
+		return {
+			t: "mouse",
+			kind: p[2] as "down" | "up" | "click",
+			x: parseInt(p[0], 10),
+			y: parseInt(p[1], 10),
+		};
+	},
+	mdrag: (p) => {
+		if (p.length < 4) throw new Error("mdrag requires <x1> <y1> <x2> <y2>");
+		return {
+			t: "mdrag",
+			x1: parseInt(p[0], 10),
+			y1: parseInt(p[1], 10),
+			x2: parseInt(p[2], 10),
+			y2: parseInt(p[3], 10),
 		};
 	},
 };
@@ -324,8 +348,13 @@ async function execAction(setup: any, a: Action): Promise<void> {
 		case "wait":
 			await new Promise((r) => setTimeout(r, a.ms));
 			break;
-		case "resize":
-			setup.resize(a.w, a.h);
+		case "mouse":
+			if (a.kind === "click") await setup.mockMouse.click(a.x, a.y);
+			else if (a.kind === "down") await setup.mockMouse.pressDown(a.x, a.y);
+			else await setup.mockMouse.release(a.x, a.y);
+			break;
+		case "mdrag":
+			await setup.mockMouse.drag(a.x1, a.y1, a.x2, a.y2);
 			break;
 	}
 	await setup.renderOnce();
