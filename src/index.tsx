@@ -1,5 +1,6 @@
 import { onCleanup } from "solid-js";
 import { setupTerminalRecovery } from "./utils/terminal-recovery";
+import { installNestedScrollBehavior } from "./utils/nested-scroll";
 import type { Feed } from "./types/feed"
 import type { Episode } from "./types/episode"
 
@@ -236,6 +237,8 @@ if (cliArgs.query !== null || cliArgs.play !== null) {
 		const { NavigationProvider } = await import("./context/NavigationContext");
 		const { DialogProvider } = await import("./ui/dialog");
 		const { CommandProvider } = await import("./ui/command");
+		// Nested scroll sections favor the innermost one under the cursor.
+		installNestedScrollBehavior();
 
 		function RendererSetup(props: { children: unknown }) {
 			const renderer = useRenderer();
