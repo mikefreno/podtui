@@ -11,6 +11,7 @@ import {
 } from "../utils/app-persistence";
 import { useFeedStore } from "./feed";
 import type { SearchResult, SearchScope } from "../types/source";
+import { createPersistScheduler } from "./persist";
 
 const STORAGE_SCOPE_KEY = "podtui_search_scope";
 const MAX_HISTORY = 10;
@@ -69,6 +70,15 @@ export function createSearchStore() {
 	const [history, setHistory] = createSignal<string[]>([]);
 	const [selectedSources, setSelectedSources] = createSignal<string[]>([]);
 	const [scope, setScopeState] = createSignal<SearchScope>(loadScope());
+
+	/** History persistence: rapid mutations collapse into one debounced
+	 *  write; the closure reads the live signal so a flush lands the
+	 *  latest list. */
+	const persistHistory = createPersistScheduler((domain: string) => {
+		if (domain === "search-history") {
+			saveSearchHistoryToFile(history());
+		}
+	});
 
 	/** Load search history from file (fire-and-forget; recents appear as
 	 *  soon as the file is read). */
@@ -167,24 +177,18 @@ export function createSearchStore() {
 	};
 
 	const addToHistory = (q: string) => {
-		setHistory((prev) => {
-			const updated = sanitizeHistory([q, ...prev]);
-			saveSearchHistoryToFile(updated);
-			return updated;
-		});
+		setHistory((prev) => sanitizeHistory([q, ...prev]));
+		persistHistory.schedule("search-history");
 	};
 
 	const clearHistory = () => {
 		setHistory([]);
-		saveSearchHistoryToFile([]);
+		persistHistory.schedule("search-history");
 	};
 
 	const removeFromHistory = (q: string) => {
-		setHistory((prev) => {
-			const updated = prev.filter((h) => h !== q);
-			saveSearchHistoryToFile(updated);
-			return updated;
-		});
+		setHistory((prev) => prev.filter((h) => h !== q));
+		persistHistory.schedule("search-history");
 	};
 
 	const clearResults = () => {
