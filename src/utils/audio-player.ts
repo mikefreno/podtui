@@ -579,8 +579,12 @@ export class MpvBackend implements AudioBackend {
 		if (pausedSeek) {
 			// time-pos sent before file-loaded is silently dropped by mpv
 			// (no file yet) — the preload then parked at 0 and the restore
-			// position was lost. Wait for the open, then seek.
-			await fileLoaded;
+			// position was lost. Wait for the open, then seek. A dead URL
+			// never fires file-loaded at all (mpv keeps retrying the
+			// open), so end-file (the open-failure notification) races it
+			// and the wait folds to "not loaded" instead of stalling the
+			// load mutex for the full 5s timeout.
+			await Promise.race([fileLoaded, this.conn?.waitEvent("end-file", 5000)]);
 			await this.send(["set_property", "time-pos", pausedSeek]);
 			this._position = pausedSeek;
 		}
