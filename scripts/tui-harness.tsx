@@ -595,9 +595,7 @@ async function snapshotState(audioControls: any): Promise<Record<string, unknown
 		const feeds = fs_.feeds ? fs_.feeds() : [];
 		state.feed = {
 			count: feeds?.length ?? 0,
-			sel: fs_.selectedFeedId ? fs_.selectedFeedId() : null,
 			loading: fs_.isLoadingFeeds ? fs_.isLoadingFeeds() : null,
-			titles: (feeds ?? []).slice(0, 8).map((f: any) => f?.podcast?.title),
 		};
 	} catch (e) {
 		state.feed = "ERR: " + String(e);
