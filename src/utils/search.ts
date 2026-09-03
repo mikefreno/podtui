@@ -1,5 +1,6 @@
 import { searchSourceByType, searchEpisodesByType } from "./source-searcher";
 import { parseRSSFeed } from "../api/rss-parser";
+import { fetchFeedXml } from "./rss-client";
 import { SourceType } from "../types/source";
 import type { PodcastSource, SearchResult } from "../types/source";
 
@@ -81,15 +82,8 @@ export const searchByFeedUrl = async (
   if (!FEED_URL_RE.test(trimmed)) return [];
 
   try {
-    const response = await fetch(trimmed, {
-      headers: {
-        "Accept-Encoding": "identity",
-        Accept: "application/rss+xml, application/xml, text/xml, */*",
-      },
-    });
-    if (!response.ok) return [];
-
-    const xml = await response.text();
+    const xml = await fetchFeedXml(trimmed);
+    if (xml === null) return [];
     const podcast = parseRSSFeed(xml, trimmed);
 
     return [
