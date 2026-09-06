@@ -84,7 +84,11 @@ export const searchByFeedUrl = async (
   try {
     const xml = await fetchFeedXml(trimmed);
     if (xml === null) return [];
-    const podcast = parseRSSFeed(xml, trimmed);
+    // Full parse's episodes are dead weight here (2,100+ stale copies were
+    // previously persisted inside Feed.podcast): addFeed refetches through
+    // fetchEpisodes and nothing reads Podcast.episodes off a search result.
+    const { episodes: _episodes, ...podcast } = parseRSSFeed(xml, trimmed);
+    void _episodes;
 
     return [
       {

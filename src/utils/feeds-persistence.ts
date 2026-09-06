@@ -83,6 +83,18 @@ function reviveDates(feed: Feed): Feed {
 		})),
 	};
 }
+
+/** Config-legacy baggage: search-time parseRSSFeed once embedded the full
+ *  episode history inside podcast.episodes (2,100+ stale copies, 3.8 MB of
+ *  config). Nothing reads them — feed.episodes is the source of truth — so
+ *  every load/save drops them. */
+function stripLegacyPodcastEpisodes(feed: Feed): Feed {
+	if (!("episodes" in feed.podcast)) return feed;
+	const { episodes: _legacy, ...podcast } = feed.podcast;
+	void _legacy;
+	return { ...feed, podcast: podcast as Feed["podcast"] };
+}
+
 /** Load feeds from config.json, pruning episodes outside the retention
  *  window (completed downloads always kept). When anything was pruned, the
  *  pruned list is rewritten to config.json (startup cleanup for legacy
@@ -93,7 +105,9 @@ export async function loadFeedsFromFile(
 	try {
 		const cfg = await loadConfig();
 		if (!Array.isArray(cfg.feeds)) return [];
-		const feeds = cfg.feeds.map(reviveDates);
+		const feeds = cfg.feeds
+			.map(reviveDates)
+			.map(stripLegacyPodcastEpisodes);
 		const downloadedIds = await readDownloadedEpisodeIds();
 		const now = new Date();
 		let prunedAny = false;
@@ -122,12 +136,14 @@ export function saveFeedsToFile(feeds: Feed[], windowDays?: number): void {
 	(async () => {
 		try {
 			const downloadedIds = await readDownloadedEpisodeIds();
-			const pruned = feeds.map((f) => ({
-				...f,
-				episodes: f.episodes.filter((ep) =>
-					episodeIsPersistable(ep, downloadedIds, new Date(), windowDays),
-				),
-			}));
+			const pruned = feeds
+				.map(stripLegacyPodcastEpisodes)
+				.map((f) => ({
+					...f,
+					episodes: f.episodes.filter((ep) =>
+						episodeIsPersistable(ep, downloadedIds, new Date(), windowDays),
+					),
+				}));
 			updateConfig({ feeds: pruned });
 		} catch {
 			updateConfig({ feeds }); /* never lose data on an error path */

@@ -36,6 +36,7 @@ import { whenConfigIdle } from "../src/utils/config";
 import { FeedVisibility } from "../src/types/feed";
 import type { Feed } from "../src/types/feed";
 import type { Episode } from "../src/types/episode";
+import type { PodcastWithEpisodes } from "../src/types/podcast";
 
 const configJsonPath = join(configHome, "podtui", "config.json");
 const downloadsJsonPath = join(configHome, "podtui", "downloads.json");
@@ -167,6 +168,73 @@ test("episodeIsPersistable keeps an episode with an invalid pubDate", () => {
 
 test("DEFAULT_EPISODE_WINDOW_DAYS is 60", () => {
 	expect(DEFAULT_EPISODE_WINDOW_DAYS).toBe(60);
+});
+
+// ── Legacy podcast.episodes baggage ────────────────────────────────────────
+
+test("saveFeedsToFile strips legacy podcast.episodes from the persisted feed", async () => {
+	const feed = makeFeed([
+		makeEpisode({ id: "recent-id", pubDate: new Date(Date.now() - 5 * DAY) }),
+	]);
+	// Simulate the pre-fix shape: parseRSSFeed's full history embedded on
+	// the podcast object (841 stale copies were persisted this way).
+	const podcastWithLegacy = feed.podcast as PodcastWithEpisodes;
+	podcastWithLegacy.episodes = [
+		makeEpisode({ id: "stale-history-1" }),
+		makeEpisode({ id: "stale-history-2" }),
+	];
+
+	saveFeedsToFile([feed]);
+	await settleWrites();
+	const raw = await Bun.file(configJsonPath).json();
+	expect("episodes" in raw.feeds[0].podcast).toBe(false);
+});
+
+test("loadFeedsFromFile drops legacy podcast.episodes from a seeded config", async () => {
+	await Bun.write(
+		configJsonPath,
+		JSON.stringify({
+			feeds: [
+				{
+					id: "feed-1",
+					podcast: {
+						id: "feed-1",
+						title: "Baggage Show",
+						description: "",
+						author: "tester",
+						feedUrl: "https://example.com/baggage.xml",
+						lastUpdated: new Date().toISOString(),
+						isSubscribed: true,
+						episodes: [
+							{ id: "huge-stale-1", title: "archived copy" },
+							{ id: "huge-stale-2", title: "archived copy" },
+						],
+					},
+					episodes: [
+						{
+							id: "recent-id",
+							podcastId: "feed-1",
+							title: "Recent",
+							description: "",
+							audioUrl: "https://example.com/audio/recent.mp3",
+							duration: 60,
+							pubDate: new Date().toISOString(),
+						},
+					],
+					visibility: "public",
+					sourceId: "source-1",
+					lastUpdated: new Date().toISOString(),
+					isPinned: false,
+				},
+			],
+		}),
+	);
+
+	const feeds = await loadFeedsFromFile();
+
+	expect(feeds).toHaveLength(1);
+	expect(feeds[0].episodes.map((e) => e.id)).toEqual(["recent-id"]);
+	expect("episodes" in feeds[0].podcast).toBe(false);
 });
 
 // ── Save path: retention window applied with completed-download exemption ──
