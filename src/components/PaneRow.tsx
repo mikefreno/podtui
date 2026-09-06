@@ -5,9 +5,9 @@
  * CENTER (current) column are draggable and resize the neighboring panes.
  * Split positions live in the shared pane-layout store (`@/stores/pane-layout`)
  * as fractions of the row width; this component resolves them to pixel
- * columns, gives each column an explicit width (so the drag strips sit
- * exactly on the drawn borders), and renders two invisible grab handles over
- * the border cells.
+ * columns, gives each column an explicit width (so the grab zones sit
+ * exactly on the drawn borders), and renders two 3-column invisible grab
+ * zones over the borders.
  *
  * Column semantics (per the yazi depth model):
  *   parent  — the previous-depth list. Renders a muted `—` placeholder and
@@ -160,15 +160,22 @@ function Pane(props: {
 	);
 }
 
-/** A 1-column invisible grab handle covering exactly one border of the
- *  current pane. `onBegin` is called on mousedown; subsequent drag/drag-end
- *  events bubble up the row and drive `usePaneLayout` there. On hover or
- *  while dragging it overdraws the border with a full-height accent `│`
- *  line (a bordered box would render as a blocky rectangle instead). */
+/** A 3-column invisible grab zone centered on one border of the current
+ *  pane: the border column plus one column of help padding on each side,
+ *  so the thin border is easy to target with a mouse. `onBegin` is called
+ *  on mousedown with the cursor's x; the row records that grab offset so
+ *  the border stays glued to the cursor while dragging. On hover or while
+ *  dragging it overdraws just the border column with a full-height accent
+ *  `│` line (a bordered box would render as a blocky rectangle instead).
+ *  The two padding columns are transparent; the hit grid is rect-based, so
+ *  they capture clicks too — they must never overlap interactive content. */
 function Splitter(props: {
+	/** Column of the border itself. The strip spans `left - 1` .. `left + 1`
+	 *  (the border plus one help-padded column each side); the highlight
+	 *  renders at `left`. */
 	left: number;
 	active: boolean;
-	onBegin: () => void;
+	onBegin: (x: number) => void;
 }) {
 	const { theme } = useTheme();
 	const dims = useTerminalDimensions();
@@ -177,14 +184,14 @@ function Splitter(props: {
 	return (
 		<box
 			position="absolute"
-			left={props.left}
+			left={props.left - 1}
 			top={0}
-			width={1}
+			width={3}
 			height="100%"
-			onMouseDown={(e) => {
-				e.preventDefault?.();
-				props.onBegin();
-			}}
+		onMouseDown={(e) => {
+			e.preventDefault?.();
+			props.onBegin(e.x);
+		}}
 			onMouseOver={() => setHovered(true)}
 			onMouseOut={() => setHovered(false)}
 		>
@@ -192,7 +199,7 @@ function Splitter(props: {
 				{/* Draw the accent edge down the full pane height; the box clips
 				 * any excess rows below the row's bottom edge. */}
 				<text fg={theme.primary} selectable={false}>
-					{"│\n".repeat(dims().height)}
+					{" │\n".repeat(dims().height)}
 				</text>
 			</Show>
 		</box>
@@ -243,22 +250,34 @@ export function PaneRow(props: PaneRowProps) {
 	const previewWidth = () => width() - pixels().rightPx;
 
 	// ── Drag state ──────────────────────────────────────────────────────────
-	// onMouseDown on a Splitter records which border is being dragged; the
-	// row then lives-updates the split from the absolute drag x (bubbled up
-	// from whatever renderable the cursor captures) and commits on release.
+	// onMouseDown on a Splitter records which border is being dragged and
+	// the cursor's grab offset from that border's column; the row then
+	// lives-updates the split from the drag x (minus the offset, so the
+	// border stays glued to the cursor) and commits on release.
 	const [activeSplit, setActiveSplit] = createSignal<"left" | "right" | null>(
 		null,
 	);
-	const beginDrag = (which: "left" | "right") => () => setActiveSplit(which);
+	// Column of the border a strip centers on (the current pane's edge).
+	const borderCol = (which: "left" | "right") =>
+		which === "left" ? pixels().leftPx : pixels().rightPx - 1;
+	// Cursor x relative to the grabbed border column. Set on mousedown and
+	// subtracted from every drag x so the border tracks the cursor rather
+	// than jumping to it.
+	let grabOffset = 0;
+	const beginDrag = (which: "left" | "right") => (x: number) => {
+		grabOffset = x - borderCol(which);
+		setActiveSplit(which);
+	};
 	const handleDrag = (e: { x: number }) => {
 		const which = activeSplit();
 		if (!which) return;
-		if (which === "left") layout.setLeft(e.x, width());
-		else layout.setRight(e.x, width());
+		if (which === "left") layout.setLeft(e.x - grabOffset, width());
+		else layout.setRight(e.x - grabOffset, width());
 	};
 	const handleDragEnd = () => {
 		if (activeSplit()) layout.commit();
 		setActiveSplit(null);
+		grabOffset = 0;
 	};
 
 	return (
@@ -300,13 +319,13 @@ export function PaneRow(props: PaneRowProps) {
 			{/* ── drag handles over the current pane's borders ───────────────── */}
 					<Show when={hasRoom()}>
 			<Splitter
-				left={pixels().leftPx}
+				left={borderCol("left")}
 				active={activeSplit() === "left"}
 				onBegin={beginDrag("left")}
 			/>
 			<Show when={panes() === 3}>
 				<Splitter
-					left={pixels().rightPx - 1}
+					left={borderCol("right")}
 					active={activeSplit() === "right"}
 					onBegin={beginDrag("right")}
 				/>

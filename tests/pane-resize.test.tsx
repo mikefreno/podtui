@@ -8,10 +8,11 @@
  * content starts one column in — `leftPx + 1`. Hence
  * `leftPx = firstC - 1`, `rightPx = firstV`.
  *
- * The drag strips overlay the border cells (left strip at [left, left+2),
- * right strip at [right-2, right)). The test presses inside a strip and
- * drags across the row — the drag bubbles to the row container which moves
- * the split, so the panes must re-render at the new columns.
+ * The grab zones overlay each border: 3 columns wide, the border plus one
+ * help-padded column each side (left zone at [left-1, left+1], right zone
+ * at [right-2, right)). The test presses inside a zone and drags across
+ * the row — the drag bubbles to the row container which moves the split,
+ * so the panes must re-render at the new columns.
  */
 import { test, expect, afterAll } from "bun:test";
 import { testRender } from "@opentui/solid";
@@ -102,7 +103,7 @@ test("dragging the left border resizes parent vs current", async () => {
 	resetSplits();
 	await setup.renderOnce();
 
-	// Press on the left strip (border at 20 → strip covers 20) and drag
+	// Press on the left zone (border at 20 → zone covers 19-21) and drag
 	// toward the middle of the row.
 	await setup.mockMouse.drag(20, 5, 45, 5);
 	for (let i = 0; i < 10; i++) await setup.renderOnce();
@@ -122,7 +123,7 @@ test("dragging the right border resizes current vs preview", async () => {
 	resetSplits();
 	await setup.renderOnce();
 
-	// Press on the right strip (border at 69 → strip covers 69) and drag
+	// Press on the right zone (border at 69 → zone covers 68-70) and drag
 	// toward the right edge of the row.
 	await setup.mockMouse.drag(69, 5, 90, 5);
 	for (let i = 0; i < 10; i++) await setup.renderOnce();
@@ -130,6 +131,52 @@ test("dragging the right border resizes current vs preview", async () => {
 	expect(after.right).toBeGreaterThanOrEqual(84);
 	expect(after.right).toBeLessThanOrEqual(85); // clamped at preview min 15
 	expect(after.left).toBe(20);
+});
+
+test("grabbing the left zone from its far edge does not jump the border", async () => {
+	const setup = await renderRow(3);
+	cleanups.push(() => setup.renderer.destroy());
+	resetSplits();
+	await setup.renderOnce();
+
+	// Press one column LEFT of the border (x=19, border at 20 → offset -1)
+	// and drag to 37. The border must track the grab, landing at 38 (37 + 1),
+	// not at 37. Without the grab offset it would jump one column.
+	await setup.mockMouse.drag(19, 5, 37, 5);
+	for (let i = 0; i < 10; i++) await setup.renderOnce();
+	const after = readBounds(setup.captureSpans());
+	expect(after.left).toBe(38);
+	expect(after.right).toBe(70);
+});
+
+test("grabbing the left zone from its inner edge does not jump the border", async () => {
+	const setup = await renderRow(3);
+	cleanups.push(() => setup.renderer.destroy());
+	resetSplits();
+	await setup.renderOnce();
+
+	// Press one column RIGHT of the border (x=21, border at 20 → offset +1)
+	// and drag to 37. The border lands at 36 (37 - 1), not 37.
+	await setup.mockMouse.drag(21, 5, 37, 5);
+	for (let i = 0; i < 10; i++) await setup.renderOnce();
+	const after = readBounds(setup.captureSpans());
+	expect(after.left).toBe(36);
+	expect(after.right).toBe(70);
+});
+
+test("a click inside a padded grab zone (off the border) does not resize", async () => {
+	const setup = await renderRow(3);
+	cleanups.push(() => setup.renderer.destroy());
+	resetSplits();
+	await setup.renderOnce();
+
+	// A bare click (no drag) on the help-padded column beside the border
+	// must not move the split — only an actual drag does.
+	await setup.mockMouse.click(19, 5);
+	await setup.renderOnce();
+	const { left, right } = readBounds(setup.captureSpans());
+	expect(left).toBe(20);
+	expect(right).toBe(70);
 });
 
 test("a plain click away from the borders does not resize", async () => {
