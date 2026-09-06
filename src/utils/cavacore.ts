@@ -95,6 +95,8 @@ export class CavaCore {
 	private _bars = 0;
 	private _channels = 1;
 	private _destroyed = false;
+	/** Serialized last init config — identical init() calls are no-ops. */
+	private lastConfigKey = "";
 
 	/** Use loadCavaCore() instead of constructing directly. */
 	constructor(lib: CavaLib) {
@@ -112,15 +114,25 @@ export class CavaCore {
 
 	/**
 	 * Initialize the cavacore engine with the given configuration.
-	 * Must be called before execute(). Can be called again after destroy()
-	 * to reinitialize with different parameters.
+	 * Must be called before execute(). Identical configs are a no-op:
+	 * cava_init/destroy churn leaks the old plan's FFTW work buffers
+	 * (upstream frees only its own struct), so a pipeline restart with
+	 * unchanged bars/rate/cutoffs must re-USE the live plan.
 	 */
 	init(config: CavaCoreConfig = {}): void {
+		const cfg = { ...DEFAULTS, ...config };
+		if (
+			this.plan !== null &&
+			!this._destroyed &&
+			this.lastConfigKey === JSON.stringify(cfg)
+		) {
+			return;
+		}
+		this.lastConfigKey = JSON.stringify(cfg);
 		if (this.plan) {
 			this.destroy();
 		}
 
-		const cfg = { ...DEFAULTS, ...config };
 		this._bars = cfg.bars;
 		this._channels = cfg.channels;
 
