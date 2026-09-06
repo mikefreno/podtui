@@ -19,7 +19,9 @@ import type { MouseEvent } from "@opentui/core";
 type ScrollDir = "up" | "down" | "left" | "right";
 
 // The scrollbox's own wheel handler (scrolls, then bubbles to its parent).
-const original = ScrollBoxRenderable.prototype.onMouseEvent;
+const original = (ScrollBoxRenderable.prototype as unknown as {
+	onMouseEvent: (event: MouseEvent) => void;
+}).onMouseEvent;
 
 let installed = false;
 
