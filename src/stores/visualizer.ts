@@ -344,6 +344,7 @@ function createVisualizerStore(): VisualizerStore {
 
 	// ── Render loop (called at ~30fps) ─────────────────────────────────
 
+	let lastBarWriteAt = 0;
 	const renderFrame = () => {
 		if (!cava?.isReady || !sampleBuffer || !pcm) return;
 
@@ -374,11 +375,17 @@ function createVisualizerStore(): VisualizerStore {
 		const count = pcm.readWindow(sampleBuffer, target);
 		// Never feed a partial FFT window to cava.
 		if (count < sampleBuffer.length) return;
-
 		const output = cava.execute(sampleBuffer);
 
-		// Normalize against the running peak and copy to a new array
-		setBarData(scaler(output));
+		// Write the UI signal at ~10fps, not 30: cava already smooths
+		// (noise reduction + peak release), and each Solid write costs a
+		// renderer diff pass. 3 of every 4 frames update only the pipeline.
+		const nowMs = performance.now();
+		if (nowMs - lastBarWriteAt >= 95) {
+			lastBarWriteAt = nowMs;
+			// Normalize against the running peak and copy to a new array
+			setBarData(scaler(output));
+		}
 		// Fresh frames only count once the position clock has MOVED from
 		// the resume point: while the player is still re-buffering after a
 		// long pause, the cache serves the same window and the spinner must
