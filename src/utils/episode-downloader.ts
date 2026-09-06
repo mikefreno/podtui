@@ -124,17 +124,17 @@ export async function downloadEpisode(
       }
     }
 
-    const reader = body.getReader()
-    const chunks: Uint8Array[] = []
+    const fileWriter = Bun.file(filePath).writer()
     let bytesDownloaded = 0
     let lastProgressTime = Date.now()
     let lastProgressBytes = 0
 
+    const reader = body.getReader()
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      chunks.push(value)
+      fileWriter.write(value)
       bytesDownloaded += value.length
 
       // Report progress roughly every 250ms
@@ -152,22 +152,14 @@ export async function downloadEpisode(
       }
     }
 
-    // Concatenate chunks and write to file
-    const totalSize = bytesDownloaded
-    const buffer = new Uint8Array(totalSize)
-    let offset = 0
-    for (const chunk of chunks) {
-      buffer.set(chunk, offset)
-      offset += chunk.length
-    }
-
-    await Bun.write(filePath, buffer)
+    // Finalize the streamed file
+    await fileWriter.end()
 
     // Final progress report
     if (onProgress) {
       onProgress({
-        bytesDownloaded: totalSize,
-        totalBytes: contentLength || totalSize,
+        bytesDownloaded,
+        totalBytes: contentLength || bytesDownloaded,
         percent: 100,
         speed: 0,
       })
@@ -176,7 +168,7 @@ export async function downloadEpisode(
     return {
       success: true,
       filePath,
-      fileSize: totalSize,
+      fileSize: bytesDownloaded,
     }
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === "AbortError") {
