@@ -4,7 +4,7 @@ import { installNestedScrollBehavior } from "./utils/nested-scroll";
 import type { Feed } from "./types/feed"
 import type { Episode } from "./types/episode"
 
-const VERSION = "0.9.0";
+const VERSION = "0.9.1";
 
 interface CliArgs {
 	version: boolean;
