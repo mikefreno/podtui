@@ -20,6 +20,7 @@ import { useTerminalDimensions } from "@opentui/solid";
 import { useTheme } from "@/context/ThemeContext";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { NF_ICONS } from "@/utils/nerd-fonts";
+import { useHeldFlag } from "@/hooks/useHeldFlag";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import type { Episode } from "@/types/episode";
 
@@ -138,6 +139,10 @@ export function FetchMoreRow(props: {
 	onMouseDown: () => void;
 }) {
 	const { theme } = useTheme();
+	// Hold the spinner past the raw load signal: a warm-cache load can
+	// begin and end between two renderer frames, and without the hold the
+	// [Fetch More] → spinner swap paints zero frames.
+	const loading = useHeldFlag(props.isLoadingMore);
 	const ref = useScrollIntoView(props.onMore);
 	const bg = () =>
 		props.index() === props.focused() && props.active()
@@ -165,7 +170,7 @@ export function FetchMoreRow(props: {
 				<text fg={fg()}>{NF_ICONS.more}</text>
 			)}
 			<Show
-				when={!props.isLoadingMore()}
+				when={!loading()}
 				fallback={<LoadingIndicator label="Fetching…" />}
 			>
 				<text fg={fg()}>[Fetch More]</text>
@@ -232,13 +237,16 @@ export function FetchMorePreview(props: {
 }) {
 	const { theme } = useTheme();
 	const muted = () => theme.muted || theme.text;
+	// Same minimum-spinning window as FetchMoreRow: keep the "Loading…"
+	// line up across the (sub-frame) cached load burst.
+	const loading = useHeldFlag(props.isLoadingMore);
 	return (
 		<box flexDirection="column" gap={1} padding={1}>
 			<text fg={theme.textPrimary ?? theme.text}>
 				<strong>[Fetch More]</strong>
 			</text>
 			<text fg={muted()}>
-				{props.isLoadingMore()
+				{loading()
 					? "Loading the next batch of episodes…"
 					: props.manualText()}
 			</text>

@@ -47,6 +47,10 @@ import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { useScrollIntoView } from "@/hooks/useScrollIntoView";
 import { useSelectionMarker } from "@/hooks/useSelectionMarker";
+import {
+	useStableListFocus,
+	FETCH_MORE_ROW_ID,
+} from "@/hooks/useStableListFocus";
 
 // ── render components ────────────────────────────────────────────────────────
 // Depth-0 rows (subscribed shows, unsubscribed-show downloads) and their
@@ -360,6 +364,32 @@ export function MyShowsPage() {
 	});
 
 	const curLen = () => (depth() === 0 ? depth0Count() : rowCount());
+
+	// ── Focus stability across lazy loads ─────────────────────────────────────
+	// The nav cursor is a plain row index; fetch-more inserts revealed
+	// episodes above the [Fetch More] row, silently moving an index-stable
+	// cursor onto a different episode or off the button. Re-anchor the cursor
+	// onto the focused row's ID after any row-count change, at both depths
+	// (the shows list shifts when subscriptions or unsubscribed downloads
+	// change; the episode list shifts on fetch-more).
+	useStableListFocus({
+		count: curLen,
+		getItemId: (i) => {
+			if (depth() === 0) {
+				const showsLen = shows().length;
+				const unsubsLen = unsubs().length;
+				if (i < showsLen) return shows()[i]?.id;
+				if (i < showsLen + unsubsLen)
+					return unsubs()[i - showsLen]?.episodeId;
+				return FETCH_MORE_ROW_ID;
+			}
+			return i === episodes().length
+				? FETCH_MORE_ROW_ID
+				: episodes()[i]?.id;
+		},
+		getFocus: () => focus(depth()),
+		setFocus: (i) => nav.setDepthFocus(i, depth()),
+	});
 
 	const ensureFocus = () => {
 		if (depth() === 0 && depth0Count() > 0 && focus(0) >= depth0Count())

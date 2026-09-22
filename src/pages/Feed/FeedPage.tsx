@@ -45,6 +45,10 @@ import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { PaneRow } from "@/components/PaneRow";
 import { TabListPane } from "@/components/TabPanel";
 import { useSelectionMarker } from "@/hooks/useSelectionMarker";
+import {
+	useStableListFocus,
+	FETCH_MORE_ROW_ID,
+} from "@/hooks/useStableListFocus";
 
 export const FeedPaneCount = 1;
 
@@ -102,6 +106,23 @@ function FeedPage() {
 	const focusedItem = (): EpItem | undefined =>
 		focusedOnMore() ? undefined : episodes()[focusedEpIdx()];
 	const curLen = () => rowCount();
+
+	// ── Focus stability across lazy loads ─────────────────────────────────────
+	// The nav cursor is a plain row index; fetch-more inserts revealed
+	// episodes above the [Fetch More] row (and, in the chronological union,
+	// can splice rows into the middle), which silently moves an index-stable
+	// cursor onto a different episode or off the button. Re-anchor the cursor
+	// onto the focused row's ID after any row-count change — the user stays
+	// on the exact episode (or the button) they were on before the load.
+	useStableListFocus({
+		count: rowCount,
+		getItemId: (i) =>
+			i === episodes().length
+				? FETCH_MORE_ROW_ID
+				: episodes()[i]?.episode.id,
+		getFocus: () => nav.depthFocus(0),
+		setFocus: (i) => nav.setDepthFocus(i, 0),
+	});
 
 	// ── Render window ────────────────────────────────────────────────────────
 	// The union grows to thousands of episodes after repeated fetch-more

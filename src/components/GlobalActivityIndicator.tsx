@@ -4,6 +4,7 @@ import { useSearchStore } from "@/stores/search";
 import { useDownloadStore } from "@/stores/download";
 import { useActivityStore } from "@/stores/activity";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
+import { useHeldFlag } from "@/hooks/useHeldFlag";
 
 /**
  * GlobalActivityIndicator — one global top-right signal that ANY feed
@@ -16,11 +17,14 @@ export function GlobalActivityIndicator() {
   const searchStore = useSearchStore();
   const downloadStore = useDownloadStore();
   const activity = useActivityStore();
+  // Fetch-more loads can begin and end between two renderer frames (warm
+  // cache); hold the feed-more contribution so the indicator paints.
+  const isLoadingMoreHeld = useHeldFlag(() => feedStore.isLoadingMore());
 
   /** True while any tracked activity is in flight */
   const isActive = () =>
     feedStore.isLoadingFeeds() ||
-    feedStore.isLoadingMore() ||
+    isLoadingMoreHeld() ||
     searchStore.isSearching() ||
     downloadStore.getActiveCount() + downloadStore.getQueue().length > 0 ||
     activity.isActive();
