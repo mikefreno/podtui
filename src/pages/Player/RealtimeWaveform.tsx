@@ -13,7 +13,7 @@
  * and a dotted placeholder when idle.
  */
 
-import { createEffect, on } from "solid-js";
+import { createEffect, createMemo, on, Show } from "solid-js";
 import { useTerminalDimensions } from "@opentui/solid";
 import { useVisualizer } from "@/stores/visualizer";
 import { useTheme } from "@/context/ThemeContext";
@@ -45,46 +45,40 @@ export function RealtimeWaveform() {
 	createEffect(on(numBars, (n) => viz.setBarCount(n)));
 
 	// ── Rendering ──────────────────────────────────────────────────────
-
-	const renderLine = () => {
+	//
+	// The two bar rows are CONTENT of fixed text nodes — the element tree is
+	// created once and only the strings change. Rebuilding the box/texts per
+	// bar update (30/s) tears down a renderable per frame, and the renderer
+	// leaks ~44KB of native memory per teardown: gigabytes over one long
+	// playback session.
+	const lines = createMemo(() => {
 		const bars = viz.barData();
-		const count = numBars();
-
-		// Loading state: the braille spinner shows while the pipeline is
-		// warming up — cold start (first play / after an unload), resume
-		// into undecoded audio, or a stalled position clock (mpv
-		// re-buffering after a long pause on a network stream). The store
-		// clears it the moment the first fresh frame renders, so stale
-		// bars never masquerade as live data while the pipeline re-arms.
-		if (viz.isLoading() || viz.isStalled()) {
-			return <LoadingIndicator />;
-		}
-
 		if (bars.length === 0) {
-			const placeholder = ".".repeat(count);
-			return (
-				<box flexDirection="column" gap={0}>
-					<text fg={theme.primary}>{placeholder}</text>
-					<text fg={theme.primary}>{placeholder}</text>
-				</box>
-			);
+			const placeholder = ".".repeat(numBars());
+			return { top: placeholder, bottom: placeholder };
 		}
-
 		const pairs = bars.map((v) => barChars(Math.floor(v * BAR_LEVELS)));
-		const top = pairs.map((pair) => pair.top).join("");
-		const bottom = pairs.map((pair) => pair.bottom).join("");
-
-		return (
-			<box flexDirection="column" gap={0}>
-				<text fg={theme.primary}>{top}</text>
-				<text fg={theme.primary}>{bottom}</text>
-			</box>
-		);
-	};
+		return {
+			top: pairs.map((pair) => pair.top).join(""),
+			bottom: pairs.map((pair) => pair.bottom).join(""),
+		};
+	});
 
 	return (
 		<box border borderColor={theme.border} padding={1}>
-			{renderLine()}
+			{/* Loading: braille spinner while the pipeline warms up — cold
+			    start, resume into undecoded audio, or a stalled position
+			    clock. The store clears it the moment the first fresh frame
+			    renders, so stale bars never masquerade as live data. */}
+			<Show
+				when={!viz.isLoading() && !viz.isStalled()}
+				fallback={<LoadingIndicator />}
+			>
+				<box flexDirection="column" gap={0}>
+					<text fg={theme.primary}>{lines().top}</text>
+					<text fg={theme.primary}>{lines().bottom}</text>
+				</box>
+			</Show>
 		</box>
 	);
 }
